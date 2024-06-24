@@ -210,12 +210,26 @@ Instead, we use single instance but students will use "connection parameter", so
 
 ## CLI and Moodle exam notes
 
-Moodle logic can be implemented in single file. No need to expose it to `lib.rs`.
+Moodle logic can be implemented in a single file. No need to expose it completely as public library.
 
-Functionality for generating Moodle exam is only needed in CLI part of the code.
+We likely need Moodle only for manual usage (so it is enough that it can be used from CLI).
 Overall, CLI is mainly needed for Moodle-based task generation, unless we also use it in GitHub pipeline as well.
 
 Generation of Moodle exam should also require pre-defined questions. We get these from general configuration file.
 There must be some logic to embed dynamic information from build process for the questions.
 Moodle exam also needs filenames of the generated output files, as they appear when uploaded to the Moodle.
 
+## Rust project structure
+
+Initial, example file structure could look like as follows:
+```text
+src/
+ - lib.rs
+ - flag_generation.rs
+ - config.rs
+ - moodle.rs
+ - build_process.rs
+ - bin/
+    - cli.rs
+
+```

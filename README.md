@@ -1,10 +1,10 @@
 # Autograder
 
 The purpose of this software is to make generation of cybersecurity-related assignments and their automatic grading possible.
-It is one sort of CTF challenge generator, where every participation has an unique flag.
+It is one sort of CTF challenge generator, where every participant has an unique flag to discover.
 The idea is converted to be more suitable for teaching.
 
-The general idea is that completion of task requires finding of *flag* to complete the assignment.
+The general idea is that completion of the task requires finding of *flag* to complete the assignment.
   * Flag can be just random hex string, but it can be also an answer for the maths assignment or some other tasks, where can be only one, unambiguous correct answer.
 
 'Plagiarism' is indeed an issue, and it seems that students are inclined to put most effort for tasks if that is not required.
@@ -99,7 +99,11 @@ We don't want to collect much personal information.
 
 ### Flag generation types
 
- * Random hexstring (32 bytes)
+Flag should include task-specific prefix, separated by `:`. It helps to identify for which task this flag is related.
+Suffix is random and varies between users. Note the impact for above definitions. 
+
+ * Prefix can be short identifier for the task (must be unique on course wide)
+ * Random hexstring suffix (32 bytes)
    * Need to use for Moodle-exams at least
       * In that case, stored to exams
       * Otherwise, need to store to database
@@ -109,6 +113,7 @@ We don't want to collect much personal information.
     * See https://en.wikipedia.org/wiki/HMAC
     * Maybe use HMAC-SHA3-256 (Note the version 3 here)
  * Deterministic RNG seed, derived from the user
+
 
 #### Possible flags types as when passed further
 

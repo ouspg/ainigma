@@ -232,6 +232,7 @@ Initial, example file structure could look like as follows:
 ```text
 src/
  - lib.rs
+ - database.rs
  - flag_generation.rs
  - config.rs
  - moodle.rs

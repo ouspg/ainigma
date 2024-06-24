@@ -49,7 +49,7 @@ Ideally, we want to have two places for rules for configuring courses and tasks;
           * While not explicitly marked, some other files might be needed when deploying things in cloud etc.
         * What kind of flag mechanism the task uses, see #Flag generation
         * We might need to use internal SQLite database already, or in the future at least
-            * A list of output files that task will provide (must be explicit path for each, instead of giving directory). It might be that these are used immediately and no need to cache. (Need to think omre)
+            * A list of output files that task will provide (must be explicit path for each, instead of giving directory). It might be that these are used immediately and no need to cache. (Need to think more about this)
               * Builder returns the list 
             * To store completely random flags, connect the flag to correct user and task
             * Other things we need to remember and cannot be derived from the configuration file
@@ -195,7 +195,7 @@ For Nix, `repl` can help learning: https://nix.dev/manual/nix/2.22/command-ref/n
 In the context of this tool, this can be implemented as single file which exposes one or more public functions.
 It also defines the types for process outputs. (Or also extensible argument type, which defines what the build process must do, if the parameters get complex)
 
-E.g. `fn generate_task(...) -> Result<GenerationOutputs, Error>` to initiate the build process with user and task specific parameters. 
+E.g. `fn build_tasks(...) -> Result<GenerationOutputs, Error>` to initiate the build process with user and task specific parameters. 
 
 Generation result returns the absolute paths of the output files, where the files for the students are marked separately.
 
@@ -213,7 +213,9 @@ Instead, we use single instance but students will use "connection parameter", so
 Moodle logic can be implemented in single file. No need to expose it to `lib.rs`.
 
 Functionality for generating Moodle exam is only needed in CLI part of the code.
-Overall, CLI is mainly needed for Moodle-based task generation, unless we also use it GitHub.
+Overall, CLI is mainly needed for Moodle-based task generation, unless we also use it in GitHub pipeline as well.
 
-Generation of Moodle exam should also require pre-defined questions. We get this from general configuration file.
+Generation of Moodle exam should also require pre-defined questions. We get these from general configuration file.
+There must be some logic to embed dynamic information from build process for the questions.
+Moodle exam also needs filenames of the generated output files, as they appear when uploaded to the Moodle.
 

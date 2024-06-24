@@ -195,6 +195,8 @@ Guix can be also considered here instead of Nix: https://guix.gnu.org/
 
 For Nix, `repl` can help learning: https://nix.dev/manual/nix/2.22/command-ref/new-cli/nix3-repl
 
+More about Nix: https://nixos-and-flakes.thiscute.world/
+
 ### Notes for Rust implementation
 
 In the context of this tool, this can be implemented as single file which exposes one or more public functions.

@@ -1,0 +1,17 @@
+[package]
+name = "autograder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sha3 = "0.10.8"
+hmac = "0.12.1"
+rand = "0.8.5"
+
+[dependencies.uuid]
+version = "1.9.1"
+features = [
+    "v7",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]

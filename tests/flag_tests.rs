@@ -2,6 +2,7 @@
 mod tests {
     use super::*;
     use autograder::flag_generator;
+    use uuid::Uuid
     #[test]
     fn test_new() {
         assert!(generate_uuid().is_ok());

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    mod flag_generator
+    mod flag_generator;
         
-    use flag_generator::{compare_hmac, generate_hmac, generate_uuid};;
+    use flag_generator::{compare_hmac, generate_hmac, generate_uuid};
     use uuid::Uuid;
     #[test]
     fn test_new() {

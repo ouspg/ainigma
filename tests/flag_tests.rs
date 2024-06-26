@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {        
-    use flag_generator::{compare_hmac, generate_hmac, generate_uuid};
+    use autograder::flag_generator::{compare_hmac, generate_hmac, generate_uuid};
     use uuid::Uuid;
     #[test]
     fn test_new() {

@@ -1,82 +1,79 @@
 use hmac::{digest::InvalidLength, Hmac, Mac};
-use rand::{rngs::StdRng, Error, Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use sha3::Sha3_256;
 use uuid::Uuid;
 
 type Hmac256 = Hmac<Sha3_256>;
 
 enum Flag {
-    RngFlag,
-    UserSeedFlag,
-    UserDerivedFlag,
+    RngFlag(FlagUnit),
+    UserSeedFlag(FlagUnit),
+    UserDerivedFlag(FlagUnit),
+}
+impl Flag {
+    pub fn random_flag(prefix: String) -> Self {
+        return Flag::RngFlag(FlagUnit::rng_flag(prefix));
+    }
+
+    pub fn user_flag(prefix: String, secret: String, taskid: String, uuid: Uuid) -> Self {
+        return Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, secret, taskid, uuid));
+    }
+    pub fn user_seed_flag(prefix: String, uuid: Uuid) -> Self {
+        return Flag::UserSeedFlag(FlagUnit::user_seed(prefix, uuid));
+    }
+
+    pub fn flag_string(&mut self) -> String {
+        match self {
+            Flag::RngFlag(rngflag) => rngflag.return_flag(),
+            Flag::UserSeedFlag(userseedflag) => userseedflag.return_flag(),
+            Flag::UserDerivedFlag(userflag) => userflag.return_flag(),
+        }
+    }
 }
 
-/// Flag
-/// - `prefix`: flag prefix with type String
-/// - `suffix`: flag suffix with type String
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct FlagUnit {
-    /// flag prefix with type String
     prefix: String,
-    /// flag suffix with type String
     suffix: String,
 }
 impl FlagUnit {
-    /// generates a random suffix flag with given prefix
-    ///
-    /// example output: "c45f0058099a8a04a8b3dd217081cf25967db333763afaee3719be0ce9c64f99"
-    pub fn rng_flag(flag_prefix: String) -> Result<Self, Error> {
+    fn rng_flag(flag_prefix: String) -> Self {
         let flag_suffix_result = generate_flag32();
 
-        let flag_suffix = match flag_suffix_result {
-            Ok(file) => file,
-            Err(error) => return Err(error),
-        };
-        return Ok(FlagUnit {
+        FlagUnit {
             prefix: flag_prefix,
-            suffix: flag_suffix,
-        });
+            suffix: flag_suffix_result,
+        }
     }
-    /// generates a flag with given prefix
-    /// - `flag_prefix`: flag prefix
-    ///
-    /// and suffix that is based on
-    /// - `secret`: secret for generating flags
-    /// - `taskid`: taskid for specific task
-    /// - `uuid`: user's id
-    pub fn user_flag(
-        flag_prefix: String,
-        secret: String,
-        taskid: String,
-        uuid: Uuid,
-    ) -> Result<Self, InvalidLength> {
+
+    fn user_flag(flag_prefix: String, secret: String, taskid: String, uuid: Uuid) -> Self {
         let flag_suffix_result = generate_hmac(uuid, secret, taskid);
 
         let flag_suffix = match flag_suffix_result {
             Ok(flag) => flag,
-            Err(_error) => return Err(InvalidLength),
+            Err(_error) => panic!("Error generating flag"),
         };
-        return Ok(FlagUnit {
+        return FlagUnit {
             prefix: flag_prefix,
             suffix: flag_suffix,
-        });
+        };
     }
-    /// returns a flag with given prefix
-    /// and suffix seed based on the user
-    pub fn user_seed(flag_prefix: String, uuid: Uuid) -> Result<Self, rand::Error> {
+
+    fn user_seed(flag_prefix: String, uuid: Uuid) -> Self {
         let flag_suffix_result = generate_userseed(uuid);
 
         let flag_suffix = match flag_suffix_result {
             Ok(flag) => flag,
-            Err(error) => return Err(error),
+            Err(_error) => panic!("Error generating flag"),
         };
-        return Ok(FlagUnit {
+        return FlagUnit {
             prefix: flag_prefix,
             suffix: flag_suffix,
-        });
+        };
     }
-    /// returns the flag as a single string
-    pub fn return_flag(&mut self) -> String {
+
+    fn return_flag(&mut self) -> String {
         let flag_prefix = &self.prefix;
         let flag_suffix = &self.suffix;
 
@@ -86,11 +83,10 @@ impl FlagUnit {
     }
 }
 
-fn generate_flag32() -> Result<String, Error> {
+fn generate_flag32() -> String {
     let mut rng = StdRng::from_entropy();
     let hex: [u8; 32] = rng.gen();
-    let s = hex.iter().map(|b| format!("{:02x}", b)).collect();
-    Ok(s)
+    hex.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 fn generate_hmac(uuid: Uuid, secret: String, taskid: String) -> Result<String, InvalidLength> {
@@ -153,10 +149,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rand() {
-        assert!(generate_flag32().is_ok());
-    }
-    #[test]
     fn test_userseed() {
         let id1 = Uuid::now_v7();
         let id2 = Uuid::now_v7();
@@ -178,7 +170,7 @@ mod tests {
         let prefix = "task_prefix".to_string();
         let prefix2 = "task_prefix2".to_string();
 
-        let answer1 = generate_flag32().expect("works");
+        let answer1 = generate_flag32();
         let answer2 = generate_hmac(id, secret, taskid).expect("works");
         let answer3 = generate_userseed(id).expect("works");
 
@@ -186,11 +178,11 @@ mod tests {
         println!("{}", answer2);
         println!("{}", answer3);
 
-        let mut flag = FlagUnit::user_flag(prefix, secret2, taskid2, id).expect("works");
-        let result = flag.return_flag();
+        let mut flag = Flag::user_flag(prefix, secret2, taskid2, id);
+        let result = flag.flag_string();
         println!("{}", result);
-        let mut flag2 = FlagUnit::user_flag(prefix2, secret3, taskid3, id).expect("works");
-        let result2 = flag2.return_flag();
+        let mut flag2 = Flag::user_flag(prefix2, secret3, taskid3, id);
+        let result2 = flag2.flag_string();
         println!("{}", result2);
     }
 }

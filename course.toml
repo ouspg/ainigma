@@ -1,0 +1,175 @@
+# Course Configuration
+
+# UUIDv7
+identifier = "01908498-ac98-708d-b886-b6f2747ef785"
+name = "Cybersecurity"
+description = "A comprehensive course covering various aspects of cybersecurity"
+# We likely need to think this further. If some task is changed, this should be changed as well.
+version = "0.0.1"
+
+# Weeks Configuration
+[[weeks]]
+number = 1
+theme = "Introduction to Cybersecurity"
+
+[[weeks.tasks]]
+# Tasks can be a single whole task or tasks with sub-parts (a, b c)
+# As long as identifier is unique on course level, we need to use something which reminds us about the actual task relation
+# Overall ID is used as flag prefix. Maybe further obfuscation needed for that but maybe not necessary
+# If the task includes subtasks, embed subtask IDs as suffix
+id = "task001"
+name = "Challenge 1"
+description = "Exploit few buffer overflow vulnerabilities"
+# Note the float type here
+points = 1.0
+# Same build can embed many flags at once
+# As a result, it is more clear to introduce list here instead of repeating multiple tasks without build
+# `id` is used to make order explicit and tie flag into task
+# E.g. consider a scenario where we build exploitable binary with many vulnerabilities. We need to build it once.
+
+flags = [
+    { type = "user_derived", id = "A" },
+    { type = "pure_random", id = "B" },
+    { type = "rng_seed", id = "C" }
+]
+# If subtasks are present, (list not empty) then the "parent" taskid does not have correlating flags
+
+# Raise error if subtasks total points is more than above definition
+# We only need subtasks feature here if the same build should embed many flags at once
+# For subtasks, think `id` as suffix, appended to base id above
+# Overal identifier for Task 1A is then task001A
+subtasks = [
+{ id = "A", name = "Subpart A", description = "", subpoints = 0.33},
+{ id = "B", name = "Subpart B", description = "", subpoints = 0.33},
+{ id = "C", name = "Subpart C", description = "", subpoints = 0.34},
+]
+
+[weeks.tasks.build]
+directory = "tasks/week1/buffer_overflow"
+entrypoint = "build.sh"
+builder = "shell"
+
+[[weeks.tasks.build.output]]
+name = "exploitable.bin"
+# Resource means that it is provided for the end-user
+type = "resource"
+
+[[weeks.tasks.build.output]]
+name = "vulnerable_server.py"
+# Internal use to provide the challenge from cloud, for example
+# Might be rare use case 
+# We might need to design tasks in mind that there is just a single server, but connection variable changes behaviour
+type = "internal"
+
+[[weeks.tasks.build.output]]
+# Specific kind of resource; instruction for the assignment and should be used as it is 
+# It includes something that is expected to be different for every user doing the tasks, and as so it is needed here
+# Probably optionally generate file or as string from the builder
+name = "readme.txt"
+type = "readme"
+
+[[weeks.tasks.build.output]]
+# Mechanic to provide embedded metadata for the task descriptions (e.g. Moodle exam), e.g. URL, docker image name
+# Something that is expected to be different for every user doing the tasks
+# Maybe not needed as "file", rather data returned by the build system
+# Should be likely key-value storage, with some predefined keys. Custom keys allowed.
+name = "meta.json"
+type = "meta"
+
+[[weeks.tasks]]
+id = "task002"
+name = "Challenge 2"
+description = "Previous exploit was trivial. Try harder."
+points = 2.0
+flags = [
+    { type = "pure_random", id = "task002" },
+]
+
+[weeks.tasks.build]
+directory = "tasks/week1/basic_crypto"
+entrypoint = "flake.nix"
+builder = "nix"
+
+[[weeks.tasks.build.output]]
+name = "exploitable.bin"
+type = "resource"
+
+[[weeks.tasks.build.output]]
+name = "vulnerable_server.py"
+type = "internal"
+
+[[weeks.tasks.build.output]]
+# Instruction for the assignment, should be used as it is 
+name = "readme.txt"
+type = "readme"
+
+[[weeks]]
+number = 2
+theme = "Network Security Fundamentals"
+
+[[weeks.tasks]]
+id = "task003"
+name = "SQL Injection Attack"
+description = "Perform a SQL injection attack on a vulnerable web application"
+points = 1.0
+flags = [
+    { type = "pure_random", id = "task003" },
+]
+
+[weeks.tasks.build]
+directory = "tasks/week2/sql_injection"
+entrypoint = "setup.sh"
+builder = "shell"
+
+[[weeks.tasks.build.output]]
+name = "vulnerable_server.py"
+type = "internal"
+
+[[weeks.tasks.build.output]]
+name = "readme.txt"
+type = "readme"
+
+[[weeks.tasks]]
+
+id = "task004"
+name = "Network Packet Analysis"
+description = "Analyze network packets to identify a security breach"
+points = 1.0
+flags = [
+    { type = "rng_seed", id = "task004" },
+]
+
+[weeks.tasks.build]
+directory = "tasks/week2/packet_analysis"
+entrypoint = "generate_pcap.sh"
+builder = "shell"
+
+[[weeks.tasks.build.output]]
+name = "my_traffic.pcap"
+type = "resource"
+
+[[weeks.tasks.build.output]]
+name = "readme.txt"
+type = "readme"
+
+# Flag Types Configuration
+# TOML reader must raise an error if selected one is not one of these
+[flag_types]
+pure_random = { length = 32 }
+# Secret is required so that the flag can be deterministic based on the user, but it should not be possible to guess
+# Secret in here should be identifier for secret in vault software, instead of storing it directly here...
+# Key must be 32 bytes at least, NOTE that in concatenation!
+# Too long key has diminishing returns, note that SHA3-256 internal bit rate aka block size is 1088 bits
+user_derived = { algorithm = "HMAC_SHA3_256", secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" }
+# Rng seed derived from the user and possibly from secret, provided for the build system in case the required answer is something 
+# which cannot be represented with random-looking flag
+rng_seed = { secret = "You must know me to predict the seed of the other users" }
+
+
+[build]
+default_timeout = 300 # seconds
+
+# Build-type specific confs
+# If entrypoint is not provided, it is assumed to be the default_filename
+nix = { default_filename = "flake.nix" }
+shell = { default_filename = "build.sh" }

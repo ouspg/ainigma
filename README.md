@@ -40,8 +40,9 @@ Ideally, we want to have two places for rules for configuring courses and tasks;
 
 * On higher level, there is single configuration file per course. It should be human readable.
   * Good candidate is [TOML](https://toml.io/en/) - human readable and easy to parse with computers (unambiguously maps to hash table)
-      * Overall configurations for the whole course (includes at least UUIDv7 identifier, short description, single secret and section of custom key-value pairs )
+      * Overall configurations for the whole course (includes at least UUIDv7 identifier, short description, section of custom key-value pairs )
       * Course might have secret values, which are used to generate flags. These should be stored elsewhere. Identifier to each secret could be marked in the configuration file, and the secret is stored in other secure place. 
+        * Secret should be in the flag configuration section
       * Configuration for every task
         * Directory for the task which is used as context for building the task. Contains build files.
         * What kind of build system task requires (Whether Nix Flake package or shell script is being used)
@@ -241,3 +242,39 @@ src/
     - cli.rs
 
 ```
+
+## Sample configuration (what it could be, it is not needed to be exactly like this, modify this if changed!)
+
+See [course.toml](course.toml) as an example.
+
+General, when reading the configuration file, the reader should validate the syntax that necessary fields for each components are there. Extra, unspecified fields can be noted as warnings and ignored. If the week is defined, it must have tasks with minimal requirements.
+Error messages should be clear.
+
+The sample configuration file should be self-descriptive, but here are some highlights below.
+No comprehensive if even something more is required.
+
+Especially, as *a major considerable thing*, it is entirely possible that single build might need multiple flags to be embedded at once.
+This means that task description that builder receives, can have list of flags to build.
+In that case, there is a subtasks definition section, where the flags are linked to correct tasks and correct grading is based on that.
+
+
+If task is specified for a week, then task must have ID, points and name to be set. 
+ * Task must have build configuration and flag type
+    * Build types
+     * nix
+     * shell
+    * Overall task configuration must have at least one flag with type and identifier. Identifier must be linked to specific task and there must be flag for every task and no unused flags.
+ 
+If the task has many subparts and all the flags must be embedded at once during build, then subtasks configuration format is used as seen from the example file.
+
+
+### Build output output types
+
+At least following should be supported Currently
+  * resource - some data for student to download. Can be anything.
+  * internal - for internal use e.g. host in cloud
+  * meta | meta.json - key-value pairs of data. We can pre-define some keys such as `url` or `oci-image`. `json` likely optional, builder returns object
+  * readme | readme.txt or readme.md some instructions with dynamic data, used as is
+
+
+

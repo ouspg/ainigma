@@ -46,7 +46,7 @@ impl Flag {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-struct FlagUnit {
+pub struct FlagUnit {
     prefix: String,
     suffix: String,
 }

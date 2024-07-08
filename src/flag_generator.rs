@@ -8,11 +8,11 @@ use uuid::Uuid;
 type Hmac256 = Hmac<Sha3_256>;
 
 #[derive(PartialEq)]
-enum Algorithm {
+pub enum Algorithm {
     HmacSha3_256,
 }
 
-enum Flag {
+pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
     UserDerivedFlag(FlagUnit),
@@ -46,7 +46,7 @@ impl Flag {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct FlagUnit {
+struct FlagUnit {
     prefix: String,
     suffix: String,
 }
@@ -118,18 +118,18 @@ fn user_derived_flag(
     secret: String,
     taskid: String,
 ) -> Result<String, InvalidLength> {
-    if algorithm == Algorithm::HmacSha3_256 {
-        let input = format!("{}-{}", secret, uuid.as_hyphenated());
-        let slice = input.as_bytes();
-        let mut mac = Hmac256::new_from_slice(slice)?;
-        mac.update(taskid.as_bytes());
+    match algorithm {
+        Algorithm::HmacSha3_256 => {
+            let input = format!("{}-{}", secret, uuid.as_hyphenated());
+            let slice = input.as_bytes();
+            let mut mac = Hmac256::new_from_slice(slice)?;
+            mac.update(taskid.as_bytes());
 
-        let result = mac.finalize();
-        let bytes = result.into_bytes();
-        let s = format!("{:x}", bytes);
-        return Ok(s);
-    } else {
-        panic!("Algorithm not supported")
+            let result = mac.finalize();
+            let bytes = result.into_bytes();
+            let s = format!("{:x}", bytes);
+            return Ok(s);
+        }
     }
 }
 // not used might be used later

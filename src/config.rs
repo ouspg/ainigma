@@ -4,12 +4,12 @@ use std::error::Error;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
-pub struct CourseConfiguration {
-    pub course_identifier: CourseIdentifier,
-    pub weeks: Vec<Weeks>,
-    pub tasks: Vec<WeeksTasks>,
-    pub taskbuild: Vec<WeeksTasksBuild>,
-    pub taskoutput: Vec<WeeksTasksOutput>,
+struct CourseConfiguration {
+    course_identifier: CourseIdentifier,
+    weeks: Vec<Weeks>,
+    tasks: Vec<WeeksTasks>,
+    taskbuild: Vec<WeeksTasksBuild>,
+    taskoutput: Vec<WeeksTasksOutput>,
 }
 
 impl CourseConfiguration {
@@ -25,12 +25,12 @@ impl CourseConfiguration {
 }
 
 #[derive(Deserialize)]
-pub struct CourseIdentifier {
+struct CourseIdentifier {
     //TODO:Change to UUID
-    pub identifier: String,
-    pub name: String,
-    pub description: String,
-    pub version: String,
+    identifier: String,
+    name: String,
+    description: String,
+    version: String,
 }
 
 impl CourseIdentifier {

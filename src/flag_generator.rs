@@ -1,3 +1,5 @@
+use core::panic;
+
 use hmac::{digest::InvalidLength, Hmac, Mac};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use sha3::Sha3_256;
@@ -5,18 +7,29 @@ use uuid::Uuid;
 
 type Hmac256 = Hmac<Sha3_256>;
 
+#[derive(PartialEq)]
+enum Algorithm {
+    HmacSha3_256,
+}
+
 enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
     UserDerivedFlag(FlagUnit),
 }
 impl Flag {
-    pub fn random_flag(prefix: String) -> Self {
-        return Flag::RngFlag(FlagUnit::rng_flag(prefix));
+    pub fn random_flag(prefix: String, length: u8) -> Self {
+        return Flag::RngFlag(FlagUnit::rng_flag(prefix, length));
     }
 
-    pub fn user_flag(prefix: String, secret: String, taskid: String, uuid: Uuid) -> Self {
-        return Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, secret, taskid, uuid));
+    pub fn user_flag(
+        prefix: String,
+        algorithm: Algorithm,
+        secret: String,
+        taskid: String,
+        uuid: Uuid,
+    ) -> Self {
+        return Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid));
     }
     pub fn user_seed_flag(prefix: String, uuid: Uuid) -> Self {
         return Flag::UserSeedFlag(FlagUnit::user_seed(prefix, uuid));
@@ -38,8 +51,8 @@ pub struct FlagUnit {
     suffix: String,
 }
 impl FlagUnit {
-    fn rng_flag(flag_prefix: String) -> Self {
-        let flag_suffix_result = generate_flag32();
+    fn rng_flag(flag_prefix: String, lenght: u8) -> Self {
+        let flag_suffix_result = pure_random_flag(lenght);
 
         FlagUnit {
             prefix: flag_prefix,
@@ -47,8 +60,14 @@ impl FlagUnit {
         }
     }
 
-    fn user_flag(flag_prefix: String, secret: String, taskid: String, uuid: Uuid) -> Self {
-        let flag_suffix_result = generate_hmac(uuid, secret, taskid);
+    fn user_flag(
+        flag_prefix: String,
+        algorithm: Algorithm,
+        secret: String,
+        taskid: String,
+        uuid: Uuid,
+    ) -> Self {
+        let flag_suffix_result = user_derived_flag(algorithm, uuid, secret, taskid);
 
         let flag_suffix = match flag_suffix_result {
             Ok(flag) => flag,
@@ -83,22 +102,35 @@ impl FlagUnit {
     }
 }
 
-fn generate_flag32() -> String {
+fn pure_random_flag(lenght: u8) -> String {
     let mut rng = StdRng::from_entropy();
-    let hex: [u8; 32] = rng.gen();
-    hex.iter().map(|b| format!("{:02x}", b)).collect()
+    let size = lenght.into();
+    let mut vec: Vec<u8> = vec![0; size];
+    for i in &mut vec {
+        *i = rng.gen();
+    }
+    vec.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-fn generate_hmac(uuid: Uuid, secret: String, taskid: String) -> Result<String, InvalidLength> {
-    let input = format!("{}-{}", secret, uuid.as_hyphenated());
-    let slice = input.as_bytes();
-    let mut mac = Hmac256::new_from_slice(slice)?;
-    mac.update(taskid.as_bytes());
+fn user_derived_flag(
+    algorithm: Algorithm,
+    uuid: Uuid,
+    secret: String,
+    taskid: String,
+) -> Result<String, InvalidLength> {
+    if algorithm == Algorithm::HmacSha3_256 {
+        let input = format!("{}-{}", secret, uuid.as_hyphenated());
+        let slice = input.as_bytes();
+        let mut mac = Hmac256::new_from_slice(slice)?;
+        mac.update(taskid.as_bytes());
 
-    let result = mac.finalize();
-    let bytes = result.into_bytes();
-    let s = format!("{:x}", bytes);
-    return Ok(s);
+        let result = mac.finalize();
+        let bytes = result.into_bytes();
+        let s = format!("{:x}", bytes);
+        return Ok(s);
+    } else {
+        panic!("Algorithm not supported")
+    }
 }
 // not used might be used later
 fn compare_hmac(
@@ -143,7 +175,7 @@ mod tests {
         let taskid = "task1".to_string();
         let secret2 = "Work".to_string();
         let taskid2 = "task1".to_string();
-        let hash = generate_hmac(id, secret, taskid).expect("error");
+        let hash = user_derived_flag(Algorithm::HmacSha3_256, id, secret, taskid).expect("error");
         print!("{}", hash);
         assert!(compare_hmac(hash, id, secret2, taskid2).expect("should work"))
     }
@@ -170,19 +202,41 @@ mod tests {
         let prefix = "task_prefix".to_string();
         let prefix2 = "task_prefix2".to_string();
 
-        let answer1 = generate_flag32();
-        let answer2 = generate_hmac(id, secret, taskid).expect("works");
+        let answer1 = pure_random_flag(32);
+        let answer2 =
+            user_derived_flag(Algorithm::HmacSha3_256, id, secret, taskid).expect("works");
         let answer3 = generate_userseed(id).expect("works");
 
         println!("{}", answer1);
         println!("{}", answer2);
         println!("{}", answer3);
 
-        let mut flag = Flag::user_flag(prefix, secret2, taskid2, id);
+        let mut flag = Flag::user_flag(prefix, Algorithm::HmacSha3_256, secret2, taskid2, id);
         let result = flag.flag_string();
         println!("{}", result);
-        let mut flag2 = Flag::user_flag(prefix2, secret3, taskid3, id);
+        let mut flag2 = Flag::user_flag(prefix2, Algorithm::HmacSha3_256, secret3, taskid3, id);
         let result2 = flag2.flag_string();
         println!("{}", result2);
+    }
+
+    #[test]
+    fn test_flags() {
+        let id = Uuid::now_v7();
+        let prefix = "task1".to_string();
+        let prefix2 = "task1".to_string();
+        let prefix3 = "task1".to_string();
+        let mut flag = Flag::random_flag(prefix, 32);
+        let mut flag2 = Flag::user_flag(
+            prefix2,
+            Algorithm::HmacSha3_256,
+            "This works".to_string(),
+            "A".to_string(),
+            id,
+        );
+        let mut flag3 = Flag::user_seed_flag(prefix3, id);
+        let string = flag.flag_string();
+        let string2 = flag2.flag_string();
+        let string3 = flag3.flag_string();
+        println!("{} {} {}", string, string2, string3)
     }
 }

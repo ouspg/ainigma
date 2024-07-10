@@ -1,7 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::error::Error;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 struct CourseConfiguration {
@@ -13,7 +10,13 @@ struct CourseConfiguration {
 }
 
 impl CourseConfiguration {
-    pub fn new(course_identifier: CourseIdentifier, weeks: Vec<Weeks>, tasks: Vec<WeeksTasks>, taskbuild: Vec<WeeksTasksBuild>, taskoutput: Vec<WeeksTasksOutput>) -> CourseConfiguration {
+    pub fn new(
+        course_identifier: CourseIdentifier,
+        weeks: Vec<Weeks>,
+        tasks: Vec<WeeksTasks>,
+        taskbuild: Vec<WeeksTasksBuild>,
+        taskoutput: Vec<WeeksTasksOutput>,
+    ) -> CourseConfiguration {
         CourseConfiguration {
             course_identifier,
             weeks,
@@ -34,7 +37,12 @@ struct CourseIdentifier {
 }
 
 impl CourseIdentifier {
-    pub fn new(identifier: String, name: String, description: String, version: String) -> CourseIdentifier {
+    pub fn new(
+        identifier: String,
+        name: String,
+        description: String,
+        version: String,
+    ) -> CourseIdentifier {
         CourseIdentifier {
             identifier,
             name,
@@ -51,10 +59,7 @@ struct Weeks {
 
 impl Weeks {
     pub fn new(number: i32, theme: String) -> Weeks {
-        Weeks {
-            number,
-            theme,
-        }
+        Weeks { number, theme }
     }
 }
 #[derive(Deserialize)]
@@ -63,12 +68,19 @@ struct WeeksTasks {
     name: String,
     description: String,
     points: f32,
-    flags: Vec<Flag>,
+    flags: Vec<FlagConfig>,
     subtasks: Vec<SubTask>,
 }
 
 impl WeeksTasks {
-    pub fn new(id: String, name: String, description: String, points: f32, flags: Vec<Flag>, subtasks: Vec<SubTask>) -> WeeksTasks {
+    pub fn new(
+        id: String,
+        name: String,
+        description: String,
+        points: f32,
+        flags: Vec<FlagConfig>,
+        subtasks: Vec<SubTask>,
+    ) -> WeeksTasks {
         WeeksTasks {
             id,
             name,
@@ -80,17 +92,14 @@ impl WeeksTasks {
     }
 }
 #[derive(Deserialize)]
-struct Flag {
+struct FlagConfig {
     flag_type: String,
     id: String,
 }
 
-impl Flag {
-    pub fn new(flag_type: String, id: String) -> Flag {
-        Flag {
-            flag_type,
-            id,
-        }
+impl FlagConfig {
+    pub fn new(flag_type: String, id: String) -> FlagConfig {
+        FlagConfig { flag_type, id }
     }
 }
 
@@ -136,9 +145,6 @@ struct WeeksTasksOutput {
 
 impl WeeksTasksOutput {
     pub fn new(name: String, output_type: String) -> WeeksTasksOutput {
-        WeeksTasksOutput {
-            name,
-            output_type,
-        }
+        WeeksTasksOutput { name, output_type }
     }
 }

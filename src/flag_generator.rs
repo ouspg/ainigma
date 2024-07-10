@@ -7,11 +7,31 @@ use uuid::Uuid;
 
 type Hmac256 = Hmac<Sha3_256>;
 
+/// Type for all possible algorithms to use when generating flag
+///
+///
+/// #### Algorithms
+/// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
 #[derive(PartialEq)]
 pub enum Algorithm {
     HmacSha3_256,
 }
 
+/// Flag type used to generate flag for specific purpose
+///
+/// Flags are 32 long hexstring and all flags need a flag prefix to be used
+///
+/// #### Flags
+/// - `RngFlag` generates a random hexstring flag with given lenght and prefix
+/// - `UserSeedFlag` generates a random hexstring flag with given user id (UUID) and prefix
+/// - `UserDerivedFlag` generates a random hexstring flag with prefix, algorithm, secret, taskid
+///  and Uuid  
+///
+/// #### Functions
+///
+/// - `random_flag()` - `RngFlag` generator
+/// - `user_seed_flag()` - `UserSeedFlag` generator
+/// - `user_flag()` - `UserDerivedFlag` generator
 pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
@@ -133,6 +153,7 @@ fn user_derived_flag(
     }
 }
 // not used might be used later
+#[allow(dead_code)]
 fn compare_hmac(
     hmac: String,
     uuid: Uuid,

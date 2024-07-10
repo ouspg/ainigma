@@ -1,27 +1,27 @@
 # Course Configuration
 
 # UUIDv7
-identifier = "01908498-ac98-708d-b886-b6f2747ef785"
-name = "Cybersecurity"
+identifier = "01908498-ac98-708d-b886-b6f2747ef785" #pakollinen
+name = "Cybersecurity" # pakollinen
 description = "A comprehensive course covering various aspects of cybersecurity"
 # We likely need to think this further. If some task is changed, this should be changed as well.
-version = "0.0.1"
+version = "0.0.1" #pakollinen
 
 # Weeks Configuration
 [[weeks]]
-number = 1
-theme = "Introduction to Cybersecurity"
+number = 1 #pakollinen
+theme = "Introduction to Cybersecurity"  
 
 [[weeks.tasks]]
 # Tasks can be a single whole task or tasks with sub-parts (a, b c)
 # As long as identifier is unique on course level, we need to use something which reminds us about the actual task relation
 # Overall ID is used as flag prefix. Maybe further obfuscation needed for that but maybe not necessary
 # If the task includes subtasks, embed subtask IDs as suffix
-id = "task001"
-name = "Challenge 1"
-description = "Exploit few buffer overflow vulnerabilities"
+id = "task001" #pakollinen
+name = "Challenge 1" #pakollinen
+description = "Exploit few buffer overflow vulnerabilities" 
 # Note the float type here
-points = 1.0
+points = 1.0 #pakollinen
 # Same build can embed many flags at once
 # As a result, it is more clear to introduce list here instead of repeating multiple tasks without build
 # `id` is used to make order explicit and tie flag into task
@@ -46,7 +46,7 @@ subtasks = [
 
 [weeks.tasks.build]
 directory = "tasks/week1/buffer_overflow"
-entrypoint = "build.sh"
+entrypoint = "build.sh" #default
 builder = "shell"
 
 [[weeks.tasks.build.output]]
@@ -155,7 +155,7 @@ type = "readme"
 # Flag Types Configuration
 # TOML reader must raise an error if selected one is not one of these
 [flag_types]
-pure_random = { length = 32 }
+pure_random = { length = 32 } # default 32
 # Secret is required so that the flag can be deterministic based on the user, but it should not be possible to guess
 # Secret in here should be identifier for secret in vault software, instead of storing it directly here...
 # Key must be 32 bytes at least, NOTE that in concatenation!

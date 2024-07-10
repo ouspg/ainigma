@@ -27,7 +27,7 @@ Configuration file and task specific build file has the required information to 
 Moodle exam needs a question, and so-called "builder", based on the task-specific configuration, is responsible for providing that.
 
 ```cmd
-autograder --config course.toml generate --week 1 --task 1 --number X moodle
+autograder --config course.toml generate --week 1 --task 1 moodle --number X 
 ```
 
 
@@ -61,10 +61,10 @@ stateDiagram-v2
     }
 
     note right of CLI: User runs command
-    note right of ReadConfig: Parse course.toml and task config
+    note right of ReadConfig: Parse course.toml
     note right of TaskInit: Initialize task generation
-    note right of FlagCreation: Pass flag to builder
-    note right of BuildProcess: Return file paths and metadata
+    note right of FlagCreation: Pass flag or seed to builder
+    note right of BuildProcess: Based on configuration, builds the task-specific files and return file paths and metadata
     note right of TaskCreation: Pass dynamic data and file paths
     note right of MoodleExamGeneration: Generate Moodle exam
 ```

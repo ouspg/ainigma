@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 
 #[derive(Deserialize)]
-struct CourseConfiguration {
+pub struct CourseConfiguration {
     course_identifier: CourseIdentifier,
     weeks: Vec<Weeks>,
     tasks: Vec<WeeksTasks>,
@@ -28,7 +31,7 @@ impl CourseConfiguration {
 }
 
 #[derive(Deserialize)]
-struct CourseIdentifier {
+pub struct CourseIdentifier {
     //TODO:Change to UUID
     identifier: String,
     name: String,
@@ -52,7 +55,7 @@ impl CourseIdentifier {
     }
 }
 #[derive(Deserialize)]
-struct Weeks {
+pub struct Weeks {
     number: i32,
     theme: String,
 }
@@ -63,7 +66,7 @@ impl Weeks {
     }
 }
 #[derive(Deserialize)]
-struct WeeksTasks {
+pub struct WeeksTasks {
     id: String,
     name: String,
     description: String,
@@ -92,7 +95,7 @@ impl WeeksTasks {
     }
 }
 #[derive(Deserialize)]
-struct FlagConfig {
+pub struct FlagConfig {
     flag_type: String,
     id: String,
 }
@@ -104,7 +107,7 @@ impl FlagConfig {
 }
 
 #[derive(Deserialize)]
-struct SubTask {
+pub struct SubTask {
     id: String,
     name: String,
     description: String,
@@ -122,7 +125,7 @@ impl SubTask {
     }
 }
 #[derive(Deserialize)]
-struct WeeksTasksBuild {
+pub struct WeeksTasksBuild {
     directory: String,
     entrypoint: String,
     builder: String,
@@ -138,7 +141,7 @@ impl WeeksTasksBuild {
     }
 }
 #[derive(Deserialize)]
-struct WeeksTasksOutput {
+pub struct WeeksTasksOutput {
     name: String,
     output_type: String,
 }
@@ -150,15 +153,18 @@ impl WeeksTasksOutput {
 }
 
 pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Error>> {
-    let mut file = fs::File::open(filepath)?;
+    let mut file = File::open(filepath)?;
     let mut file_content = String::new();
     file.read_to_string(&mut file_content)?;
     Ok(file_content)
 }
 
-
 //TODO: Add warnings for unspecified fields
 pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn Error>> {
     let course_config: CourseConfiguration = toml::from_str(&file_content)?;
     Ok(course_config)
+}
+
+pub fn check_toml() -> bool {
+    return true;
 }

@@ -6,31 +6,22 @@ use uuid::{uuid, Uuid};
 
 use crate::flag_generator::Flag;
 
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
     pub weeks: Vec<Weeks>,
-<<<<<<< HEAD
     pub taskbuild: Vec<WeeksTasksBuild>,
-=======
-    pub tasks: Vec<WeeksTasks>,
-    pub taskbuild: WeeksTasksBuild,
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
     pub taskoutput: Vec<WeeksTasksOutput>,
 }
 
 impl CourseConfiguration {
-<<<<<<< HEAD
     pub fn new(
         course_identifier: CourseIdentifier,
         weeks: Vec<Weeks>,
         taskbuild: Vec<WeeksTasksBuild>,
         taskoutput: Vec<WeeksTasksOutput>,
     ) -> CourseConfiguration {
-=======
-    pub fn new(course_identifier: CourseIdentifier, weeks: Vec<Weeks>, tasks: Vec<WeeksTasks>, taskbuild: WeeksTasksBuild, taskoutput: Vec<WeeksTasksOutput>) -> CourseConfiguration {
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
         CourseConfiguration {
             course_identifier,
             weeks,
@@ -40,13 +31,9 @@ impl CourseConfiguration {
     }
 }
 
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 pub struct CourseIdentifier {
-<<<<<<< HEAD
     //TODO:Change to UUID
-=======
-    //Change to UUID
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
     pub identifier: String,
     pub name: String,
     pub description: String,
@@ -54,7 +41,12 @@ pub struct CourseIdentifier {
 }
 
 impl CourseIdentifier {
-    pub fn new(identifier: String, name: String, description: String, version: String) -> CourseIdentifier {
+    pub fn new(
+        identifier: String,
+        name: String,
+        description: String,
+        version: String,
+    ) -> CourseIdentifier {
         CourseIdentifier {
             identifier,
             name,
@@ -63,37 +55,28 @@ impl CourseIdentifier {
         }
     }
 }
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 pub struct Weeks {
-<<<<<<< HEAD
     pub tasks: Vec<WeeksTasks>,
-=======
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
     pub number: i32,
     pub theme: String,
 }
 
 impl Weeks {
-<<<<<<< HEAD
     pub fn new(tasks: Vec<WeeksTasks>, number: i32, theme: String) -> Weeks {
         Weeks {
             tasks,
-=======
-    pub fn new(number: i32, theme: String) -> Weeks {
-        Weeks {
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
             number,
             theme,
         }
     }
 }
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 pub struct WeeksTasks {
     pub id: String,
     pub name: String,
     pub description: String,
     pub points: f32,
-<<<<<<< HEAD
     pub flags: Vec<FlagConfig>,
     pub subtasks: Option<Vec<SubTask>>,
 }
@@ -107,14 +90,6 @@ impl WeeksTasks {
         flags: Vec<FlagConfig>,
         subtasks: Option<Vec<SubTask>>,
     ) -> WeeksTasks {
-=======
-    pub flags: Vec<Flag>,
-    pub subtasks: Vec<SubTask>,
-}
-
-impl WeeksTasks {
-    pub fn new(id: String, name: String, description: String, points: f32, flags: Vec<Flag>, subtasks: Vec<SubTask>) -> WeeksTasks {
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
         WeeksTasks {
             id,
             name,
@@ -125,27 +100,19 @@ impl WeeksTasks {
         }
     }
 }
-<<<<<<< HEAD
 #[derive(Deserialize)]
 pub struct FlagConfig {
-=======
-#[derive(Deserialize,Clone)]
-pub struct Flag {
->>>>>>> e05ba41fc8ced75fcdf6946c1e93b172b71ff364
     pub flag_type: String,
     pub id: String,
 }
 
 impl Flag {
     pub fn new(flag_type: String, id: String) -> Flag {
-        Flag {
-            flag_type,
-            id,
-        }
+        Flag { flag_type, id }
     }
 }
 
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 pub struct SubTask {
     pub id: String,
     pub name: String,
@@ -163,7 +130,7 @@ impl SubTask {
         }
     }
 }
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 pub struct WeeksTasksBuild {
     pub directory: String,
     pub entrypoint: String,
@@ -179,7 +146,7 @@ impl WeeksTasksBuild {
         }
     }
 }
-#[derive(Deserialize,Clone)]
+#[derive(Deserialize, Clone)]
 pub struct WeeksTasksOutput {
     pub name: String,
     pub output_type: String,
@@ -187,10 +154,7 @@ pub struct WeeksTasksOutput {
 
 impl WeeksTasksOutput {
     pub fn new(name: String, output_type: String) -> WeeksTasksOutput {
-        WeeksTasksOutput {
-            name,
-            output_type,
-        }
+        WeeksTasksOutput { name, output_type }
     }
 }
 

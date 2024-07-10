@@ -6,8 +6,7 @@ use uuid::{uuid, Uuid};
 
 use crate::flag_generator::Flag;
 
-#[derive(Deserialize, Clone)]
-
+#[derive(Deserialize)]
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
     pub weeks: Vec<Weeks>,
@@ -55,7 +54,7 @@ impl CourseIdentifier {
         }
     }
 }
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct Weeks {
     pub tasks: Vec<WeeksTasks>,
     pub number: i32,
@@ -71,7 +70,7 @@ impl Weeks {
         }
     }
 }
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct WeeksTasks {
     pub id: String,
     pub name: String,
@@ -106,9 +105,9 @@ pub struct FlagConfig {
     pub id: String,
 }
 
-impl Flag {
-    pub fn new(flag_type: String, id: String) -> Flag {
-        Flag { flag_type, id }
+impl FlagConfig {
+    pub fn new(flag_type: String, id: String) -> FlagConfig {
+        FlagConfig { flag_type, id }
     }
 }
 

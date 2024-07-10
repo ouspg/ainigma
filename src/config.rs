@@ -1,29 +1,29 @@
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::fs::File;
 use std::io::Read;
+use std::{error::Error, fmt::format};
+use uuid::{uuid, Uuid};
+
+use crate::flag_generator::Flag;
 
 #[derive(Deserialize)]
 pub struct CourseConfiguration {
-    course_identifier: CourseIdentifier,
-    weeks: Vec<Weeks>,
-    tasks: Vec<WeeksTasks>,
-    taskbuild: Vec<WeeksTasksBuild>,
-    taskoutput: Vec<WeeksTasksOutput>,
+    pub course_identifier: CourseIdentifier,
+    pub weeks: Vec<Weeks>,
+    pub taskbuild: Vec<WeeksTasksBuild>,
+    pub taskoutput: Vec<WeeksTasksOutput>,
 }
 
 impl CourseConfiguration {
     pub fn new(
         course_identifier: CourseIdentifier,
         weeks: Vec<Weeks>,
-        tasks: Vec<WeeksTasks>,
         taskbuild: Vec<WeeksTasksBuild>,
         taskoutput: Vec<WeeksTasksOutput>,
     ) -> CourseConfiguration {
         CourseConfiguration {
             course_identifier,
             weeks,
-            tasks,
             taskbuild,
             taskoutput,
         }
@@ -33,10 +33,10 @@ impl CourseConfiguration {
 #[derive(Deserialize)]
 pub struct CourseIdentifier {
     //TODO:Change to UUID
-    identifier: String,
-    name: String,
-    description: String,
-    version: String,
+    pub identifier: String,
+    pub name: String,
+    pub description: String,
+    pub version: String,
 }
 
 impl CourseIdentifier {
@@ -56,23 +56,28 @@ impl CourseIdentifier {
 }
 #[derive(Deserialize)]
 pub struct Weeks {
-    number: i32,
-    theme: String,
+    pub tasks: Vec<WeeksTasks>,
+    pub number: i32,
+    pub theme: String,
 }
 
 impl Weeks {
-    pub fn new(number: i32, theme: String) -> Weeks {
-        Weeks { number, theme }
+    pub fn new(tasks: Vec<WeeksTasks>, number: i32, theme: String) -> Weeks {
+        Weeks {
+            tasks,
+            number,
+            theme,
+        }
     }
 }
 #[derive(Deserialize)]
 pub struct WeeksTasks {
-    id: String,
-    name: String,
-    description: String,
-    points: f32,
-    flags: Vec<FlagConfig>,
-    subtasks: Vec<SubTask>,
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub points: f32,
+    pub flags: Vec<FlagConfig>,
+    pub subtasks: Option<Vec<SubTask>>,
 }
 
 impl WeeksTasks {
@@ -82,7 +87,7 @@ impl WeeksTasks {
         description: String,
         points: f32,
         flags: Vec<FlagConfig>,
-        subtasks: Vec<SubTask>,
+        subtasks: Option<Vec<SubTask>>,
     ) -> WeeksTasks {
         WeeksTasks {
             id,
@@ -96,8 +101,8 @@ impl WeeksTasks {
 }
 #[derive(Deserialize)]
 pub struct FlagConfig {
-    flag_type: String,
-    id: String,
+    pub flag_type: String,
+    pub id: String,
 }
 
 impl FlagConfig {
@@ -108,10 +113,10 @@ impl FlagConfig {
 
 #[derive(Deserialize)]
 pub struct SubTask {
-    id: String,
-    name: String,
-    description: String,
-    subpoints: f32,
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub subpoints: f32,
 }
 
 impl SubTask {
@@ -126,9 +131,9 @@ impl SubTask {
 }
 #[derive(Deserialize)]
 pub struct WeeksTasksBuild {
-    directory: String,
-    entrypoint: String,
-    builder: String,
+    pub directory: String,
+    pub entrypoint: String,
+    pub builder: String,
 }
 
 impl WeeksTasksBuild {
@@ -142,8 +147,8 @@ impl WeeksTasksBuild {
 }
 #[derive(Deserialize)]
 pub struct WeeksTasksOutput {
-    name: String,
-    output_type: String,
+    pub name: String,
+    pub output_type: String,
 }
 
 impl WeeksTasksOutput {
@@ -165,6 +170,21 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn
     Ok(course_config)
 }
 
-pub fn check_toml() -> bool {
-    return true;
+pub fn check_toml(course_config: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
+    let course = course_config;
+    let id = course.course_identifier.identifier.as_str();
+    let mut result: [u8; 16] = [0; 16];
+
+    for (i, hex_byte) in id.as_bytes().chunks(2).enumerate() {
+        let byte_str = String::from_utf8_lossy(hex_byte);
+        let byte_value = u8::from_str_radix(&byte_str, 16).unwrap();
+        result[i] = byte_value;
+    }
+    let course_id = Uuid::from_bytes(result);
+    let course_name = course.course_identifier.name;
+    if course_name.is_empty() {
+        panic!("Empty course name");
+    }
+
+    return Ok(true);
 }

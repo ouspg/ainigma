@@ -1,7 +1,7 @@
 use core::panic;
-
 use hmac::{digest::InvalidLength, Hmac, Mac};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use serde::Deserialize;
 use sha3::Sha3_256;
 use uuid::Uuid;
 
@@ -32,6 +32,7 @@ pub enum Algorithm {
 /// - `user_seed_flag()` - `UserSeedFlag` generator
 /// - `user_flag()` - `UserDerivedFlag` generator
 /// - `flag_string()` - returns Flag as a one string
+#[derive(Deserialize)]
 pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
@@ -67,7 +68,7 @@ impl Flag {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct FlagUnit {
     prefix: String,
     suffix: String,

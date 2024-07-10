@@ -1,0 +1,30 @@
+[course_identifier]
+identifier = "01908498-ac98-708d-b886-b6f2747ef785"
+name = "Cybersecurity"
+description = "A comprehensive course covering various aspects of cybersecurity"
+version = "0.0.1"
+[[weeks]]
+number = 1
+theme = "Introduction to Cybersecurity"
+[[tasks]]
+id = "task001"
+name = "Challenge 1"
+description = "Argon2 hash exam"
+points = 1.0
+flags = [
+    { flag_type = "user_derived", id = "A" },
+    { flag_type = "pure_random", id = "B" },
+    { flag_type = "rng_seed", id = "C" }
+]
+subtasks = [
+{ id = "A", name = "Subpart A", description = "", subpoints = 0.33},
+{ id = "B", name = "Subpart B", description = "", subpoints = 0.33},
+{ id = "C", name = "Subpart C", description = "", subpoints = 0.34},
+]
+[taskbuild]
+directory = "tasks/week1/buffer_overflow"
+entrypoint = "build.sh"
+builder = "shell"
+[[taskoutput]]
+name = "exploitable.bin"
+output_type = "resource"

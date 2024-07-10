@@ -16,22 +16,57 @@ As a result, this software should support many courses, and courses can have var
 
 # Requirements
 
+## Use case 1 (Generate Moodle exam)
+
+The user uses command-line interface (CLI) to generate Moodle exams for the course.
+The course has configuration file `course.toml` and task-specific configuration files to build and generate exams.
+
+For example, user runs following command to generate X amount (with `--number` parameter) of varying questions as Moodle exam, for a single task.
+Configuration file and task specific build file has the required information to do so.
+
+Moodle exam needs a question, and so-called "builder", based on the task-specific configuration, is responsible for providing that.
+
+```cmd
+autograder --config course.toml generate --week 1 --task 1 --number X moodle
+```
+
+
 Overall process for task generation could look like as follows:
 
 ```mermaid
 stateDiagram-v2
-state "Task generation initialised" as s2
-state "Flag created" as s3
-state "Task build process initiated" as s4
-state "Flag injected or used in the task" as s5
-state "Task created, output files generated" as s6
-[*] --> s2
-s2 --> s3
-s3 --> s4
-s4 --> s5
-s5 --> s6
-s6 --> [*]
+    [*] --> CLI
+    CLI --> ReadConfig
+    ReadConfig --> TaskInit
+    TaskInit --> FlagCreation
+    FlagCreation --> BuildProcess
+    BuildProcess --> TaskCreation
+    TaskCreation --> MoodleExamGeneration
+    MoodleExamGeneration --> [*]
 
+    state CLI {
+        ParseArguments --> ValidateInput
+    }
+
+    state ReadConfig {
+        ParseCourseConfig --> ParseTaskConfig
+    }
+
+    state TaskInit {
+        IdentifyFlagType --> IdentifyBuildType
+    }
+
+    state BuildProcess {
+        EmbedFlag --> GenerateFiles
+    }
+
+    note right of CLI: User runs command
+    note right of ReadConfig: Parse course.toml and task config
+    note right of TaskInit: Initialize task generation
+    note right of FlagCreation: Pass flag to builder
+    note right of BuildProcess: Return file paths and metadata
+    note right of TaskCreation: Pass dynamic data and file paths
+    note right of MoodleExamGeneration: Generate Moodle exam
 ```
 
 ## Configuration and concept

@@ -19,29 +19,30 @@ pub enum Algorithm {
 
 /// Flag type used to generate flag for specific purpose
 ///
-/// Flags are 32 long hexstring and all flags need a flag prefix to be used
+/// Flags are normally 32 long hexstring and all flags need a flag prefix to be used
 ///
 /// #### Flags
-/// - `RngFlag` generates a random hexstring flag with given lenght and prefix
-/// - `UserSeedFlag` generates a random hexstring flag with given user id (UUID) and prefix
-/// - `UserDerivedFlag` generates a random hexstring flag with prefix, algorithm, secret, taskid
+/// - `RngFlag` generates a random hexstring flag with given prefix and lenght  
+/// - `UserSeedFlag` generates a random hexstring flag with given prefix and user id (UUID)
+/// - `UserDerivedFlag` generates a random hexstring flag with given prefix, algorithm, secret, taskid
 ///  and Uuid  
 ///
 /// #### Functions
-///
 /// - `random_flag()` - `RngFlag` generator
 /// - `user_seed_flag()` - `UserSeedFlag` generator
 /// - `user_flag()` - `UserDerivedFlag` generator
+/// - `flag_string()` - returns Flag as a one string
 pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
     UserDerivedFlag(FlagUnit),
 }
 impl Flag {
+    /// Generates a random hexstring flag with given prefix and lenght
     pub fn random_flag(prefix: String, length: u8) -> Self {
         return Flag::RngFlag(FlagUnit::rng_flag(prefix, length));
     }
-
+    /// Generates a random hexstring flag with given prefix, algorithm, secret, taskid and Uuid
     pub fn user_flag(
         prefix: String,
         algorithm: Algorithm,
@@ -51,10 +52,11 @@ impl Flag {
     ) -> Self {
         return Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid));
     }
+    /// Generates a random hexstring flag with given prefix and user id (UUID)
     pub fn user_seed_flag(prefix: String, uuid: Uuid) -> Self {
         return Flag::UserSeedFlag(FlagUnit::user_seed(prefix, uuid));
     }
-
+    /// Returns flag as one string
     pub fn flag_string(&mut self) -> String {
         match self {
             Flag::RngFlag(rngflag) => rngflag.return_flag(),

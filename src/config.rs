@@ -148,3 +148,17 @@ impl WeeksTasksOutput {
         WeeksTasksOutput { name, output_type }
     }
 }
+
+pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Error>> {
+    let mut file = fs::File::open(filepath)?;
+    let mut file_content = String::new();
+    file.read_to_string(&mut file_content)?;
+    Ok(file_content)
+}
+
+
+//TODO: Add warnings for unspecified fields
+pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn Error>> {
+    let course_config: CourseConfiguration = toml::from_str(&file_content)?;
+    Ok(course_config)
+}

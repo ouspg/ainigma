@@ -57,12 +57,12 @@ impl CourseIdentifier {
 #[derive(Deserialize)]
 pub struct Weeks {
     pub tasks: Vec<WeeksTasks>,
-    pub number: i32,
+    pub number: u8,
     pub theme: String,
 }
 
 impl Weeks {
-    pub fn new(tasks: Vec<WeeksTasks>, number: i32, theme: String) -> Weeks {
+    pub fn new(tasks: Vec<WeeksTasks>, number: u8, theme: String) -> Weeks {
         Weeks {
             tasks,
             number,
@@ -169,7 +169,7 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn
     let course_config: CourseConfiguration = toml::from_str(&file_content)?;
     Ok(course_config)
 }
-
+//TODO: FINISH
 pub fn check_toml(course_config: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
     let course = course_config;
     let id = course.course_identifier.identifier.as_str();
@@ -180,11 +180,11 @@ pub fn check_toml(course_config: CourseConfiguration) -> Result<bool, Box<dyn Er
         let byte_value = u8::from_str_radix(&byte_str, 16).unwrap();
         result[i] = byte_value;
     }
-    let course_id = Uuid::from_bytes(result);
+    let _course_id = Uuid::from_bytes(result);
     let course_name = course.course_identifier.name;
     if course_name.is_empty() {
         panic!("Empty course name");
     }
-
+    // Continue
     return Ok(true);
 }

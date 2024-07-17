@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 use std::{error::Error, fmt::format};
@@ -169,9 +170,8 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn
     let course_config: CourseConfiguration = toml::from_str(&file_content)?;
     Ok(course_config)
 }
-//TODO: FINISH
-pub fn check_toml(course_config: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
-    let course = course_config;
+
+pub fn check_toml(course: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
     let id = course.course_identifier.identifier.as_str();
     let mut result: [u8; 16] = [0; 16];
 
@@ -183,8 +183,95 @@ pub fn check_toml(course_config: CourseConfiguration) -> Result<bool, Box<dyn Er
     let _course_id = Uuid::from_bytes(result);
     let course_name = course.course_identifier.name;
     if course_name.is_empty() {
-        panic!("Empty course name");
+        return Ok(false);
+    }
+    let course_version = course.course_identifier.version;
+    if course_version.is_empty() {
+        return Ok(false);
+    }
+
+    // check number uniques
+    let numbers = course
+        .weeks
+        .iter()
+        .map(|week| week.number)
+        .collect::<std::collections::HashSet<u8>>();
+    if numbers.len() != course.weeks.len() {
+        return Ok(false);
+    }
+    // check course task id uniques
+    let mut task_ids = HashSet::new();
+    let mut task_count: usize = 0;
+
+    // Check each task in each week
+    for week in course.weeks {
+        let week_ids = week
+            .tasks
+            .iter()
+            .map(|task| task.id.clone())
+            .collect::<std::collections::HashSet<String>>();
+        task_ids.extend(week_ids);
+        task_count = task_count + week.tasks.len();
+        for task in week.tasks {
+            if check_task(task).unwrap() == false {
+                return Ok(false);
+            }
+        }
+    }
+    if task_ids.len() != task_count {
+        return Ok(false);
     }
     // Continue
+    return Ok(true);
+}
+
+pub fn check_task(task: WeeksTasks) -> Result<bool, Box<dyn Error>> {
+    if task.id.is_empty() {
+        return Ok(false);
+    }
+
+    if task.name.is_empty() {
+        return Ok(false);
+    }
+    if task.points.is_sign_negative() {
+        return Ok(false);
+    }
+
+    for flag in &task.flags {
+        // possible flag enum later
+        if !(flag.flag_type == "user_derived"
+            || flag.flag_type == "pure_random"
+            || flag.flag_type == "rng_seed")
+        {
+            return Ok(false);
+        }
+    }
+    let ids = task
+        .flags
+        .iter()
+        .map(|flag| flag.id.clone())
+        .collect::<std::collections::HashSet<String>>();
+    if ids.len() != task.flags.len() {
+        return Ok(false);
+    }
+    if task.subtasks.is_some() {
+        let subtasks = task.subtasks.as_ref().unwrap();
+        let sub_id = subtasks
+            .iter()
+            .map(|subtask| subtask.id.clone())
+            .collect::<std::collections::HashSet<String>>();
+        if sub_id.len() != subtasks.len() {
+            return Ok(false);
+        }
+        if !(task
+            .subtasks
+            .unwrap()
+            .iter_mut()
+            .zip(task.flags.iter())
+            .all(|(a, b)| a.id == b.id))
+        {
+            return Ok(false);
+        }
+    }
     return Ok(true);
 }

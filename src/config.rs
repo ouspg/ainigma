@@ -7,6 +7,21 @@ use uuid::{uuid, Uuid};
 
 use crate::flag_generator::Flag;
 
+#[derive(Debug)]
+pub enum ConfigError {
+    CourseNameError,
+    CourseVersionError,
+    WeekNumberError,
+    TaskIdError,
+    TaskCountError,
+    TaskNameError,
+    TaskPointError,
+    FlagTypeError,
+    FlagCountError,
+    SubTaskCountError,
+    SubTaskMatchError
+}
+
 #[derive(Deserialize)]
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
@@ -171,7 +186,7 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn
     Ok(course_config)
 }
 
-pub fn check_toml(course: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
+pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
     let id = course.course_identifier.identifier.as_str();
     let mut result: [u8; 16] = [0; 16];
 
@@ -183,11 +198,11 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
     let _course_id = Uuid::from_bytes(result);
     let course_name = course.course_identifier.name;
     if course_name.is_empty() {
-        return Ok(false);
+        return Err(ConfigError::CourseNameError);
     }
     let course_version = course.course_identifier.version;
     if course_version.is_empty() {
-        return Ok(false);
+        return Err(ConfigError::CourseVersionError);
     }
 
     // check number uniques
@@ -197,7 +212,7 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
         .map(|week| week.number)
         .collect::<std::collections::HashSet<u8>>();
     if numbers.len() != course.weeks.len() {
-        return Ok(false);
+        return Err(ConfigError::WeekNumberError);
     }
     // check course task id uniques
     let mut task_ids = HashSet::new();
@@ -213,28 +228,26 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, Box<dyn Error>> {
         task_ids.extend(week_ids);
         task_count = task_count + week.tasks.len();
         for task in week.tasks {
-            if check_task(task).unwrap() == false {
-                return Ok(false);
-            }
+            let _task_result = check_task(task)?;
         }
     }
     if task_ids.len() != task_count {
-        return Ok(false);
+        return Err(ConfigError::TaskCountError);
     }
     // Continue
     return Ok(true);
 }
 
-pub fn check_task(task: WeeksTasks) -> Result<bool, Box<dyn Error>> {
+pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
     if task.id.is_empty() {
-        return Ok(false);
+        return Err(ConfigError::TaskIdError);
     }
 
     if task.name.is_empty() {
-        return Ok(false);
+        return Err(ConfigError::TaskNameError);
     }
     if task.points.is_sign_negative() {
-        return Ok(false);
+        return Err(ConfigError::TaskPointError);
     }
 
     for flag in &task.flags {
@@ -243,16 +256,17 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, Box<dyn Error>> {
             || flag.flag_type == "pure_random"
             || flag.flag_type == "rng_seed")
         {
-            return Ok(false);
+            return Err(ConfigError::FlagTypeError);
         }
     }
+    //TODO: CHECK NAME, ID, POINT TOTAL
     let ids = task
         .flags
         .iter()
         .map(|flag| flag.id.clone())
         .collect::<std::collections::HashSet<String>>();
     if ids.len() != task.flags.len() {
-        return Ok(false);
+        return Err(ConfigError::FlagCountError);
     }
     if task.subtasks.is_some() {
         let subtasks = task.subtasks.as_ref().unwrap();
@@ -261,7 +275,7 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, Box<dyn Error>> {
             .map(|subtask| subtask.id.clone())
             .collect::<std::collections::HashSet<String>>();
         if sub_id.len() != subtasks.len() {
-            return Ok(false);
+            return Err(ConfigError::SubTaskCountError);
         }
         if !(task
             .subtasks
@@ -270,7 +284,7 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, Box<dyn Error>> {
             .zip(task.flags.iter())
             .all(|(a, b)| a.id == b.id))
         {
-            return Ok(false);
+            return Err(ConfigError::SubTaskMatchError);
         }
     }
     return Ok(true);

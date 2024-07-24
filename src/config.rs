@@ -19,7 +19,9 @@ pub enum ConfigError {
     FlagTypeError,
     FlagCountError,
     SubTaskCountError,
-    SubTaskMatchError
+    SubTaskIdMatchError,
+    SubTaskPointError,
+    SubTaskNameError,
 }
 
 #[derive(Deserialize)]
@@ -277,14 +279,27 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
         if sub_id.len() != subtasks.len() {
             return Err(ConfigError::SubTaskCountError);
         }
-        if !(task
-            .subtasks
-            .unwrap()
-            .iter_mut()
+        let subtasks2 = task.subtasks.as_ref().unwrap();
+        if !(subtasks2
+            .iter()
             .zip(task.flags.iter())
             .all(|(a, b)| a.id == b.id))
         {
-            return Err(ConfigError::SubTaskMatchError);
+            return Err(ConfigError::SubTaskIdMatchError);
+        }
+        let subtasks3 = task.subtasks.as_ref().unwrap();
+        let all_names_are_non_empty = subtasks3.iter().all(|s| !s.name.is_empty());
+        if !all_names_are_non_empty {
+            return Err(ConfigError::SubTaskNameError);
+        }
+        let sub_points = task
+            .subtasks
+            .unwrap()
+            .iter()
+            .map(|subtask| subtask.subpoints)
+            .sum();
+        if (task.points as f32) != sub_points {
+            return Err(ConfigError::SubTaskPointError);
         }
     }
     return Ok(true);

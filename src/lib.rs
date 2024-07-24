@@ -1,2 +1,2 @@
-pub mod flag_generator;
 pub mod config;
+pub mod flag_generator;

@@ -191,7 +191,7 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn
 pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
     let id = course.course_identifier.identifier.as_str();
     let mut result: [u8; 16] = [0; 16];
-
+    // Uuid check removable when id is Uuid
     for (i, hex_byte) in id.as_bytes().chunks(2).enumerate() {
         let byte_str = String::from_utf8_lossy(hex_byte);
         let byte_value = u8::from_str_radix(&byte_str, 16).unwrap();
@@ -261,7 +261,7 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
             return Err(ConfigError::FlagTypeError);
         }
     }
-    //TODO: CHECK NAME, ID, POINT TOTAL
+    // checks flags have unique id
     let ids = task
         .flags
         .iter()
@@ -271,6 +271,7 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
         return Err(ConfigError::FlagCountError);
     }
     if task.subtasks.is_some() {
+        //checks subtasks have unique id
         let subtasks = task.subtasks.as_ref().unwrap();
         let sub_id = subtasks
             .iter()
@@ -279,6 +280,7 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
         if sub_id.len() != subtasks.len() {
             return Err(ConfigError::SubTaskCountError);
         }
+        // checks subtasks have match id with flags
         let subtasks2 = task.subtasks.as_ref().unwrap();
         if !(subtasks2
             .iter()
@@ -287,11 +289,13 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
         {
             return Err(ConfigError::SubTaskIdMatchError);
         }
+        // checks subtasks have a name
         let subtasks3 = task.subtasks.as_ref().unwrap();
         let all_names_are_non_empty = subtasks3.iter().all(|s| !s.name.is_empty());
         if !all_names_are_non_empty {
             return Err(ConfigError::SubTaskNameError);
         }
+        // checks subtask point count matches
         let sub_points = task
             .subtasks
             .unwrap()

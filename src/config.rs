@@ -147,7 +147,7 @@ pub struct WeeksTasksBuild {
     pub directory: String,
     pub entrypoint: String,
     pub builder: String,
-    pub outputs: Vec<WeeksTasksOutput>,
+    pub output: Vec<WeeksTasksOutput>,
 }
 
 impl WeeksTasksBuild {
@@ -155,13 +155,13 @@ impl WeeksTasksBuild {
         directory: String,
         entrypoint: String,
         builder: String,
-        outputs: Vec<WeeksTasksOutput>,
+        output: Vec<WeeksTasksOutput>,
     ) -> WeeksTasksBuild {
         WeeksTasksBuild {
             directory,
             entrypoint,
             builder,
-            outputs,
+            output,
         }
     }
 }

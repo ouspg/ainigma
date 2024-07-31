@@ -2,7 +2,6 @@
 use std::error::Error;
 use crate::config::CourseConfiguration;
 use crate::flag_gen;
-use crate::config;
 
 pub fn identify_flag_types_for_task(course_config: CourseConfiguration, week_number: usize, task_id: String) {
     for week in course_config.weeks.iter() {

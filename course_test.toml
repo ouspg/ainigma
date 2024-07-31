@@ -21,7 +21,7 @@ subtasks = [
 { id = "B", name = "Subpart B", description = "", subpoints = 0.33},
 { id = "C", name = "Subpart C", description = "", subpoints = 0.34},
 ]
-[[weeks.tasks.build]]
+[weeks.tasks.build]
 directory = "tasks/week1/buffer_overflow"
 entrypoint = "build.sh"
 builder = "shell"

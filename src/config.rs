@@ -88,7 +88,7 @@ pub struct Tasks {
     pub points: f32,
     pub flags: Vec<FlagConfig>,
     pub subtasks: Option<Vec<SubTask>>,
-    pub taskbuild: WeeksTasksBuild,
+    pub build: WeeksTasksBuild,
 }
 
 impl Tasks {
@@ -99,7 +99,7 @@ impl Tasks {
         points: f32,
         flags: Vec<FlagConfig>,
         subtasks: Option<Vec<SubTask>>,
-        taskbuild: WeeksTasksBuild,
+        build: WeeksTasksBuild,
     ) -> Tasks {
         Tasks {
             id,
@@ -108,7 +108,7 @@ impl Tasks {
             points,
             flags,
             subtasks,
-            taskbuild,
+            build,
         }
     }
 }

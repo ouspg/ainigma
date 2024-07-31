@@ -8,7 +8,6 @@ number = 1
 theme = "Introduction to Cybersecurity"
 [[weeks.tasks]]
 id = "task001"
-name = "Challenge 1"
 
 description = "Argon2 hash exam"
 points = 1.0

@@ -9,6 +9,7 @@ use crate::flag_generator::Flag;
 
 #[derive(Debug)]
 pub enum ConfigError {
+    TomlParseError { message: String },
     CourseNameError,
     CourseVersionError,
     WeekNumberError,
@@ -183,9 +184,16 @@ pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Err
 }
 
 //TODO: Add warnings for unspecified fields
-pub fn toml_content(file_content: String) -> Result<CourseConfiguration, Box<dyn Error>> {
-    let course_config: CourseConfiguration = toml::from_str(&file_content)?;
-    Ok(course_config)
+pub fn toml_content(file_content: String) -> Result<CourseConfiguration, ConfigError> {
+    let course_config = toml::from_str(&file_content);
+    match course_config {
+        Ok(val) => return Ok(val),
+        Err(err) => {
+            return Err(ConfigError::TomlParseError {
+                message: err.to_string(),
+            })
+        }
+    }
 }
 
 pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
@@ -318,6 +326,6 @@ mod tests {
     fn test_toml() {
         let result = read_toml_content_from_file("course_test.toml");
         let result1 = toml_content(result.unwrap());
-        let courseconfig = result1.unwrap();
+        let _courseconfig = result1.unwrap();
     }
 }

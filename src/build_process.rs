@@ -4,16 +4,6 @@ use crate::config::CourseConfiguration;
 use crate::flag_gen;
 use crate::config;
 
-fn read_and_check_toml_content(config_filepath: &str) -> Result<CourseConfiguration, Box<dyn Error>> {
-    let file_content_as_string = course_config::read_toml_content_from_file(config_filepath);
-    let toml_content = course_config::toml_content(file_content_as_string).unwrap();
-    if(course_config::check_toml(toml_content)) {
-        return Ok(toml_content);
-    } else {
-        return Err("Error in toml file");
-    }
-}
-
 pub fn identify_flag_types_for_task(course_config: CourseConfiguration, week_number: usize, task_id: String) {
     for week in course_config.weeks.iter() {
         if week.number == week_number {

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -197,7 +198,7 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, ConfigE
     }
 }
 
-pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
+pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, ConfigError> {
     let id = course.course_identifier.identifier.as_str();
     let mut result: [u8; 16] = [0; 16];
     // Uuid check removable when id is Uuid
@@ -207,11 +208,11 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
         result[i] = byte_value;
     }
     let _course_id = Uuid::from_bytes(result);
-    let course_name = course.course_identifier.name;
+    let course_name = &course.course_identifier.name;
     if course_name.is_empty() {
         return Err(ConfigError::CourseNameError);
     }
-    let course_version = course.course_identifier.version;
+    let course_version = &course.course_identifier.version;
     if course_version.is_empty() {
         return Err(ConfigError::CourseVersionError);
     }
@@ -230,7 +231,7 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
     let mut task_count: usize = 0;
 
     // Check each task in each week
-    for week in course.weeks {
+    for week in &course.weeks {
         let week_ids = week
             .tasks
             .iter()
@@ -238,18 +239,18 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
             .collect::<std::collections::HashSet<String>>();
         task_ids.extend(week_ids);
         task_count = task_count + week.tasks.len();
-        for task in week.tasks {
-            let _task_result = check_task(task)?;
+        for task in &week.tasks {
+            let _task_result = check_task(&task)?;
         }
     }
     if task_ids.len() != task_count {
         return Err(ConfigError::TaskCountError);
     }
     // Continue
-    return Ok(true);
+    return Ok(course);
 }
 
-pub fn check_task(task: Tasks) -> Result<bool, ConfigError> {
+pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
     if task.id.is_empty() {
         return Err(ConfigError::TaskIdError);
     }
@@ -307,6 +308,7 @@ pub fn check_task(task: Tasks) -> Result<bool, ConfigError> {
         // checks subtask point count matches
         let sub_points = task
             .subtasks
+            .as_ref()
             .unwrap()
             .iter()
             .map(|subtask| subtask.subpoints)
@@ -318,15 +320,25 @@ pub fn check_task(task: Tasks) -> Result<bool, ConfigError> {
     return Ok(true);
 }
 
+pub fn read_check_toml(filepath: &str) -> Result<CourseConfiguration, ConfigError> {
+    let tomlstring = read_toml_content_from_file(filepath).expect("No reading errors");
+    let courseconfig = toml_content(tomlstring)?;
+    let result = check_toml(courseconfig);
+    match result {
+        Ok(val) => return Ok(val),
+        Err(err) => return Err(err),
+    }
+}
 #[cfg(test)]
 mod tests {
-    use super::{toml_content, CourseConfiguration};
+    use super::{check_toml, toml_content};
     use crate::config::read_toml_content_from_file;
 
     #[test]
     fn test_toml() {
         let result = read_toml_content_from_file("course_test.toml");
         let result1 = toml_content(result.unwrap());
-        let _courseconfig = result1.unwrap();
+        let courseconfig = result1.unwrap();
+        let _coursefconfig = check_toml(courseconfig).unwrap();
     }
 }

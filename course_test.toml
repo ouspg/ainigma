@@ -21,10 +21,10 @@ subtasks = [
 { id = "B", name = "Subpart B", description = "", subpoints = 0.33},
 { id = "C", name = "Subpart C", description = "", subpoints = 0.34},
 ]
-[[taskbuild]]
+[[weeks.tasks.build]]
 directory = "tasks/week1/buffer_overflow"
 entrypoint = "build.sh"
 builder = "shell"
-[[taskoutput]]
+[[weeks.tasks.build.output]]
 name = "exploitable.bin"
 output_type = "resource"

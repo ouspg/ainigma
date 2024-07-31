@@ -32,12 +32,7 @@ pub struct CourseConfiguration {
 }
 
 impl CourseConfiguration {
-    pub fn new(
-        course_identifier: CourseIdentifier,
-        weeks: Vec<Weeks>,
-        taskbuild: Vec<WeeksTasksBuild>,
-        taskoutput: Vec<WeeksTasksOutput>,
-    ) -> CourseConfiguration {
+    pub fn new(course_identifier: CourseIdentifier, weeks: Vec<Weeks>) -> CourseConfiguration {
         CourseConfiguration {
             course_identifier,
             weeks,
@@ -72,18 +67,14 @@ impl CourseIdentifier {
 #[derive(Deserialize)]
 pub struct Weeks {
     pub tasks: Vec<Tasks>,
-    pub taskbuild: Vec<WeeksTasksBuild>,
-    pub taskoutput: Vec<WeeksTasksOutput>,
     pub number: u8,
     pub theme: String,
 }
 
 impl Weeks {
-    pub fn new(tasks: Vec<Tasks>,taskbuild: Vec<WeeksTasksBuild>,taskoutput: Vec<WeeksTasksOutput>, number: u8, theme: String) -> Weeks {
+    pub fn new(tasks: Vec<Tasks>, number: u8, theme: String) -> Weeks {
         Weeks {
             tasks,
-            taskbuild,
-            taskoutput,
             number,
             theme,
         }
@@ -97,6 +88,7 @@ pub struct Tasks {
     pub points: f32,
     pub flags: Vec<FlagConfig>,
     pub subtasks: Option<Vec<SubTask>>,
+    pub taskbuild: WeeksTasksBuild,
 }
 
 impl Tasks {
@@ -107,6 +99,7 @@ impl Tasks {
         points: f32,
         flags: Vec<FlagConfig>,
         subtasks: Option<Vec<SubTask>>,
+        taskbuild: WeeksTasksBuild,
     ) -> Tasks {
         Tasks {
             id,
@@ -115,6 +108,7 @@ impl Tasks {
             points,
             flags,
             subtasks,
+            taskbuild,
         }
     }
 }
@@ -153,14 +147,21 @@ pub struct WeeksTasksBuild {
     pub directory: String,
     pub entrypoint: String,
     pub builder: String,
+    pub outputs: Vec<WeeksTasksOutput>,
 }
 
 impl WeeksTasksBuild {
-    pub fn new(directory: String, entrypoint: String, builder: String) -> WeeksTasksBuild {
+    pub fn new(
+        directory: String,
+        entrypoint: String,
+        builder: String,
+        outputs: Vec<WeeksTasksOutput>,
+    ) -> WeeksTasksBuild {
         WeeksTasksBuild {
             directory,
             entrypoint,
             builder,
+            outputs,
         }
     }
 }

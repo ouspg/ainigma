@@ -308,3 +308,16 @@ pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
     }
     return Ok(true);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{toml_content, CourseConfiguration};
+    use crate::config::read_toml_content_from_file;
+
+    #[test]
+    fn test_toml() {
+        let result = read_toml_content_from_file("course_test.toml");
+        let result1 = toml_content(result.unwrap());
+        let courseconfig = result1.unwrap();
+    }
+}

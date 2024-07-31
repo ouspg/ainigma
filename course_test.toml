@@ -6,9 +6,10 @@ version = "0.0.1"
 [[weeks]]
 number = 1
 theme = "Introduction to Cybersecurity"
-[[tasks]]
+[[weeks.tasks]]
 id = "task001"
 name = "Challenge 1"
+
 description = "Argon2 hash exam"
 points = 1.0
 flags = [
@@ -21,7 +22,7 @@ subtasks = [
 { id = "B", name = "Subpart B", description = "", subpoints = 0.33},
 { id = "C", name = "Subpart C", description = "", subpoints = 0.34},
 ]
-[taskbuild]
+[[taskbuild]]
 directory = "tasks/week1/buffer_overflow"
 entrypoint = "build.sh"
 builder = "shell"

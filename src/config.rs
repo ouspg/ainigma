@@ -29,8 +29,6 @@ pub enum ConfigError {
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
     pub weeks: Vec<Weeks>,
-    pub taskbuild: Vec<WeeksTasksBuild>,
-    pub taskoutput: Vec<WeeksTasksOutput>,
 }
 
 impl CourseConfiguration {
@@ -43,8 +41,6 @@ impl CourseConfiguration {
         CourseConfiguration {
             course_identifier,
             weeks,
-            taskbuild,
-            taskoutput,
         }
     }
 }
@@ -75,22 +71,26 @@ impl CourseIdentifier {
 }
 #[derive(Deserialize)]
 pub struct Weeks {
-    pub tasks: Vec<WeeksTasks>,
+    pub tasks: Vec<Tasks>,
+    pub taskbuild: Vec<WeeksTasksBuild>,
+    pub taskoutput: Vec<WeeksTasksOutput>,
     pub number: u8,
     pub theme: String,
 }
 
 impl Weeks {
-    pub fn new(tasks: Vec<WeeksTasks>, number: u8, theme: String) -> Weeks {
+    pub fn new(tasks: Vec<Tasks>,taskbuild: Vec<WeeksTasksBuild>,taskoutput: Vec<WeeksTasksOutput>, number: u8, theme: String) -> Weeks {
         Weeks {
             tasks,
+            taskbuild,
+            taskoutput,
             number,
             theme,
         }
     }
 }
 #[derive(Deserialize)]
-pub struct WeeksTasks {
+pub struct Tasks {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -99,7 +99,7 @@ pub struct WeeksTasks {
     pub subtasks: Option<Vec<SubTask>>,
 }
 
-impl WeeksTasks {
+impl Tasks {
     pub fn new(
         id: String,
         name: String,
@@ -107,8 +107,8 @@ impl WeeksTasks {
         points: f32,
         flags: Vec<FlagConfig>,
         subtasks: Option<Vec<SubTask>>,
-    ) -> WeeksTasks {
-        WeeksTasks {
+    ) -> Tasks {
+        Tasks {
             id,
             name,
             description,
@@ -248,7 +248,7 @@ pub fn check_toml(course: CourseConfiguration) -> Result<bool, ConfigError> {
     return Ok(true);
 }
 
-pub fn check_task(task: WeeksTasks) -> Result<bool, ConfigError> {
+pub fn check_task(task: Tasks) -> Result<bool, ConfigError> {
     if task.id.is_empty() {
         return Err(ConfigError::TaskIdError);
     }

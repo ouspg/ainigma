@@ -131,11 +131,11 @@ pub struct SubTask {
     pub name: String,
     pub description: String,
     pub subpoints: f32,
-    pub flag_type: String,
+    pub flag_type: FlagConfig,
 }
 
 impl SubTask {
-    pub fn new(id: String, name: String, description: String, subpoints: f32, flag_type: String) -> SubTask {
+    pub fn new(id: String, name: String, description: String, subpoints: f32, flag_type: FlagConfig) -> SubTask {
         SubTask {
             id,
             name,

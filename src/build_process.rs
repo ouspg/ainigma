@@ -1,7 +1,7 @@
 //File for initializing the build process
 use std::error::Error;
 use crate::config::CourseConfiguration;
-use crate::flag_generator;
+use crate::flag_gen;
 
 pub fn identify_flag_types_for_task(course_config: CourseConfiguration, week_number: usize, task_id: String) {
     for week in course_config.weeks.iter() {
@@ -56,31 +56,4 @@ pub fn identify_all_flag_types(course_config: CourseConfiguration) {
         }
     } 
 }
-}
-
-pub fn generate_embed_flags_for_task(course_config: CourseConfiguration, week_number: usize, task_id: String) -> Result<Flag, Error>{
-    identify_flag_types_for_task(course_config, week_number, task_id);
-    for week in course_config.weeks.iter() {
-        if week.number == week_number {
-            for task in week.tasks.iter() {
-                if task.id == task_id {
-                    if task.subtasks.is_some() {
-                        for (j,subtask) in task.subtasks.iter().enumerate() {
-                            match subtask[j].
-
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-}
-
-pub fn generate_embded_flags_for_week(course_config: CourseConfiguration, week_number: usize){
-    identify_flag_types_for_week(course_config, week_number);
-}
-
-pub fn generate_embed_flags_for_all(course_config: CourseConfiguration){
-    identify_all_flag_types(course_config);
 }

@@ -30,13 +30,15 @@ pub enum ConfigError {
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
     pub weeks: Vec<Weeks>,
+    pub flag_types: FlagsTypes,
 }
 
 impl CourseConfiguration {
-    pub fn new(course_identifier: CourseIdentifier, weeks: Vec<Weeks>) -> CourseConfiguration {
+    pub fn new(course_identifier: CourseIdentifier, weeks: Vec<Weeks>, flag_types: FlagsTypes) -> CourseConfiguration {
         CourseConfiguration {
             course_identifier,
             weeks,
+            flag_types
         }
     }
 }
@@ -150,7 +152,7 @@ pub struct WeeksTasksBuild {
     pub directory: String,
     pub entrypoint: String,
     pub builder: String,
-    pub output: Vec<WeeksTasksOutput>,
+    pub output: WeeksTasksOutput,
 }
 
 impl WeeksTasksBuild {
@@ -185,6 +187,12 @@ pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Err
     let mut file_content = String::new();
     file.read_to_string(&mut file_content)?;
     Ok(file_content)
+}
+
+pub struct FlagsTypes {
+    pub pure_random: i32,
+    pub user_derived: Vec<String>,
+    pub rng_seed: String,
 }
 
 //TODO: Add warnings for unspecified fields

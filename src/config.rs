@@ -115,7 +115,7 @@ impl Tasks {
         }
     }
 }
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize)]
 pub struct FlagConfig {
     pub flag_type: String,
     pub id: String,
@@ -137,13 +137,7 @@ pub struct SubTask {
 }
 
 impl SubTask {
-    pub fn new(
-        id: String,
-        name: String,
-        description: String,
-        subpoints: f32,
-        flag_type: FlagConfig,
-    ) -> SubTask {
+    pub fn new(id: String, name: String, description: String, subpoints: f32, flag_type: FlagConfig) -> SubTask {
         SubTask {
             id,
             name,
@@ -194,7 +188,7 @@ pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Err
     file.read_to_string(&mut file_content)?;
     Ok(file_content)
 }
-
+#[derive(Deserialize)]
 pub struct FlagsTypes {
     pub pure_random: i32,
     pub user_derived: Vec<String>,
@@ -278,7 +272,7 @@ pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
         return Err(ConfigError::TaskPointError);
     }
 
-    for flag in &task.flag_types {
+    for flag in &task.flags {
         // possible flag enum later
         if !(flag.flag_type == "user_derived"
             || flag.flag_type == "pure_random"
@@ -289,11 +283,11 @@ pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
     }
     // checks flags have unique id
     let ids = task
-        .flag_types
+        .flags
         .iter()
         .map(|flag| flag.id.clone())
         .collect::<std::collections::HashSet<String>>();
-    if ids.len() != task.flag_types.len() {
+    if ids.len() != task.flags.len() {
         return Err(ConfigError::FlagCountError);
     }
     if task.subtasks.is_some() {
@@ -310,7 +304,7 @@ pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
         let subtasks2 = task.subtasks.as_ref().unwrap();
         if !(subtasks2
             .iter()
-            .zip(task.flag_types.iter())
+            .zip(task.flags.iter())
             .all(|(a, b)| a.id == b.id))
         {
             return Err(ConfigError::SubTaskIdMatchError);

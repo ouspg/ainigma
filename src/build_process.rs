@@ -5,7 +5,7 @@ use std::process::Stdio;
 use uuid::Uuid;
 
 use crate::config::{CourseConfiguration, WeeksTasksBuild};
-use crate::flag_generator;
+use crate::flag_generator::{self, Algorithm};
 
 struct EmbedFlag {
     // id: id matches the task or subtask, which the embed flag is created for
@@ -207,12 +207,15 @@ fn match_flag_types_and_generate_embed_flags(
     task_id: String,
     uuid: Uuid,
 ) {
-    match flag_type {
+    match flag_type.as_str() {
         "user_derived" => {
+            let algorithm = match course_config.flag_types.user_derived[0].as_str(){
+                "HMAC_SHA3_256" => Algorithm::HmacSha3_256,
+            }
             //TODO: Check parameters
             let generated_flag = flag_generator::Flag::user_flag(
                 task_id,
-                course_config.flag_types.user_derived[0],
+                algorithm,
                 course_config.flag_types.user_derived[1],
                 task_id,
                 uuid,
@@ -226,7 +229,7 @@ fn match_flag_types_and_generate_embed_flags(
         "pure_random" => {
             //TODO: Check parameters
             let generated_flag =
-                flag_generator::Flag::rng_flag(task_id, course_config.flag_types.pure_random);
+                flag_generator::Flag::random_flag(task_id, course_config.flag_types.pure_random);
             let embed_flag = EmbedFlag {
                 id: task_id,
                 flag: generated_flag,
@@ -241,9 +244,6 @@ fn match_flag_types_and_generate_embed_flags(
                 flag: generated_flag,
             };
             embed_flags.embed_flags.push(embed_flag);
-        }
-        _ => {
-            Err("Invalid flag type");
         }
     }
 }

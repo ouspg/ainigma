@@ -200,7 +200,7 @@ pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Err
 }
 #[derive(Deserialize, Clone)]
 pub struct FlagsTypes {
-    pub pure_random: i32,
+    pub pure_random: u8,
     pub user_derived: Vec<String>,
     pub rng_seed: String,
 }

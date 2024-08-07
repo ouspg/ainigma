@@ -14,9 +14,8 @@ struct Generate {
     week: u8,
     #[arg(short, long)]
     task: String,
-
     #[command(subcommand)]
-    cmd: Builder,
+    cmd: Moodle,
 }
 
 fn main() {

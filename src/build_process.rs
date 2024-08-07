@@ -52,15 +52,6 @@ pub fn identify_flag_types_for_week(course_config: CourseConfiguration, week_num
 }
 
 pub fn identify_all_flag_types(course_config: CourseConfiguration) {
-<<<<<<< HEAD
-    for (i, week) in course_config.weeks.iter().enumerate() {
-        if week.tasks[i].subtasks.is_some() {
-            for (j, subtask) in week.tasks[i].subtasks.iter().enumerate() {
-                for flag_type in week.tasks[i].flag_types.iter() {
-                    if flag_type.id == subtask[j].id {
-                        subtask[j].flag_type = flag_type;
-                        break;
-=======
         for week in course_config.weeks.iter() {
             for task in week.tasks.iter() {
                 if let Some(subtasks) = &task.subtasks {
@@ -70,15 +61,9 @@ pub fn identify_all_flag_types(course_config: CourseConfiguration) {
                                 subtask.flag_type = flag_type;
                                 break;
                         }
->>>>>>> 8adf09037a0c502713d8069b84007c541e15c2fb
                     }
                 }
             }
         }
-<<<<<<< HEAD
-    }
-}
-=======
     } 
 }
->>>>>>> 8adf09037a0c502713d8069b84007c541e15c2fb

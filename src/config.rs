@@ -87,7 +87,7 @@ pub struct Tasks {
     pub name: String,
     pub description: String,
     pub points: f32,
-    pub flags: Vec<FlagConfig>,
+    pub flag_types: Vec<FlagConfig>,
     pub subtasks: Option<Vec<SubTask>>,
     pub build: WeeksTasksBuild,
 }
@@ -98,7 +98,7 @@ impl Tasks {
         name: String,
         description: String,
         points: f32,
-        flags: Vec<FlagConfig>,
+        flag_types: Vec<FlagConfig>,
         subtasks: Option<Vec<SubTask>>,
         build: WeeksTasksBuild,
     ) -> Tasks {
@@ -107,7 +107,7 @@ impl Tasks {
             name,
             description,
             points,
-            flags,
+            flag_types,
             subtasks,
             build,
         }
@@ -131,15 +131,17 @@ pub struct SubTask {
     pub name: String,
     pub description: String,
     pub subpoints: f32,
+    pub flag_type: FlagConfig,
 }
 
 impl SubTask {
-    pub fn new(id: String, name: String, description: String, subpoints: f32) -> SubTask {
+    pub fn new(id: String, name: String, description: String, subpoints: f32, flag_type: FlagConfig) -> SubTask {
         SubTask {
             id,
             name,
             description,
             subpoints,
+            flag_type,
         }
     }
 }

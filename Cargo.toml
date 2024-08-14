@@ -9,7 +9,7 @@ hmac = "0.12.1"
 rand = "0.8.5"
 serde = { version = "1.0.204", features = ["derive"] }
 toml = "0.8.14"
-clap = "4.5.13"
+clap = { version = "4.5.15" , features = ["derive"] }
 
 [dependencies.uuid]
 version = "1.9.1"

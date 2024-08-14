@@ -20,7 +20,7 @@ enum Commands {
         #[arg(short, long)]
         week: u32,
         #[arg(short, long)]
-        task: Option<u32>,
+        task: Option<String>,
         #[command(subcommand)]
         moodle: Option<Moodle>,
     },
@@ -51,3 +51,6 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {}

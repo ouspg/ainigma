@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
 use uuid::Uuid;
@@ -203,7 +204,7 @@ pub struct UserDerived {
 pub struct RngSeed {
     pub secret: String,
 }
-pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Error>> {
+pub fn read_toml_content_from_file(filepath: &OsStr) -> Result<String, Box<dyn Error>> {
     let mut file = File::open(filepath)?;
     let mut file_content = String::new();
     file.read_to_string(&mut file_content)?;
@@ -341,7 +342,7 @@ pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
     return Ok(true);
 }
 
-pub fn read_check_toml(filepath: &str) -> Result<CourseConfiguration, ConfigError> {
+pub fn read_check_toml(filepath: &OsStr) -> Result<CourseConfiguration, ConfigError> {
     let tomlstring = read_toml_content_from_file(filepath).expect("No reading errors");
     let courseconfig = toml_content(tomlstring)?;
     let result = check_toml(courseconfig);
@@ -352,12 +353,14 @@ pub fn read_check_toml(filepath: &str) -> Result<CourseConfiguration, ConfigErro
 }
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
+
     use super::{check_toml, toml_content};
     use crate::config::read_toml_content_from_file;
 
     #[test]
     fn test_toml() {
-        let result = read_toml_content_from_file("course_test.toml");
+        let result = read_toml_content_from_file(OsStr::new("course_test.toml"));
         let result1 = toml_content(result.unwrap());
         let courseconfig = result1.unwrap();
         let _coursefconfig = check_toml(courseconfig).unwrap();

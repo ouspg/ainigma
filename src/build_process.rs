@@ -2,7 +2,7 @@ use core::str;
 use std::env;
 use uuid::Uuid;
 
-use crate::config::{CourseConfiguration, FlagConfig, WeeksTasksBuild};
+use crate::config::{self, CourseConfiguration, FlagConfig, WeeksTasksBuild};
 use crate::flag_generator;
 
 #[derive(Clone)]

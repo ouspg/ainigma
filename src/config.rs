@@ -9,6 +9,7 @@ use crate::flag_generator;
 
 #[derive(Debug)]
 pub enum ConfigError {
+    UuidError,
     TomlParseError { message: String },
     CourseNameError,
     CourseVersionError,
@@ -224,14 +225,10 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, ConfigE
 
 pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, ConfigError> {
     let id = course.course_identifier.identifier.as_str();
-    let mut result: [u8; 16] = [0; 16];
-    // Uuid check removable when id is Uuid
-    for (i, hex_byte) in id.as_bytes().chunks(2).enumerate() {
-        let byte_str = String::from_utf8_lossy(hex_byte);
-        let byte_value = u8::from_str_radix(&byte_str, 16).unwrap();
-        result[i] = byte_value;
-    }
-    let _course_id = Uuid::from_bytes(result);
+    match Uuid::parse_str(id) {
+        Ok(ok) => ok,
+        Err(_err) => return Err(ConfigError::UuidError),
+    };
     let course_name = &course.course_identifier.name;
     if course_name.is_empty() {
         return Err(ConfigError::CourseNameError);

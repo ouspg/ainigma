@@ -11,15 +11,15 @@ id = "task001"
 name = "Challenge 1"
 description = "Argon2 hash exam"
 points = 1.0
-flags = [
-    { flag_type = "user_derived", id = "A" },
-    { flag_type = "pure_random", id = "B" },
-    { flag_type = "rng_seed", id = "C" }
+flag_types = [
+    { flag_type = "user_derived", id = "task001A" },
+    { flag_type = "pure_random", id = "task001B" },
+    { flag_type = "rng_seed", id = "task001C" }
 ]
 subtasks = [
-{ id = "A", name = "Subpart A", description = "", subpoints = 0.33},
-{ id = "B", name = "Subpart B", description = "", subpoints = 0.33},
-{ id = "C", name = "Subpart C", description = "", subpoints = 0.34},
+{ id = "task001A", name = "Subpart A", description = "", subpoints = 0.33},
+{ id = "task001B", name = "Subpart B", description = "", subpoints = 0.33},
+{ id = "task001C", name = "Subpart C", description = "", subpoints = 0.34},
 ]
 [weeks.tasks.build]
 directory = "tasks/week1/buffer_overflow"
@@ -28,3 +28,7 @@ builder = "shell"
 [[weeks.tasks.build.output]]
 name = "exploitable.bin"
 output_type = "resource"
+[flag_types]
+pure_random = { length = 32 }
+user_derived = { algorithm = "HmacSha3_256", secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" }
+rng_seed = { secret = "You must know me to predict the seed of the other users" }

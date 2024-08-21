@@ -1,4 +1,3 @@
-use autograder::config::CourseConfiguration;
 use clap::{command, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -15,7 +14,7 @@ pub struct Config {
 /// Generate command
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate config
+    /// Generate config with given week and optionally task
     Generate {
         #[arg(short, long)]
         week: u32,
@@ -27,7 +26,12 @@ enum Commands {
 }
 #[derive(Debug, Subcommand)]
 enum Moodle {
-    Moodle { number: u8 },
+    /// Generate tasks for moodle
+    Moodle {
+        /// Number of task instances created for moodle
+        #[arg(short, long)]
+        number: u8,
+    },
 }
 
 fn main() {
@@ -40,11 +44,13 @@ fn main() {
             match cmd_moodle {
                 Some(cmd_moodle) => match cmd_moodle {
                     Moodle::Moodle { number } => println!(
+                        // Task in Option format !!
                         " Generating {number:?} Moodle task for  week : {week:?}, task : {task:?}"
                     ),
                 },
 
                 None => {
+                    // Task in Option format !!
                     println!(" Generating task for week : {week:?}, task : {task:?}")
                 }
             }

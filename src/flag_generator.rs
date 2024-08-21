@@ -12,7 +12,7 @@ type Hmac256 = Hmac<Sha3_256>;
 ///
 /// #### Algorithms
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
-#[derive(PartialEq)]
+#[derive(PartialEq, Deserialize, Clone)]
 pub enum Algorithm {
     HmacSha3_256,
 }
@@ -32,7 +32,7 @@ pub enum Algorithm {
 /// - `user_seed_flag()` - `UserSeedFlag` generator
 /// - `user_flag()` - `UserDerivedFlag` generator
 /// - `flag_string()` - returns Flag as a one string
-#[derive(Deserialize)]
+#[derive(Deserialize,Clone)]
 pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
@@ -68,7 +68,7 @@ impl Flag {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize,Clone)]
 pub struct FlagUnit {
     prefix: String,
     suffix: String,

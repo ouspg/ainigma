@@ -4,6 +4,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use uuid::Uuid;
+use std::error::Error;
+use uuid::Uuid;
 
 use crate::flag_generator;
 
@@ -26,6 +28,7 @@ pub enum ConfigError {
 }
 
 #[derive(Deserialize, Clone)]
+#[derive(Deserialize,Clone)]
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
     pub weeks: Vec<Weeks>,
@@ -140,6 +143,12 @@ pub struct SubTask {
 
 impl SubTask {
     pub fn new(id: String, name: String, description: String, subpoints: f32) -> SubTask {
+    pub fn new(
+        id: String,
+        name: String,
+        description: String,
+        subpoints: f32,
+    ) -> SubTask {
         SubTask {
             id,
             name,

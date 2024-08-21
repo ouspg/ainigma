@@ -3,7 +3,7 @@ use autograder::{
     config::{read_check_toml, ConfigError, CourseConfiguration},
 };
 use clap::{command, Parser, Subcommand};
-use std::{arch::x86_64::_SIDD_CMP_EQUAL_ORDERED, path::PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 /// Autograder CLI Application

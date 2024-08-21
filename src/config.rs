@@ -1,12 +1,11 @@
-use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
+use serde::Deserialize;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
-use std::{error::Error, fmt::format};
-use uuid::{uuid, Uuid};
+use std::error::Error;
+use uuid::Uuid;
 
-use crate::flag_generator::Flag;
+use crate::flag_generator;
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -26,7 +25,7 @@ pub enum ConfigError {
     SubTaskNameError,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Clone)]
 pub struct CourseConfiguration {
     pub course_identifier: CourseIdentifier,
     pub weeks: Vec<Weeks>,
@@ -71,7 +70,7 @@ impl CourseIdentifier {
         }
     }
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Weeks {
     pub tasks: Vec<Tasks>,
     pub number: u8,
@@ -87,7 +86,7 @@ impl Weeks {
         }
     }
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Tasks {
     pub id: String,
     pub name: String,
@@ -137,7 +136,6 @@ pub struct SubTask {
     pub name: String,
     pub description: String,
     pub subpoints: f32,
-    pub flag_type: FlagConfig,
 }
 
 impl SubTask {
@@ -146,14 +144,12 @@ impl SubTask {
         name: String,
         description: String,
         subpoints: f32,
-        flag_type: FlagConfig,
     ) -> SubTask {
         SubTask {
             id,
             name,
             description,
             subpoints,
-            flag_type,
         }
     }
 }
@@ -192,17 +188,30 @@ impl WeeksTasksOutput {
     }
 }
 
+#[derive(Deserialize, Clone)]
+pub struct FlagsTypes {
+    pub pure_random: PureRandom,
+    pub user_derived: UserDerived,
+    pub rng_seed: RngSeed,
+}
+#[derive(Deserialize, Clone)]
+pub struct PureRandom {
+    pub length: u8,
+}
+#[derive(Deserialize, Clone)]
+pub struct UserDerived {
+    pub algorithm: flag_generator::Algorithm,
+    pub secret: String,
+}
+#[derive(Deserialize, Clone)]
+pub struct RngSeed {
+    pub secret: String,
+}
 pub fn read_toml_content_from_file(filepath: &str) -> Result<String, Box<dyn Error>> {
     let mut file = File::open(filepath)?;
     let mut file_content = String::new();
     file.read_to_string(&mut file_content)?;
     Ok(file_content)
-}
-#[derive(Deserialize, Clone)]
-pub struct FlagsTypes {
-    pub pure_random: u8,
-    pub user_derived: Vec<String>,
-    pub rng_seed: String,
 }
 
 //TODO: Add warnings for unspecified fields

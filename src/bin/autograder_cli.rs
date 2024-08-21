@@ -82,6 +82,7 @@ fn moodle_build(
         build_task(&mut result, task.unwrap(), uuid)
     } else {
         println!("Generating {} moodle task for week {}", &number, &week);
+        // TODO: Generating all tasks from one week
     }
     Ok(())
 }
@@ -89,7 +90,7 @@ fn moodle_build(
 /// fn error_handler(error: ConfigError) {
 ///    match error {
 ///        ConfigError::UuidError => println!("Error in Toml file: Course Uuid must be valid"),
-///        ConfigError::CourseNameError =>
+///        ConfigError::CourseNameError => println!("Error in Toml file: Course name must not be empty"),
 ///    }
 /// }
 ///

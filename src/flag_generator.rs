@@ -12,7 +12,7 @@ type Hmac256 = Hmac<Sha3_256>;
 ///
 /// #### Algorithms
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
-#[derive(PartialEq, Clone, Deserialize)]
+#[derive(PartialEq, Deserialize, Clone)]
 pub enum Algorithm {
     HmacSha3_256,
 }

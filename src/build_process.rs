@@ -2,7 +2,7 @@ use core::str;
 use std::env;
 use uuid::Uuid;
 
-use crate::config::{self, CourseConfiguration, FlagConfig, WeeksTasksBuild};
+use crate::config::{CourseConfiguration, FlagConfig, WeeksTasksBuild};
 use crate::flag_generator;
 
 #[derive(Clone)]
@@ -36,7 +36,7 @@ fn find_flagtype_for_task(
             }
         }
     }
-    Err(format!("Flagtype not found!"))
+    Err("Flagtype not found!".to_string())
 }
 
 pub fn generate_embed_flags_for_task(

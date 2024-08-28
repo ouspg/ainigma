@@ -3,6 +3,7 @@ use hmac::{digest::InvalidLength, Hmac, Mac};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::Deserialize;
 use sha3::Sha3_256;
+use std::fmt::Write;
 use uuid::Uuid;
 
 type Hmac256 = Hmac<Sha3_256>;
@@ -22,10 +23,9 @@ pub enum Algorithm {
 /// Flags are normally 32 long hexstring and all flags need a flag prefix to be used
 ///
 /// #### Flags
-/// - `RngFlag` generates a random hexstring flag with given prefix and lenght  
+/// - `RngFlag` generates a random hexstring flag with given prefix and lenght
 /// - `UserSeedFlag` generates a random hexstring flag with given prefix and user id (UUID)
-/// - `UserDerivedFlag` generates a random hexstring flag with given prefix, algorithm, secret, taskid
-///  and Uuid  
+/// - `UserDerivedFlag` generates a random hexstring flag with given prefix, algorithm, secret, taskid and Uuid
 ///
 /// #### Functions
 /// - `random_flag()` - `RngFlag` generator
@@ -41,7 +41,7 @@ pub enum Flag {
 impl Flag {
     /// Generates a random hexstring flag with given prefix and lenght
     pub fn random_flag(prefix: String, length: u8) -> Self {
-        return Flag::RngFlag(FlagUnit::rng_flag(prefix, length));
+        Flag::RngFlag(FlagUnit::rng_flag(prefix, length))
     }
     /// Generates a random hexstring flag with given prefix, algorithm, secret, taskid and Uuid
     pub fn user_flag(
@@ -51,11 +51,11 @@ impl Flag {
         taskid: String,
         uuid: Uuid,
     ) -> Self {
-        return Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid));
+        Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid))
     }
     /// Generates a random hexstring flag with given prefix and user id (UUID)
     pub fn user_seed_flag(prefix: String, uuid: Uuid) -> Self {
-        return Flag::UserSeedFlag(FlagUnit::user_seed(prefix, uuid));
+        Flag::UserSeedFlag(FlagUnit::user_seed(prefix, uuid))
     }
     /// Returns flag as one string
     pub fn flag_string(&mut self) -> String {
@@ -96,10 +96,10 @@ impl FlagUnit {
             Ok(flag) => flag,
             Err(_error) => panic!("Error generating flag"),
         };
-        return FlagUnit {
+        FlagUnit {
             prefix: flag_prefix,
             suffix: flag_suffix,
-        };
+        }
     }
 
     fn user_seed(flag_prefix: String, uuid: Uuid) -> Self {
@@ -109,19 +109,17 @@ impl FlagUnit {
             Ok(flag) => flag,
             Err(_error) => panic!("Error generating flag"),
         };
-        return FlagUnit {
+        FlagUnit {
             prefix: flag_prefix,
             suffix: flag_suffix,
-        };
+        }
     }
 
     fn return_flag(&mut self) -> String {
         let flag_prefix = &self.prefix;
         let flag_suffix = &self.suffix;
 
-        let flag = flag_prefix.to_owned() + ":" + flag_suffix;
-
-        return flag;
+        flag_prefix.to_owned() + ":" + flag_suffix
     }
 }
 
@@ -132,7 +130,10 @@ fn pure_random_flag(lenght: u8) -> String {
     for i in &mut vec {
         *i = rng.gen();
     }
-    vec.iter().map(|b| format!("{:02x}", b)).collect()
+    vec.iter().fold(String::new(), |mut output, b| {
+        let _ = write!(output, "{b:02x}");
+        output
+    })
 }
 
 fn user_derived_flag(
@@ -150,8 +151,7 @@ fn user_derived_flag(
 
             let result = mac.finalize();
             let bytes = result.into_bytes();
-            let s = format!("{:x}", bytes);
-            return Ok(s);
+            Ok(format!("{:x}", bytes))
         }
     }
 }
@@ -171,20 +171,21 @@ fn compare_hmac(
     let result = mac.finalize();
     let bytes = result.into_bytes();
     let s = format!("{:x}", bytes);
-    return Ok(s == hmac);
+    Ok(s == hmac)
 }
 /// generates a random seed using uuid as a base
 fn generate_userseed(uuid: Uuid) -> Result<String, rand::Error> {
     let (_, uuidvalue) = uuid.as_u64_pair();
     let mut rng = StdRng::seed_from_u64(uuidvalue);
     let hex: [u8; 32] = rng.gen();
-    let s = hex.iter().map(|b| format!("{:02x}", b)).collect();
-    Ok(s)
+    Ok(hex.iter().fold(String::new(), |mut output, b| {
+        let _ = write!(output, "{b:02x}");
+        output
+    }))
 }
 
 pub fn generate_uuid() -> Result<Uuid, uuid::Error> {
-    let id = Uuid::now_v7();
-    return Ok(id);
+    Ok(Uuid::now_v7())
 }
 
 #[cfg(test)]

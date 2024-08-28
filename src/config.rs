@@ -244,14 +244,9 @@ pub fn read_toml_content_from_file(filepath: &OsStr) -> Result<String, Box<dyn E
 //TODO: Add warnings for unspecified fields
 pub fn toml_content(file_content: String) -> Result<CourseConfiguration, ConfigError> {
     let course_config = toml::from_str(&file_content);
-    match course_config {
-        Ok(val) => return Ok(val),
-        Err(err) => {
-            return Err(ConfigError::TomlParseError {
-                message: err.to_string(),
-            })
-        }
-    }
+    course_config.map_err(|err| ConfigError::TomlParseError {
+        message: err.to_string(),
+    })
 }
 
 pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, ConfigError> {
@@ -290,16 +285,16 @@ pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, Co
             .map(|task| task.id.clone())
             .collect::<std::collections::HashSet<String>>();
         task_ids.extend(week_ids);
-        task_count = task_count + week.tasks.len();
+        task_count += week.tasks.len();
         for task in &week.tasks {
-            let _task_result = check_task(&task)?;
+            let _task_result = check_task(task)?;
         }
     }
     if task_ids.len() != task_count {
         return Err(ConfigError::TaskCountError);
     }
     // Continue
-    return Ok(course);
+    Ok(course)
 }
 
 pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
@@ -365,21 +360,17 @@ pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
             .iter()
             .map(|subtask| subtask.subpoints)
             .sum();
-        if (task.points as f32) != sub_points {
+        if (task.points) != sub_points {
             return Err(ConfigError::SubTaskPointError);
         }
     }
-    return Ok(true);
+    Ok(true)
 }
 
 pub fn read_check_toml(filepath: &OsStr) -> Result<CourseConfiguration, ConfigError> {
     let tomlstring = read_toml_content_from_file(filepath).expect("No reading errors");
     let courseconfig = toml_content(tomlstring)?;
-    let result = check_toml(courseconfig);
-    match result {
-        Ok(val) => return Ok(val),
-        Err(err) => return Err(err),
-    }
+    check_toml(courseconfig)
 }
 #[cfg(test)]
 mod tests {

@@ -82,11 +82,25 @@ fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), Con
     Ok(())
 }
 fn moodle_build(
-    _path: PathBuf,
-    _week: u8,
-    _task: Option<String>,
-    _number: u8,
+    path: PathBuf,
+    week: u8,
+    task: Option<String>,
+    number: u8,
 ) -> Result<(), ConfigError> {
+    if task.is_some() {
+        println!(
+            "Generating {} moodle task for week {} and task {}",
+            &number,
+            &week,
+            &task.as_ref().unwrap()
+        );
+        let mut result = read_check_toml(path.into_os_string().as_os_str())?;
+        let uuid = Uuid::now_v7();
+        build_task(&mut result, task.unwrap(), uuid)
+    } else {
+        println!("Generating moodle task for week {}", &week);
+        // TODO: Generating all tasks from one week
+    }
     Ok(())
 }
 

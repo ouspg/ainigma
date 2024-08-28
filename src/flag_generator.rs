@@ -24,8 +24,8 @@ pub enum Algorithm {
 ///
 /// #### Flags
 /// - `RngFlag` generates a random hexstring flag with given prefix and lenght
-/// - `UserSeedFlag` generates a random hexstring flag with given prefix and user id (UUID)
-/// - `UserDerivedFlag` generates a random hexstring flag with given prefix, algorithm, secret, taskid and Uuid
+/// - `UserSeedFlag` generates a user based seed flag with given prefix, algorithm, secret, taskid and User id (Uuid)
+/// - `UserDerivedFlag` generates a user based flag with given prefix, algorithm, secret, taskid and User id (Uuid)
 ///
 /// #### Functions
 /// - `random_flag()` - `RngFlag` generator
@@ -108,19 +108,6 @@ impl FlagUnit {
         }
     }
 
-    fn user_seed(flag_prefix: String, uuid: Uuid) -> Self {
-        let flag_suffix_result = generate_userseed(uuid);
-
-        let flag_suffix = match flag_suffix_result {
-            Ok(flag) => flag,
-            Err(_error) => panic!("Error generating flag"),
-        };
-        FlagUnit {
-            prefix: flag_prefix,
-            suffix: flag_suffix,
-        }
-    }
-
     fn return_flag(&mut self) -> String {
         let flag_prefix = &self.prefix;
         let flag_suffix = &self.suffix;
@@ -180,15 +167,6 @@ fn compare_hmac(
     Ok(s == hmac)
 }
 /// generates a random seed using uuid as a base
-fn generate_userseed(uuid: Uuid) -> Result<String, rand::Error> {
-    let (_, uuidvalue) = uuid.as_u64_pair();
-    let mut rng = StdRng::seed_from_u64(uuidvalue);
-    let hex: [u8; 32] = rng.gen();
-    Ok(hex.iter().fold(String::new(), |mut output, b| {
-        let _ = write!(output, "{b:02x}");
-        output
-    }))
-}
 
 pub fn generate_uuid() -> Result<Uuid, uuid::Error> {
     Ok(Uuid::now_v7())
@@ -212,16 +190,6 @@ mod tests {
     }
 
     #[test]
-    fn test_userseed() {
-        let id1 = Uuid::now_v7();
-        let id2 = Uuid::now_v7();
-        assert!(generate_userseed(id1).is_ok());
-
-        assert!(
-            generate_userseed(id1).expect("no error") != generate_userseed(id2).expect("no error")
-        );
-    }
-    #[test]
     fn test_outputs() {
         let id = Uuid::now_v7();
         let secret = "Work".to_string();
@@ -236,11 +204,9 @@ mod tests {
         let answer1 = pure_random_flag(32);
         let answer2 =
             user_derived_flag(Algorithm::HmacSha3_256, id, secret, taskid).expect("works");
-        let answer3 = generate_userseed(id).expect("works");
 
         println!("{}", answer1);
         println!("{}", answer2);
-        println!("{}", answer3);
 
         let mut flag = Flag::user_flag(prefix, Algorithm::HmacSha3_256, secret2, taskid2, id);
         let result = flag.flag_string();

@@ -41,7 +41,7 @@ fn main() {
     let cli = Config::parse();
 
     if !(cli.config.exists()) {
-        panic!("configurateion file doesn't exist")
+        panic!("configuration file doesn't exist")
     } else {
         match &cli.command {
             Commands::Generate { week, task, moodle } => {
@@ -55,25 +55,20 @@ fn main() {
                             }
                         }
                     },
-                    None => {
-                        println!(" Generating task for week : {week:?}, task : {task:?}")
-                    }
+                    None => match normal_build(cli.config, *week, task.clone()) {
+                        Ok(()) => (),
+                        Err(error) => eprintln!("{}", error),
+                    },
                 }
             }
         }
     }
 }
 
-fn moodle_build(
-    path: PathBuf,
-    week: u8,
-    task: Option<String>,
-    number: u8,
-) -> Result<(), ConfigError> {
+fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), ConfigError> {
     if task.is_some() {
         println!(
-            "Generating {} moodle task for week {} and task {}",
-            &number,
+            "Generating task for week {} and task {}",
             &week,
             &task.as_ref().unwrap()
         );
@@ -81,9 +76,17 @@ fn moodle_build(
         let uuid = Uuid::now_v7();
         build_task(&mut result, task.unwrap(), uuid)
     } else {
-        println!("Generating {} moodle task for week {}", &number, &week);
+        println!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week
     }
+    Ok(())
+}
+fn moodle_build(
+    path: PathBuf,
+    week: u8,
+    task: Option<String>,
+    number: u8,
+) -> Result<(), ConfigError> {
     Ok(())
 }
 

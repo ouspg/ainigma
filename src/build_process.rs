@@ -93,8 +93,13 @@ fn match_flag_types_and_generate_embed_flags(
                 embed_flags.embed_flags.push(embed_flag);
             }
             "rng_seed" => {
-                let generated_flag =
-                    flag_generator::Flag::user_seed_flag(flag_type.id.clone(), uuid);
+                let generated_flag = flag_generator::Flag::user_seed_flag(
+                    flag_type.id.clone(),
+                    course_config.flag_types.user_derived.algorithm.clone(),
+                    course_config.flag_types.user_derived.secret.clone(),
+                    flag_type.id.clone(),
+                    uuid,
+                );
                 let embed_flag = EmbedFlag {
                     id: flag_type.id.clone(),
                     flag: generated_flag,

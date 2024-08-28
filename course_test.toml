@@ -31,4 +31,4 @@ output_type = "resource"
 [flag_types]
 pure_random = { length = 32 }
 user_derived = { algorithm = "HmacSha3_256", secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" }
-rng_seed = { secret = "You must know me to predict the seed of the other users" }
+rng_seed = { algorithm = "HmacSha3_256", secret = "You must know me to predict the seed of the other users" }

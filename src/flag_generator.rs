@@ -54,8 +54,14 @@ impl Flag {
         Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid))
     }
     /// Generates a random hexstring flag with given prefix and user id (UUID)
-    pub fn user_seed_flag(prefix: String, uuid: Uuid) -> Self {
-        Flag::UserSeedFlag(FlagUnit::user_seed(prefix, uuid))
+    pub fn user_seed_flag(
+        prefix: String,
+        algorithm: Algorithm,
+        secret: String,
+        taskid: String,
+        uuid: Uuid,
+    ) -> Self {
+        Flag::UserSeedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid))
     }
     /// Returns flag as one string
     pub fn flag_string(&mut self) -> String {
@@ -258,7 +264,13 @@ mod tests {
             "A".to_string(),
             id,
         );
-        let mut flag3 = Flag::user_seed_flag(prefix3, id);
+        let mut flag3 = Flag::user_seed_flag(
+            prefix3,
+            Algorithm::HmacSha3_256,
+            "this also works".to_string(),
+            "B".to_string(),
+            id,
+        );
         let string = flag.flag_string();
         let string2 = flag2.flag_string();
         let string3 = flag3.flag_string();

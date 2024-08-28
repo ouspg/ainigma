@@ -100,7 +100,6 @@ fn get_build_info(
     ))
 }
 
-#[allow(dead_code)]
 pub fn build_task(
     course_config: &CourseConfiguration,
     //week_number: u8,

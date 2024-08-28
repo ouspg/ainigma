@@ -72,9 +72,9 @@ fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), Con
             &week,
             &task.as_ref().unwrap()
         );
-        let mut result = read_check_toml(path.into_os_string().as_os_str())?;
+        let result = read_check_toml(path.into_os_string().as_os_str())?;
         let uuid = Uuid::now_v7();
-        build_task(&mut result, task.unwrap(), uuid)
+        build_task(&result, task.unwrap(), uuid)
     } else {
         println!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week

@@ -15,7 +15,8 @@ type Hmac256 = Hmac<Sha3_256>;
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
 #[derive(PartialEq, Deserialize, Clone)]
 pub enum Algorithm {
-    HmacSha3_256,
+    #[allow(non_camel_case_types)]
+    HMAC_SHA3_256,
 }
 
 /// Flag type used to generate flag for specific purpose
@@ -64,7 +65,7 @@ impl Flag {
         Flag::UserSeedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid))
     }
     /// Returns flag as one string
-    pub fn flag_string(&mut self) -> String {
+    pub fn flag_string(&self) -> String {
         match self {
             Flag::RngFlag(rngflag) => rngflag.return_flag(),
             Flag::UserSeedFlag(userseedflag) => userseedflag.return_flag(),
@@ -108,7 +109,7 @@ impl FlagUnit {
         }
     }
 
-    fn return_flag(&mut self) -> String {
+    fn return_flag(&self) -> String {
         let flag_prefix = &self.prefix;
         let flag_suffix = &self.suffix;
 
@@ -136,7 +137,7 @@ fn user_derived_flag(
     taskid: String,
 ) -> Result<String, InvalidLength> {
     match algorithm {
-        Algorithm::HmacSha3_256 => {
+        Algorithm::HMAC_SHA3_256 => {
             let input = format!("{}-{}", secret, uuid.as_hyphenated());
             let slice = input.as_bytes();
             let mut mac = Hmac256::new_from_slice(slice)?;
@@ -184,7 +185,7 @@ mod tests {
         let taskid = "task1".to_string();
         let secret2 = "Work".to_string();
         let taskid2 = "task1".to_string();
-        let hash = user_derived_flag(Algorithm::HmacSha3_256, id, secret, taskid).expect("error");
+        let hash = user_derived_flag(Algorithm::HMAC_SHA3_256, id, secret, taskid).expect("error");
         print!("{}", hash);
         assert!(compare_hmac(hash, id, secret2, taskid2).expect("should work"))
     }
@@ -203,15 +204,15 @@ mod tests {
 
         let answer1 = pure_random_flag(32);
         let answer2 =
-            user_derived_flag(Algorithm::HmacSha3_256, id, secret, taskid).expect("works");
+            user_derived_flag(Algorithm::HMAC_SHA3_256, id, secret, taskid).expect("works");
 
         println!("{}", answer1);
         println!("{}", answer2);
 
-        let mut flag = Flag::user_flag(prefix, Algorithm::HmacSha3_256, secret2, taskid2, id);
+        let flag = Flag::user_flag(prefix, Algorithm::HMAC_SHA3_256, secret2, taskid2, id);
         let result = flag.flag_string();
         println!("{}", result);
-        let mut flag2 = Flag::user_flag(prefix2, Algorithm::HmacSha3_256, secret3, taskid3, id);
+        let flag2 = Flag::user_flag(prefix2, Algorithm::HMAC_SHA3_256, secret3, taskid3, id);
         let result2 = flag2.flag_string();
         println!("{}", result2);
     }
@@ -222,17 +223,17 @@ mod tests {
         let prefix = "task1".to_string();
         let prefix2 = "task1".to_string();
         let prefix3 = "task1".to_string();
-        let mut flag = Flag::random_flag(prefix, 32);
-        let mut flag2 = Flag::user_flag(
+        let flag = Flag::random_flag(prefix, 32);
+        let flag2 = Flag::user_flag(
             prefix2,
-            Algorithm::HmacSha3_256,
+            Algorithm::HMAC_SHA3_256,
             "This works".to_string(),
             "A".to_string(),
             id,
         );
-        let mut flag3 = Flag::user_seed_flag(
+        let flag3 = Flag::user_seed_flag(
             prefix3,
-            Algorithm::HmacSha3_256,
+            Algorithm::HMAC_SHA3_256,
             "this also works".to_string(),
             "B".to_string(),
             id,

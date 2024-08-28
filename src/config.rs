@@ -59,143 +59,140 @@ impl fmt::Display for ConfigError {
 
 #[derive(Deserialize, Clone)]
 pub struct CourseConfiguration {
-    pub course_identifier: CourseIdentifier,
-    pub weeks: Vec<Weeks>,
-    pub flag_types: FlagsTypes,
-}
-
-impl CourseConfiguration {
-    pub fn new(
-        course_identifier: CourseIdentifier,
-        weeks: Vec<Weeks>,
-        flag_types: FlagsTypes,
-    ) -> CourseConfiguration {
-        CourseConfiguration {
-            course_identifier,
-            weeks,
-            flag_types,
-        }
-    }
-}
-
-#[derive(Deserialize, Clone)]
-pub struct CourseIdentifier {
     //TODO:Change to UUID
     pub identifier: String,
     pub name: String,
     pub description: String,
     pub version: String,
+    pub weeks: Vec<Week>,
+    pub flag_types: FlagsTypes,
 }
 
-impl CourseIdentifier {
+impl CourseConfiguration {
     pub fn new(
         identifier: String,
         name: String,
         description: String,
         version: String,
-    ) -> CourseIdentifier {
-        CourseIdentifier {
+        weeks: Vec<Week>,
+        flag_types: FlagsTypes,
+    ) -> CourseConfiguration {
+        CourseConfiguration {
             identifier,
             name,
             description,
             version,
+            weeks,
+            flag_types,
         }
     }
+    pub fn get_task_by_id(&self, id: &str) -> Option<&Task> {
+        for week in &self.weeks {
+            for task in &week.tasks {
+                if task.id == id {
+                    return Some(task);
+                }
+            }
+        }
+        None
+    }
 }
+
 #[derive(Deserialize, Clone)]
-pub struct Weeks {
-    pub tasks: Vec<Tasks>,
+pub struct Week {
+    pub tasks: Vec<Task>,
     pub number: u8,
     pub theme: String,
 }
 
-impl Weeks {
-    pub fn new(tasks: Vec<Tasks>, number: u8, theme: String) -> Weeks {
-        Weeks {
+impl Week {
+    pub fn new(tasks: Vec<Task>, number: u8, theme: String) -> Week {
+        Week {
             tasks,
             number,
             theme,
         }
     }
 }
+
 #[derive(Deserialize, Clone)]
-pub struct Tasks {
+pub struct Task {
     pub id: String,
     pub name: String,
     pub description: String,
     pub points: f32,
-    pub flag_types: Vec<FlagConfig>,
-    pub subtasks: Option<Vec<SubTask>>,
-    pub build: WeeksTasksBuild,
+    pub stages: Vec<TaskElement>,
+    pub build: BuildConfig,
 }
 
-impl Tasks {
+impl Task {
     pub fn new(
         id: String,
         name: String,
         description: String,
         points: f32,
-        flag_types: Vec<FlagConfig>,
-        subtasks: Option<Vec<SubTask>>,
-        build: WeeksTasksBuild,
-    ) -> Tasks {
-        Tasks {
+        stages: Vec<TaskElement>,
+        build: BuildConfig,
+    ) -> Task {
+        Task {
             id,
             name,
             description,
             points,
-            flag_types,
-            subtasks,
+            stages,
             build,
         }
     }
 }
-#[derive(Deserialize, Clone)]
-pub struct FlagConfig {
-    pub flag_type: String,
-    pub id: String,
-}
 
-impl FlagConfig {
-    pub fn new(flag_type: String, id: String) -> FlagConfig {
-        FlagConfig { flag_type, id }
-    }
+#[derive(Deserialize, Clone)]
+#[non_exhaustive]
+pub struct FlagConfiguration {
+    pub kind: String,
 }
 
 #[derive(Deserialize, Clone)]
-pub struct SubTask {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub subpoints: f32,
+pub struct TaskElement {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub weight: Option<u8>,
+    pub flag: FlagConfiguration,
 }
 
-impl SubTask {
-    pub fn new(id: String, name: String, description: String, subpoints: f32) -> SubTask {
-        SubTask {
+impl TaskElement {
+    pub fn new(
+        id: Option<String>,
+        name: Option<String>,
+        description: Option<String>,
+        weight: Option<u8>,
+        flag: FlagConfiguration,
+    ) -> TaskElement {
+        TaskElement {
             id,
             name,
             description,
-            subpoints,
+            weight,
+            flag,
         }
     }
 }
 #[derive(Deserialize, Clone)]
-pub struct WeeksTasksBuild {
+pub struct BuildConfig {
     pub directory: String,
     pub entrypoint: String,
     pub builder: String,
-    pub output: Vec<WeeksTasksOutput>,
+    pub output: Vec<BuildOutputFile>,
 }
 
-impl WeeksTasksBuild {
+impl BuildConfig {
     pub fn new(
         directory: String,
         entrypoint: String,
         builder: String,
-        output: Vec<WeeksTasksOutput>,
-    ) -> WeeksTasksBuild {
-        WeeksTasksBuild {
+        output: Vec<BuildOutputFile>,
+    ) -> BuildConfig {
+        BuildConfig {
             directory,
             entrypoint,
             builder,
@@ -204,14 +201,15 @@ impl WeeksTasksBuild {
     }
 }
 #[derive(Deserialize, Clone)]
-pub struct WeeksTasksOutput {
+pub struct BuildOutputFile {
     pub name: String,
-    pub output_type: String,
+    // TODO create own type
+    pub kind: String,
 }
 
-impl WeeksTasksOutput {
-    pub fn new(name: String, output_type: String) -> WeeksTasksOutput {
-        WeeksTasksOutput { name, output_type }
+impl BuildOutputFile {
+    pub fn new(name: String, kind: String) -> BuildOutputFile {
+        BuildOutputFile { name, kind }
     }
 }
 
@@ -250,16 +248,16 @@ pub fn toml_content(file_content: String) -> Result<CourseConfiguration, ConfigE
 }
 
 pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, ConfigError> {
-    let id = course.course_identifier.identifier.as_str();
+    let id = course.identifier.as_str();
     match Uuid::parse_str(id) {
         Ok(ok) => ok,
         Err(_err) => return Err(ConfigError::UuidError),
     };
-    let course_name = &course.course_identifier.name;
+    let course_name = &course.name;
     if course_name.is_empty() {
         return Err(ConfigError::CourseNameError);
     }
-    let course_version = &course.course_identifier.version;
+    let course_version = &course.version;
     if course_version.is_empty() {
         return Err(ConfigError::CourseVersionError);
     }
@@ -297,7 +295,7 @@ pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, Co
     Ok(course)
 }
 
-pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
+pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
     if task.id.is_empty() {
         return Err(ConfigError::TaskIdError);
     }
@@ -308,62 +306,69 @@ pub fn check_task(task: &Tasks) -> Result<bool, ConfigError> {
     if task.points.is_sign_negative() {
         return Err(ConfigError::TaskPointError);
     }
+    if task.stages.is_empty() {
+        return Err(ConfigError::SubTaskCountError);
+    }
 
-    for flag in &task.flag_types {
+    for part in &task.stages {
+        if task.stages.len() > 1 {
+            if part.id.is_none() {
+                return Err(ConfigError::SubTaskCountError);
+            }
+            if let Some(id) = &part.id {
+                if !id.to_lowercase().starts_with(&task.id.to_lowercase()) {
+                    return Err(ConfigError::SubTaskIdMatchError);
+                }
+            }
+        } else if part.id.is_some() {
+            // Single element in parts, id must be none
+            return Err(ConfigError::SubTaskCountError);
+        }
         // possible flag enum later
-        if !(flag.flag_type == "user_derived"
-            || flag.flag_type == "pure_random"
-            || flag.flag_type == "rng_seed")
+        if !(part.flag.kind == "user_derived"
+            || part.flag.kind == "pure_random"
+            || part.flag.kind == "rng_seed")
         {
             return Err(ConfigError::FlagTypeError);
         }
     }
-    // checks flags have unique id
-    let ids = task
-        .flag_types
-        .iter()
-        .map(|flag| flag.id.clone())
-        .collect::<std::collections::HashSet<String>>();
-    if ids.len() != task.flag_types.len() {
-        return Err(ConfigError::FlagCountError);
-    }
-    if task.subtasks.is_some() {
-        //checks subtasks have unique id
-        let subtasks = task.subtasks.as_ref().unwrap();
-        let sub_id = subtasks
+
+    //checks subtasks have unique id
+    if task.stages.len() > 1 {
+        let mut set = HashSet::new();
+        if !&task
+            .stages
             .iter()
-            .map(|subtask| subtask.id.clone())
-            .collect::<std::collections::HashSet<String>>();
-        if sub_id.len() != subtasks.len() {
+            .all(|item| set.insert(item.id.as_ref().unwrap()))
+        {
             return Err(ConfigError::SubTaskCountError);
         }
-        // checks subtasks have match id with flags
-        let subtasks2 = task.subtasks.as_ref().unwrap();
-        if !(subtasks2
+
+        let all_names_are_non_empty = &task
+            .stages
             .iter()
-            .zip(task.flag_types.iter())
-            .all(|(a, b)| a.id == b.id))
-        {
-            return Err(ConfigError::SubTaskIdMatchError);
-        }
-        // checks subtasks have a name
-        let subtasks3 = task.subtasks.as_ref().unwrap();
-        let all_names_are_non_empty = subtasks3.iter().all(|s| !s.name.is_empty());
+            .all(|s| !s.name.as_ref().unwrap_or(&"".to_string()).is_empty());
         if !all_names_are_non_empty {
             return Err(ConfigError::SubTaskNameError);
         }
-        // checks subtask point count matches
-        let sub_points = task
-            .subtasks
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|subtask| subtask.subpoints)
-            .sum();
-        if (task.points) != sub_points {
-            return Err(ConfigError::SubTaskPointError);
+    } else {
+        // id, name, description, weight must be none if just one element in parts
+        if task.stages[0].id.is_some() {
+            return Err(ConfigError::SubTaskCountError);
+        }
+        if task.stages[0].name.is_some() {
+            return Err(ConfigError::SubTaskNameError);
+        }
+        if task.stages[0].description.is_some() {
+            // TODO change error message
+            return Err(ConfigError::SubTaskNameError);
+        }
+        if task.stages[0].weight.is_some() {
+            // TODO change error message
+            return Err(ConfigError::SubTaskNameError);
         }
     }
+
     Ok(true)
 }
 
@@ -381,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_toml() {
-        let result = read_toml_content_from_file(OsStr::new("course_test.toml"));
+        let result = read_toml_content_from_file(OsStr::new("course.toml"));
         let result1 = toml_content(result.unwrap());
         let courseconfig = result1.unwrap();
         let _coursefconfig = check_toml(courseconfig).unwrap();

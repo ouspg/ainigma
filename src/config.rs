@@ -49,8 +49,8 @@ impl fmt::Display for ConfigError {
             ConfigError::TaskPointError => write!(f, "Error in Toml file: Task point amount must be non-negative"),
             ConfigError::FlagTypeError => write!(f, "Error in Toml file: Flag type must be one of the three \"user_derived\", \"pure_random\", \"rng_seed\""),
             ConfigError::FlagCountError => write!(f, "Error in Toml file: Task flags must have a unique id"),
-            ConfigError::SubTaskCountError => write!(f, "Error in Toml file: Each task subtask must have a unique id"),
-            ConfigError::SubTaskIdMatchError => write!(f,"Error in Toml file: Each task subtask must have a unique matching id with subtask flag"),
+            ConfigError::SubTaskCountError => write!(f, "Error in Toml file: Each task subtask must have a unique ID"),
+            ConfigError::SubTaskIdMatchError => write!(f,"Error in Toml file: Each subtask ID must include the current task ID as prefix."),
             ConfigError::SubTaskPointError => write!(f, "Error in Toml file: Each task points much match subtask point total"),
             ConfigError::SubTaskNameError => write!(f, "Error in Toml file: Each task subtask name must not be empty"),
         }
@@ -143,11 +143,29 @@ impl Task {
             build,
         }
     }
+    /// Gets all task IDs for a task, including possible subtasks in `stages`
+    /// Mainly used for validating that they are unique
+    pub fn get_task_ids(&self) -> Vec<&str> {
+        if self.stages.len() == 1 {
+            vec![self.id.as_str()]
+        } else {
+            let mut task_ids = Vec::with_capacity(self.stages.len());
+            for stage in &self.stages {
+                if let Some(stage) = stage.id.as_ref() {
+                    task_ids.push(stage.as_str());
+                } else {
+                    panic!("Unexpected empty stage ID");
+                }
+            }
+            task_ids.sort();
+            task_ids
+        }
+    }
 }
 
 #[derive(Deserialize, Clone)]
 #[non_exhaustive]
-pub struct FlagConfiguration {
+pub struct FlagConfig {
     pub kind: String,
 }
 
@@ -157,7 +175,7 @@ pub struct TaskElement {
     pub name: Option<String>,
     pub description: Option<String>,
     pub weight: Option<u8>,
-    pub flag: FlagConfiguration,
+    pub flag: FlagConfig,
 }
 
 impl TaskElement {
@@ -166,7 +184,7 @@ impl TaskElement {
         name: Option<String>,
         description: Option<String>,
         weight: Option<u8>,
-        flag: FlagConfiguration,
+        flag: FlagConfig,
     ) -> TaskElement {
         TaskElement {
             id,
@@ -271,25 +289,21 @@ pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, Co
     if numbers.len() != course.weeks.len() {
         return Err(ConfigError::WeekNumberError);
     }
-    // check course task id uniques
+    // Use set to check course task id uniques
     let mut task_ids = HashSet::new();
-    let mut task_count: usize = 0;
 
     // Check each task in each week
     for week in &course.weeks {
-        let week_ids = week
-            .tasks
-            .iter()
-            .map(|task| task.id.clone())
-            .collect::<std::collections::HashSet<String>>();
-        task_ids.extend(week_ids);
-        task_count += week.tasks.len();
+        for task in &week.tasks {
+            for id in task.get_task_ids() {
+                if !task_ids.insert(id) {
+                    return Err(ConfigError::TaskCountError);
+                }
+            }
+        }
         for task in &week.tasks {
             let _task_result = check_task(task)?;
         }
-    }
-    if task_ids.len() != task_count {
-        return Err(ConfigError::TaskCountError);
     }
     // Continue
     Ok(course)

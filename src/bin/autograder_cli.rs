@@ -1,6 +1,6 @@
 use autograder::{
     build_process::build_task,
-    config::{read_check_toml, ConfigError, CourseConfiguration},
+    config::{read_check_toml, ConfigError},
 };
 use clap::{command, Parser, Subcommand};
 use std::path::PathBuf;

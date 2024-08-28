@@ -51,7 +51,7 @@ fn main() {
                         Moodle::Moodle { number } => {
                             match moodle_build(cli.config, *week, task.clone(), *number) {
                                 Ok(()) => (),
-                                Err(error) => (), // error_handler(error),
+                                Err(error) => eprintln!("{}", error),
                             }
                         }
                     },
@@ -86,14 +86,6 @@ fn moodle_build(
     }
     Ok(())
 }
-///
-/// fn error_handler(error: ConfigError) {
-///    match error {
-///        ConfigError::UuidError => println!("Error in Toml file: Course Uuid must be valid"),
-///        ConfigError::CourseNameError => println!("Error in Toml file: Course name must not be empty"),
-///    }
-/// }
-///
 
 #[cfg(test)]
 mod tests {}

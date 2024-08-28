@@ -2,6 +2,7 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::error::Error;
 use std::ffi::OsStr;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use uuid::Uuid;
@@ -25,6 +26,35 @@ pub enum ConfigError {
     SubTaskIdMatchError,
     SubTaskPointError,
     SubTaskNameError,
+}
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigError::UuidError => write!(f, "Error in Toml file: Course Uuid must be valid"),
+            ConfigError::TomlParseError { message } => write!(f, "{}", message),
+            ConfigError::CourseNameError => {
+                write!(f, "Error in Toml file: Course name must not be empty")
+            }
+            ConfigError::CourseVersionError => {
+                write!(f, "Error in Toml file: Course version must not be empty")
+            }
+            ConfigError::WeekNumberError => {
+                write!(f, "Error in Toml file: Each week must have a unique number")
+            }
+            ConfigError::TaskIdError => {
+                write!(f, "Error in Toml file: Task Id cannot be empty")
+            }
+            ConfigError::TaskCountError => write!(f, "Error in Toml file: Each task must have a unique id"),
+            ConfigError::TaskNameError => write!(f, "Error in Toml file: Task name cannot be empty"),
+            ConfigError::TaskPointError => write!(f, "Error in Toml file: Task point amount must be non-negative"),
+            ConfigError::FlagTypeError => write!(f, "Error in Toml file: Flag type must be one of the three \"user_derived\", \"pure_random\", \"rng_seed\""),
+            ConfigError::FlagCountError => write!(f, "Error in Toml file: Task flags must have a unique id"),
+            ConfigError::SubTaskCountError => write!(f, "Error in Toml file: Each task subtask must have a unique id"),
+            ConfigError::SubTaskIdMatchError => write!(f,"Error in Toml file: Each task subtask must have a unique matching id with subtask flag"),
+            ConfigError::SubTaskPointError => write!(f, "Error in Toml file: Each task points much match subtask point total"),
+            ConfigError::SubTaskNameError => write!(f, "Error in Toml file: Each task subtask name must not be empty"),
+        }
+    }
 }
 
 #[derive(Deserialize, Clone)]

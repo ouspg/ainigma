@@ -82,10 +82,10 @@ fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), Con
     Ok(())
 }
 fn moodle_build(
-    path: PathBuf,
-    week: u8,
-    task: Option<String>,
-    number: u8,
+    _path: PathBuf,
+    _week: u8,
+    _task: Option<String>,
+    _number: u8,
 ) -> Result<(), ConfigError> {
     Ok(())
 }

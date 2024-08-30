@@ -10,7 +10,7 @@ cat << EOF > secret.sh
 #!/bin/bash
 
 # The flag is now hardcoded in the script
-FLAG="$flag_pure_random_task005"
+FLAG="$FLAG_PURE_RANDOM_task005"
 
 echo "The flag is: \$FLAG"
 EOF

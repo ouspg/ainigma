@@ -100,7 +100,7 @@ pub fn build_task(
     //env::set_current_dir(&task_config.build.directory)
     //    .expect("failed to locate resource directory");
 
-    let output = std::process::Command::new("powershell")
+    let output = std::process::Command::new("sh")
         .arg(task_config.build.entrypoint.clone())
         .envs(id_flag_pairs)
         .current_dir(&task_config.build.directory)

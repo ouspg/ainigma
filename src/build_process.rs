@@ -2,21 +2,9 @@ use core::str;
 use std::env;
 use uuid::Uuid;
 
-use crate::config::{CourseConfiguration, FlagConfig, WeeksTasksBuild};
-use crate::flag_generator;
+use crate::config::{BuildConfig, CourseConfiguration, Task};
+use crate::flag_generator::{self, Flag};
 
-#[derive(Clone)]
-#[allow(dead_code)]
-pub struct EmbedFlag {
-    // id: id matches the task or subtask, which the embed flag is created for (unused at the moment)
-    // flag: The flag supposed to be embedded into the task
-    id: String,
-    flag: flag_generator::Flag,
-}
-#[derive(Clone)]
-pub struct EmbedFlags {
-    embed_flags: Vec<EmbedFlag>,
-}
 /*
 struct GenerationOutputs {
     output_files: Vec<String>,
@@ -25,112 +13,80 @@ struct GenerationOutputs {
 }
 */
 
-fn find_flagtype_for_task(
-    course_config: CourseConfiguration,
-    task_id: String,
-) -> Result<Vec<FlagConfig>, String> {
-    for week in course_config.weeks {
-        for task in week.tasks {
-            if task_id == task.id {
-                return Ok(task.flag_types.clone());
-            }
+fn create_flag_id_pairs_by_task<'a>(
+    task_config: &'a Task,
+    course_config: &'a CourseConfiguration,
+    uuid: Uuid,
+) -> Vec<(&'a str, Flag)> {
+    let mut flags = Vec::with_capacity(3);
+    for stage in &task_config.stages {
+        // let task_id = part.id.clone();
+        let id: &str;
+        if let Some(stage_id) = &stage.id {
+            id = stage_id;
+        } else {
+            id = &task_config.id
         }
-    }
-    Err("Flagtype not found!".to_string())
-}
-
-pub fn generate_embed_flags_for_task(
-    course_config: &mut CourseConfiguration,
-    task_id: String,
-    uuid: Uuid,
-) -> EmbedFlags {
-    let flag_type = find_flagtype_for_task(course_config.clone(), task_id.clone()).unwrap();
-    let mut embed_flags = EmbedFlags {
-        embed_flags: Vec::new(),
-    };
-
-    match_flag_types_and_generate_embed_flags(
-        course_config,
-        flag_type.clone(),
-        &mut embed_flags,
-        uuid,
-    );
-
-    embed_flags
-}
-
-fn match_flag_types_and_generate_embed_flags(
-    course_config: &mut CourseConfiguration,
-    flag_types: Vec<FlagConfig>,
-    embed_flags: &mut EmbedFlags,
-    uuid: Uuid,
-) {
-    for flag_type in flag_types {
-        match flag_type.flag_type.as_str() {
-            "user_derived" => {
-                let generated_flag = flag_generator::Flag::user_flag(
-                    flag_type.id.clone(),
+        flags.push(match stage.flag.kind.as_str() {
+            "user_derived" => (
+                id,
+                flag_generator::Flag::user_flag(
+                    id.into(),
                     course_config.flag_types.user_derived.algorithm.clone(),
                     course_config.flag_types.user_derived.secret.clone(),
-                    flag_type.id.clone(),
+                    id.into(),
                     uuid,
-                );
-                let embed_flag = EmbedFlag {
-                    id: flag_type.id.clone(),
-                    flag: generated_flag,
-                };
-                embed_flags.embed_flags.push(embed_flag);
-            }
-            "pure_random" => {
-                let generated_flag = flag_generator::Flag::random_flag(
-                    flag_type.id.clone(),
+                ),
+            ),
+            "pure_random" => (
+                id,
+                flag_generator::Flag::random_flag(
+                    id.into(),
                     course_config.flag_types.pure_random.length,
-                );
-                let embed_flag = EmbedFlag {
-                    id: flag_type.id.clone(),
-                    flag: generated_flag,
-                };
-                embed_flags.embed_flags.push(embed_flag);
-            }
-            "rng_seed" => {
-                let generated_flag = flag_generator::Flag::user_seed_flag(
-                    flag_type.id.clone(),
+                ),
+            ),
+            "rng_seed" => (
+                id,
+                flag_generator::Flag::user_seed_flag(
+                    id.into(),
                     course_config.flag_types.user_derived.algorithm.clone(),
                     course_config.flag_types.user_derived.secret.clone(),
-                    flag_type.id.clone(),
+                    id.into(),
                     uuid,
-                );
-                let embed_flag = EmbedFlag {
-                    id: flag_type.id.clone(),
-                    flag: generated_flag,
-                };
-                embed_flags.embed_flags.push(embed_flag);
-            }
-            _ => {
-                panic!("Invalid flag type");
+                ),
+            ),
+            _ => panic!("Invalid flag type"),
+        });
+    }
+    flags
+}
+
+fn set_flags_to_env_variables(flags: &[(&str, Flag)]) {
+    match flags.len() {
+        0 => {
+            // TODO: Add error handling
+            panic!("Empty Flag vector provided")
+        }
+        1 => {
+            let env_var_flag = flag_generator::Flag::flag_string(&flags[0].1);
+            std::env::set_var("FLAG", env_var_flag);
+        }
+        _ => {
+            for (i, (_id, flag)) in flags.iter().enumerate() {
+                let env_var_flag = flag_generator::Flag::flag_string(flag);
+                let env_var_name = format!("FLAG_{}", i + 1);
+                std::env::set_var(env_var_name, env_var_flag);
             }
         }
     }
 }
 
-fn set_flags_to_env_variables(flags: &mut EmbedFlags) {
-    if flags.embed_flags.len() > 1 {
-        for (i, flag) in flags.embed_flags.iter_mut().enumerate() {
-            let env_var_flag = flag_generator::Flag::flag_string(&mut flag.flag);
-            let env_var_name = format!("FLAG_{}", i + 1);
-            std::env::set_var(env_var_name, env_var_flag);
-        }
-    }
-    let mut flag = flags.embed_flags[0].flag.clone();
-    let env_var_flag = flag_generator::Flag::flag_string(&mut flag);
-    std::env::set_var("FLAG", env_var_flag);
-}
-
+#[allow(dead_code)]
 fn get_build_info(
     course_config: &mut CourseConfiguration,
     //week_number: u8, needed?
     task_id: String,
-) -> Result<WeeksTasksBuild, String> {
+) -> Result<BuildConfig, String> {
     for week in &mut course_config.weeks {
         for task in &week.tasks {
             if task_id == task.id {
@@ -145,23 +101,22 @@ fn get_build_info(
 }
 
 pub fn build_task(
-    course_config: &mut CourseConfiguration,
+    course_config: &CourseConfiguration,
     //week_number: u8,
     task_id: String,
     uuid: Uuid,
 ) {
-    let mut flags = generate_embed_flags_for_task(course_config, task_id.clone(), uuid);
-    set_flags_to_env_variables(&mut flags);
-    let build_info = get_build_info(course_config, task_id).unwrap();
-    let resource_directory = build_info.directory;
-    //the script which builds the task
-    let build_entrypoint = build_info.entrypoint;
-    //let output_filename = build_info.output.name;
+    let task_config = course_config
+        .get_task_by_id(&task_id)
+        .unwrap_or_else(|| panic!("Task with id {} not found in course configuration", task_id));
+    let id_flag_pairs = create_flag_id_pairs_by_task(task_config, course_config, uuid);
+    set_flags_to_env_variables(&id_flag_pairs);
 
-    env::set_current_dir(&resource_directory).expect("failed to locate resource directory");
+    env::set_current_dir(&task_config.build.directory)
+        .expect("failed to locate resource directory");
 
     let output = std::process::Command::new("sh")
-        .arg(build_entrypoint)
+        .arg(task_config.build.entrypoint.clone())
         .output()
         .expect("Failed to compile task");
 
@@ -175,6 +130,4 @@ pub fn build_task(
     if !output.status.success() {
         eprintln!("Error: {}", str::from_utf8(&output.stderr).unwrap());
     }
-
-    flags.embed_flags.clear();
 }

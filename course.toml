@@ -137,6 +137,23 @@ kind = "resource"
 name = "readme.txt"
 kind = "readme"
 
+[[weeks.tasks]]
+id = "task005"
+name = "Challenge 5"
+description = "Previous exploit was trivial. Try harder."
+points = 2.0
+# Minimalistic flag configuration since just single flag which provides all the points
+stages = [{ flag = { kind = "pure_random" } }]
+
+[weeks.tasks.build]
+directory = "samples/tasks/simple_shell"
+entrypoint = "entrypoint.sh"
+builder = "shell"
+
+[[weeks.tasks.build.output]]
+name = "readme.txt"
+kind = "readme"
+
 # Flag Types Configuration
 # TOML reader must raise an error if selected one is not one of these
 [flag_types]

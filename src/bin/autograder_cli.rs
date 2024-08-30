@@ -19,7 +19,7 @@ pub struct Config {
 /// Generate command
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate config
+    /// Generate configuration
     Generate {
         #[arg(short, long)]
         week: u8,

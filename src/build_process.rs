@@ -37,7 +37,7 @@ fn create_flag_id_pairs_by_task<'a>(
                     uuid,
                 )
                 .flag_string();
-                let flag_key = format!("flag_user_derived_{}", id.to_string());
+                let flag_key = format!("flag_user_derived_{}", id);
                 flags.insert(flag_key, flag_value);
             }
             "pure_random" => {
@@ -46,7 +46,7 @@ fn create_flag_id_pairs_by_task<'a>(
                     course_config.flag_types.pure_random.length,
                 )
                 .flag_string();
-                let flag_key = format!("flag_pure_random_{}", id.to_string());
+                let flag_key = format!("flag_pure_random_{}", id);
                 flags.insert(flag_key, flag_value);
             }
             "rng_seed" => {
@@ -58,7 +58,7 @@ fn create_flag_id_pairs_by_task<'a>(
                     uuid,
                 )
                 .flag_string();
-                let flag_key = format!("flag_user_seed_{}", id.to_string());
+                let flag_key = format!("flag_user_seed_{}", id);
                 flags.insert(flag_key, flag_value);
             }
             _ => panic!("Invalid flag type"),

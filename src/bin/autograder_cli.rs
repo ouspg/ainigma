@@ -34,6 +34,8 @@ enum Moodle {
     Moodle {
         #[arg(short, long)]
         number: u8,
+        #[arg(short, long)]
+        category: String,
     },
 }
 
@@ -48,8 +50,14 @@ fn main() {
                 let cmd_moodle = moodle;
                 match cmd_moodle {
                     Some(cmd_moodle) => match cmd_moodle {
-                        Moodle::Moodle { number } => {
-                            match moodle_build(cli.config, *week, task.clone(), *number) {
+                        Moodle::Moodle { number, category } => {
+                            match moodle_build(
+                                cli.config,
+                                *week,
+                                task.clone(),
+                                *number,
+                                category.to_string(),
+                            ) {
                                 Ok(()) => (),
                                 Err(error) => eprintln!("{}", error),
                             }
@@ -86,17 +94,19 @@ fn moodle_build(
     week: u8,
     task: Option<String>,
     number: u8,
+    category: String,
 ) -> Result<(), ConfigError> {
     if task.is_some() {
         println!(
-            "Generating {} moodle task for week {} and task {}",
+            "Generating {} category {} moodle task for week {} and task {}",
             &number,
+            &category,
             &week,
             &task.as_ref().unwrap()
         );
         let mut result = read_check_toml(path.into_os_string().as_os_str())?;
         let uuid = Uuid::now_v7();
-        build_task(&mut result, task.unwrap(), uuid)
+        //TODO: Generating moodle tasks
     } else {
         println!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week

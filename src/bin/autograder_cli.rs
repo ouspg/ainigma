@@ -19,7 +19,7 @@ pub struct Config {
 /// Generate command
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate config
+    /// Generate configuration
     Generate {
         #[arg(short, long)]
         week: u8,
@@ -34,6 +34,8 @@ enum Moodle {
     Moodle {
         #[arg(short, long)]
         number: u8,
+        #[arg(short, long)]
+        category: String,
     },
 }
 
@@ -48,8 +50,14 @@ fn main() {
                 let cmd_moodle = moodle;
                 match cmd_moodle {
                     Some(cmd_moodle) => match cmd_moodle {
-                        Moodle::Moodle { number } => {
-                            match moodle_build(cli.config, *week, task.clone(), *number) {
+                        Moodle::Moodle { number, category } => {
+                            match moodle_build(
+                                cli.config,
+                                *week,
+                                task.clone(),
+                                *number,
+                                category.to_string(),
+                            ) {
                                 Ok(()) => (),
                                 Err(error) => eprintln!("{}", error),
                             }
@@ -86,11 +94,13 @@ fn moodle_build(
     week: u8,
     task: Option<String>,
     number: u8,
+    category: String,
 ) -> Result<(), ConfigError> {
     if task.is_some() {
         println!(
-            "Generating {} moodle task for week {} and task {}",
+            "Generating {} category {} moodle task for week {} and task {}",
             &number,
+            &category,
             &week,
             &task.as_ref().unwrap()
         );

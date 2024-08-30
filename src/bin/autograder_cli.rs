@@ -107,7 +107,6 @@ fn moodle_build(
         let result = read_check_toml(path.into_os_string().as_os_str())?;
         let uuid = Uuid::now_v7();
         build_task(&result, task.unwrap(), uuid)
-        //TODO: Generating moodle tasks
     } else {
         println!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week

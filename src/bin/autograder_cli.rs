@@ -4,6 +4,8 @@ use autograder::{
 };
 use clap::{command, Parser, Subcommand};
 use std::path::PathBuf;
+use tracing::{debug, event, info, subscriber, Level};
+use tracing_subscriber;
 use uuid::Uuid;
 
 /// Autograder CLI Application
@@ -40,17 +42,37 @@ enum Moodle {
 }
 
 fn main() {
+    let collector = tracing_subscriber::fmt().finish();
     let cli = Config::parse();
 
     if !(cli.config.exists()) {
+        tracing::error!("Given configuration file is not found");
         panic!("configuration file doesn't exist")
     } else {
+        event!(Level::DEBUG, "Config file found");
         match &cli.command {
             Commands::Generate { week, task, moodle } => {
+                if task.is_some() {
+                    event!(
+                        Level::DEBUG,
+                        "Generating task {:?} for week {} with Moodle:{}",
+                        task,
+                        week,
+                        moodle.is_some()
+                    );
+                } else {
+                    event!(
+                        Level::DEBUG,
+                        "Generating tasks for week {} with Moodle:{}",
+                        week,
+                        moodle.is_some()
+                    );
+                }
                 let cmd_moodle = moodle;
                 match cmd_moodle {
                     Some(cmd_moodle) => match cmd_moodle {
                         Moodle::Moodle { number, category } => {
+                            event!(Level::DEBUG, "Moodle Option selected");
                             match moodle_build(
                                 cli.config,
                                 *week,

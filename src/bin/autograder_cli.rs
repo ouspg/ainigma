@@ -72,7 +72,6 @@ fn main() {
                 match cmd_moodle {
                     Some(cmd_moodle) => match cmd_moodle {
                         Moodle::Moodle { number, category } => {
-                            event!(Level::DEBUG, "Moodle Option selected");
                             match moodle_build(
                                 cli.config,
                                 *week,
@@ -96,6 +95,7 @@ fn main() {
 }
 
 fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), ConfigError> {
+    event!(Level::INFO, "Normal build option selected");
     if task.is_some() {
         println!(
             "Generating task for week {} and task {}",
@@ -103,7 +103,9 @@ fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), Con
             &task.as_ref().unwrap()
         );
         let result = read_check_toml(path.into_os_string().as_os_str())?;
+        event!(Level::INFO, "Course configuration created successfully");
         let uuid = Uuid::now_v7();
+        event!(Level::DEBUG, "Uuid created: {}", uuid.to_string());
         build_task(&result, task.unwrap(), uuid)
     } else {
         println!("Generating moodle task for week {}", &week);
@@ -118,6 +120,13 @@ fn moodle_build(
     number: u8,
     category: String,
 ) -> Result<(), ConfigError> {
+    event!(Level::INFO, "Moodle build option selected");
+    event!(
+        Level::DEBUG,
+        "Moodle building tasks for category {}, amount : {}",
+        category,
+        number
+    );
     if task.is_some() {
         println!(
             "Generating {} category {} moodle task for week {} and task {}",
@@ -127,6 +136,10 @@ fn moodle_build(
             &task.as_ref().unwrap()
         );
         let result = read_check_toml(path.into_os_string().as_os_str())?;
+        event!(
+            Level::INFO,
+            "Course configuration created and checked successfully"
+        );
         let uuid = Uuid::now_v7();
         build_task(&result, task.unwrap(), uuid)
     } else {

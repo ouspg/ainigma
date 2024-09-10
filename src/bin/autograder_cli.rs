@@ -3,7 +3,7 @@ use autograder::{
     config::{read_check_toml, ConfigError},
 };
 use clap::{command, Parser, Subcommand};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc, thread};
 use tracing::{event, Level};
 use tracing_subscriber;
 use uuid::Uuid;
@@ -42,32 +42,14 @@ enum Moodle {
 }
 
 fn main() {
-    let collector = tracing_subscriber::fmt().finish();
     let cli = Config::parse();
 
     if !(cli.config.exists()) {
-        tracing::error!("Given configuration file is not found");
         panic!("configuration file doesn't exist")
     } else {
         event!(Level::DEBUG, "Config file found");
         match &cli.command {
             Commands::Generate { week, task, moodle } => {
-                if task.is_some() {
-                    event!(
-                        Level::DEBUG,
-                        "Generating task {:?} for week {} with Moodle:{}",
-                        task,
-                        week,
-                        moodle.is_some()
-                    );
-                } else {
-                    event!(
-                        Level::DEBUG,
-                        "Generating tasks for week {} with Moodle:{}",
-                        week,
-                        moodle.is_some()
-                    );
-                }
                 let cmd_moodle = moodle;
                 match cmd_moodle {
                     Some(cmd_moodle) => match cmd_moodle {
@@ -95,7 +77,6 @@ fn main() {
 }
 
 fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), ConfigError> {
-    event!(Level::INFO, "Normal build option selected");
     if task.is_some() {
         println!(
             "Generating task for week {} and task {}",
@@ -103,9 +84,7 @@ fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), Con
             &task.as_ref().unwrap()
         );
         let result = read_check_toml(path.into_os_string().as_os_str())?;
-        event!(Level::INFO, "Course configuration created successfully");
         let uuid = Uuid::now_v7();
-        event!(Level::DEBUG, "Uuid created: {}", uuid.to_string());
         build_task(&result, task.unwrap(), uuid)
     } else {
         println!("Generating moodle task for week {}", &week);
@@ -120,13 +99,6 @@ fn moodle_build(
     number: u8,
     category: String,
 ) -> Result<(), ConfigError> {
-    event!(Level::INFO, "Moodle build option selected");
-    event!(
-        Level::DEBUG,
-        "Moodle building tasks for category {}, amount : {}",
-        category,
-        number
-    );
     if task.is_some() {
         println!(
             "Generating {} category {} moodle task for week {} and task {}",
@@ -136,12 +108,29 @@ fn moodle_build(
             &task.as_ref().unwrap()
         );
         let result = read_check_toml(path.into_os_string().as_os_str())?;
-        event!(
-            Level::INFO,
-            "Course configuration created and checked successfully"
-        );
-        let uuid = Uuid::now_v7();
-        build_task(&result, task.unwrap(), uuid)
+
+        if number > 1 {
+            // Multithread the task many times
+            let mut handles = vec![];
+
+            let config = Arc::new(&result);
+
+            for i in 0..number {
+                let handle = thread::spawn(move || {});
+                let courseconf = Arc::clone(&config);
+                let uuid = Uuid::now_v7();
+                build_task(&courseconf, task.clone().unwrap(), uuid);
+                handles.push(handle)
+            }
+
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        } else {
+            // only one task generated
+            let uuid = Uuid::now_v7();
+            build_task(&result, task.unwrap(), uuid)
+        }
     } else {
         println!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week

@@ -5,7 +5,6 @@ use autograder::{
 use clap::{command, Parser, Subcommand};
 use std::{path::PathBuf, sync::Arc, thread};
 use tracing::{event, Level};
-use tracing_subscriber;
 use uuid::Uuid;
 
 /// Autograder CLI Application
@@ -115,14 +114,14 @@ fn moodle_build(
 
             let config = Arc::new(&result);
 
-            for i in 0..number {
+            for _i in 0..number {
                 let handle = thread::spawn(move || {});
                 let courseconf = Arc::clone(&config);
                 let uuid = Uuid::now_v7();
                 build_task(&courseconf, task.clone().unwrap(), uuid);
                 handles.push(handle)
             }
-
+            // join multithreads together
             for handle in handles {
                 handle.join().unwrap();
             }

@@ -4,7 +4,6 @@ use autograder::{
 };
 use clap::{command, Parser, Subcommand};
 use std::{path::PathBuf, sync::Arc, thread};
-use tracing::{event, Level};
 use uuid::Uuid;
 
 /// Autograder CLI Application
@@ -46,7 +45,6 @@ fn main() {
     if !(cli.config.exists()) {
         panic!("configuration file doesn't exist")
     } else {
-        event!(Level::DEBUG, "Config file found");
         match &cli.command {
             Commands::Generate { week, task, moodle } => {
                 let cmd_moodle = moodle;

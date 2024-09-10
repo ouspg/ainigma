@@ -4,7 +4,7 @@ use autograder::{
 };
 use clap::{command, Parser, Subcommand};
 use std::path::PathBuf;
-use tracing::{debug, event, info, subscriber, Level};
+use tracing::{event, Level};
 use tracing_subscriber;
 use uuid::Uuid;
 

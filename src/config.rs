@@ -217,16 +217,32 @@ impl BuildConfig {
         }
     }
 }
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct BuildOutputFile {
-    pub name: String,
-    // TODO create own type
-    pub kind: String,
+    pub kind: OutputKind,
 }
 
-impl BuildOutputFile {
-    pub fn new(name: String, kind: String) -> BuildOutputFile {
-        BuildOutputFile { name, kind }
+#[derive(Debug, Deserialize, Clone)]
+pub enum OutputKind {
+    #[serde(rename = "internal")]
+    Internal(String),
+    #[serde(rename = "resource")]
+    Resource(String),
+    #[serde(rename = "readme")]
+    Readme(String),
+    #[serde(rename = "meta")]
+    Meta(String),
+}
+
+impl OutputKind {
+    pub fn get_filename(&self) -> &str {
+        match self {
+            OutputKind::Internal(name) => name,
+            OutputKind::Resource(name) => name,
+            OutputKind::Readme(name) => name,
+            OutputKind::Meta(name) => name,
+        }
     }
 }
 

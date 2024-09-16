@@ -22,6 +22,8 @@ enum Commands {
     /// Generate configuration
     Generate {
         #[arg(short, long)]
+        dry_run: bool,
+        #[arg(short, long)]
         week: u8,
         #[arg(short, long)]
         task: Option<String>,
@@ -46,7 +48,17 @@ fn main() {
         panic!("configuration file doesn't exist")
     } else {
         match &cli.command {
-            Commands::Generate { week, task, moodle } => {
+            Commands::Generate {
+                dry_run,
+                week,
+                task,
+                moodle,
+            } => {
+                if *dry_run {
+                    // Just parse the config for now
+                    let result = read_check_toml(cli.config.as_os_str()).unwrap();
+                    dbg!(result);
+                }
                 let cmd_moodle = moodle;
                 match cmd_moodle {
                     Some(cmd_moodle) => match cmd_moodle {

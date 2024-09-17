@@ -1,6 +1,6 @@
 use super::CloudStorage;
 use super::FileObjects;
-use crate::errors::AccessError;
+use crate::errors::{AccessError, CloudStorageError};
 use s3::{
     bucket::Bucket,
     creds::Credentials,
@@ -28,10 +28,16 @@ impl S3Storage {
         link_expiration_days: u32,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // We currently support only acquiring credentials from environment variables
-        let access_key = env::var("AWS_ACCESS_KEY_ID")
-            .map_err(|e| AccessError::MissingAccessKey(e.to_string()))?;
-        let secret_key = env::var("AWS_SECRET_ACCESS_KEY")
-            .map_err(|e| AccessError::MissingAccessKey(e.to_string()))?;
+        let access_key = env::var("AWS_ACCESS_KEY_ID").map_err(|e| {
+            AccessError::MissingAccessKey(
+                "AWS_ACCESS_KEY_ID - ".to_owned() + e.to_string().as_str(),
+            )
+        })?;
+        let secret_key = env::var("AWS_SECRET_ACCESS_KEY").map_err(|e| {
+            AccessError::MissingAccessKey(
+                "AWS_SECRET_ACCESS_KEY - ".to_owned() + e.to_string().as_str(),
+            )
+        })?;
         let session_token = env::var("AWS_SESSION_TOKEN").ok();
         let credentials = Credentials::new(
             Some(&access_key),
@@ -76,11 +82,14 @@ impl S3Storage {
 
 impl CloudStorage for S3Storage {
     // #[tracing::instrument]
-    async fn upload(&self, files: FileObjects) -> Result<String, Box<dyn std::error::Error>> {
+    async fn upload(
+        &self,
+        files: FileObjects,
+    ) -> Result<HashMap<String, String>, CloudStorageError> {
         //
 
         tracing::info!(
-            "Starting to upload {} files in to the S3 bucket {} in path '{}'.",
+            "Starting to upload {} files in to the S3 bucket '{}' in path '{}'.",
             files.len(),
             self.bucket.name(),
             files.dst_location
@@ -88,11 +97,13 @@ impl CloudStorage for S3Storage {
         let exists = self.bucket.exists().await?;
         if exists {
             tracing::info!("Bucket exists! Updating the bucket lifecycle.");
-            let result = self
-                .bucket
-                .put_bucket_lifecycle(self.life_cycle.clone())
-                .await?;
-            tracing::info!("The result of the bucket lifecycle update: {:?}", result);
+            // let result = self
+            //     .bucket
+            //     .put_bucket_lifecycle(self.life_cycle.clone())
+            //     .await?;
+            // let result = self.bucket.get_bucket_lifecycle().await?;
+            // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
+            // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
             // Upload the files
             let shared_map = Arc::new(Mutex::new(HashMap::<String, String>::with_capacity(
                 files.len(),
@@ -101,8 +112,6 @@ impl CloudStorage for S3Storage {
             for file in files.files {
                 let shared_map = Arc::clone(&shared_map);
                 let bucket = self.bucket.clone();
-                // let bucket = self.bucket.clone();
-                // let dst_location = files.dst_location.clone();
                 let link_expiration_days = self.link_expiration_days;
                 let file_key = format!("/{}/{}", files.dst_location, file.0);
                 let task = tokio::spawn(async move {
@@ -145,13 +154,14 @@ impl CloudStorage for S3Storage {
             for task in tasks {
                 task.await.unwrap();
             }
-            let map = shared_map.lock().await;
-            println!("{:#?}", *map);
+            let mut map = shared_map.lock().await;
+            Ok(core::mem::take(&mut map))
         } else {
-            tracing::error!("The bucket {} did not exist", self.bucket.name());
-            return Ok("Not nice".to_string());
+            tracing::warn!("The bucket {} did not exist, we expect currently that you have created it manually.", self.bucket.name());
+            Err(CloudStorageError::BucketNotFound(
+                self.bucket.name().to_owned(),
+            ))
         }
-        Ok("Nice!".to_string())
     }
 
     #[tracing::instrument]

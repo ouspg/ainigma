@@ -1,2 +1,2 @@
 mod base;
-pub use base::{AccessError, FileObjectError};
+pub use base::{AccessError, CloudStorageError, FileObjectError};

@@ -49,6 +49,14 @@ enum Moodle {
 }
 
 fn main() {
+    // Global stdout subscriber for event tracing
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    // In case of env filter
+    // tracing_subscriber::fmt()
+    //         .with_env_filter(EnvFilter::from_default_env())
+    //         .init();
+
     let cli = Config::parse();
 
     if !(cli.config.exists()) {
@@ -64,7 +72,7 @@ fn main() {
                 if *dry_run {
                     // Just parse the config for now
                     // dbg!(result);
-                    println!("Dry run of generate..")
+                    tracing::info!("Dry run of generate..")
                 }
                 let cmd_moodle = moodle;
                 match cmd_moodle {
@@ -93,22 +101,29 @@ fn main() {
                     let result = read_check_toml(cli.config.as_os_str());
                     if let Ok(config) = result {
                         // Check if the bucket exists
-                        let storage = S3Storage::from_config(config.deployment.upload).unwrap();
+                        let storage = S3Storage::from_config(config.deployment.upload);
+                        let storage = match storage {
+                            Ok(storage) => storage,
+                            Err(error) => {
+                                tracing::error!("Error when creating the S3 storage: {}", error);
+                                tracing::error!("Cannot continue with the file upload.");
+                                std::process::exit(1)
+                            }
+                        };
 
-                        let files = vec![PathBuf::from("./foo.txt")];
+                        let files = vec![PathBuf::from("./files/foo.txt")];
 
                         match FileObjects::new("test".to_string(), files) {
                             Ok(files) => {
-                                let subscriber = tracing_subscriber::FmtSubscriber::new();
-                                tracing::subscriber::set_global_default(subscriber).unwrap();
-
                                 let rt = Runtime::new().unwrap();
                                 rt.block_on(async {
                                     storage.upload(files).await.unwrap();
-                                    println!("Voila!");
+                                    tracing::info!("Voila!");
                                 });
                             }
-                            Err(error) => eprintln!("{}", error),
+                            Err(error) => {
+                                tracing::error!("Error when creating the file objects: {}", error);
+                            }
                         }
                     } else {
                         eprintln!("Error: {}", result.err().unwrap());

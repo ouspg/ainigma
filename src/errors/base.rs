@@ -10,6 +10,8 @@ pub enum FileObjectError {
     },
     #[error("Filepath ending to '..', attempted path traversal with suffix? : {0}")]
     SuffixPathTraversal(String),
+    #[error("Filepath with '..', attempted path traversal : {0}")]
+    GeneralPathTraversal(String),
     /// file not exist
     #[error("File {0} does not exist")]
     InvalidFilePath(#[from] std::io::Error),
@@ -22,6 +24,15 @@ pub enum FileObjectError {
     PresignedUrlFailure(String),
     #[error("unknown data store error")]
     Unknown,
+}
+
+#[derive(Error, Debug)]
+pub enum CloudStorageError {
+    #[error("Bucket not found: {0}")]
+    BucketNotFound(String),
+    // inner S3 error wrapped
+    #[error("Inner S3 error: {0:?}")]
+    S3Error(#[from] s3::error::S3Error),
 }
 
 #[derive(Error, Debug)]

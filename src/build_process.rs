@@ -100,7 +100,7 @@ pub fn build_task(
     //env::set_current_dir(&task_config.build.directory)
     //    .expect("failed to locate resource directory");
     match task_config.build.builder {
-        Builder::shell(ref entrypoint) => {
+        Builder::Shell(ref entrypoint) => {
             let output = std::process::Command::new("sh")
                 .arg(entrypoint.entrypoint.as_str())
                 .envs(id_flag_pairs)
@@ -119,6 +119,6 @@ pub fn build_task(
                 eprintln!("Error: {}", str::from_utf8(&output.stderr).unwrap());
             }
         }
-        Builder::nix(_) => {}
+        Builder::Nix(_) => {}
     }
 }

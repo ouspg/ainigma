@@ -224,14 +224,11 @@ pub struct BuildOutputFile {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum OutputKind {
-    #[serde(rename = "internal")]
     Internal(String),
-    #[serde(rename = "resource")]
     Resource(String),
-    #[serde(rename = "readme")]
     Readme(String),
-    #[serde(rename = "meta")]
     Meta(String),
 }
 
@@ -284,16 +281,16 @@ pub struct Upload {
 
 #[derive(Debug, Deserialize, Clone)]
 #[non_exhaustive]
-#[allow(non_camel_case_types)]
+#[serde(rename_all = "lowercase")]
 pub enum Builder {
-    nix(Nix),
-    shell(Shell),
+    Nix(Nix),
+    Shell(Shell),
 }
 impl Builder {
     pub const fn to_str(&self) -> &str {
         match self {
-            Builder::nix(_) => "nix",
-            Builder::shell(_) => "shell",
+            Builder::Nix(_) => "nix",
+            Builder::Shell(_) => "shell",
         }
     }
 }

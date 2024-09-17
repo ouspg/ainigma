@@ -162,4 +162,9 @@ build_timeout = 300 # seconds
 [deployment.upload]
 AWS_S3_ENDPOINT = "https://a3s.fi"
 AWS_REGION = ""
+BUCKET_NAME = "hardware-software-security"
+# Days when the link is valid for the user
+LINK_EXPIRATION = 14 # In days
+# Days when the files are automatically deleted from the storage
+FILE_EXPIRATION = 30 # In days
 # Credentials are stored in the environment variables

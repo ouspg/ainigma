@@ -1,9 +1,11 @@
 use autograder::{
     build_process::build_task,
     config::{read_check_toml, ConfigError},
+    storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{command, Parser, Subcommand};
 use std::path::PathBuf;
+use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 /// Autograder CLI Application
@@ -29,6 +31,11 @@ enum Commands {
         task: Option<String>,
         #[command(subcommand)]
         moodle: Option<Moodle>,
+    },
+    Upload {
+        /// Check if the bucket exists
+        #[arg(short, long)]
+        check_bucket: bool,
     },
 }
 #[derive(Debug, Subcommand)]
@@ -56,8 +63,8 @@ fn main() {
             } => {
                 if *dry_run {
                     // Just parse the config for now
-                    let result = read_check_toml(cli.config.as_os_str()).unwrap();
-                    dbg!(result);
+                    // dbg!(result);
+                    println!("Dry run of generate..")
                 }
                 let cmd_moodle = moodle;
                 match cmd_moodle {
@@ -79,6 +86,33 @@ fn main() {
                         Ok(()) => (),
                         Err(error) => eprintln!("{}", error),
                     },
+                }
+            }
+            Commands::Upload { check_bucket } => {
+                if *check_bucket {
+                    let result = read_check_toml(cli.config.as_os_str());
+                    if let Ok(config) = result {
+                        // Check if the bucket exists
+                        let storage = S3Storage::from_config(config.deployment.upload).unwrap();
+
+                        let files = vec![PathBuf::from("./foo.txt")];
+
+                        match FileObjects::new("test".to_string(), files) {
+                            Ok(files) => {
+                                let subscriber = tracing_subscriber::FmtSubscriber::new();
+                                tracing::subscriber::set_global_default(subscriber).unwrap();
+
+                                let rt = Runtime::new().unwrap();
+                                rt.block_on(async {
+                                    storage.upload(files).await.unwrap();
+                                    println!("Voila!");
+                                });
+                            }
+                            Err(error) => eprintln!("{}", error),
+                        }
+                    } else {
+                        eprintln!("Error: {}", result.err().unwrap());
+                    }
                 }
             }
         }

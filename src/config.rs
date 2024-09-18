@@ -7,6 +7,9 @@ use std::fs::File;
 use std::io::Read;
 use uuid::Uuid;
 
+const DEFAULT_NIX_FILENAME: &str = "flake.nix";
+const DEFAULT_SH_FILENAME: &str = "entrypoint.sh";
+
 use crate::flag_generator;
 
 #[derive(Debug)]
@@ -57,7 +60,7 @@ impl fmt::Display for ConfigError {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CourseConfiguration {
     //TODO:Change to UUID
     pub identifier: String,
@@ -66,6 +69,7 @@ pub struct CourseConfiguration {
     pub version: String,
     pub weeks: Vec<Week>,
     pub flag_types: FlagsTypes,
+    pub deployment: Deployment,
 }
 
 impl CourseConfiguration {
@@ -76,6 +80,7 @@ impl CourseConfiguration {
         version: String,
         weeks: Vec<Week>,
         flag_types: FlagsTypes,
+        deployment: Deployment,
     ) -> CourseConfiguration {
         CourseConfiguration {
             identifier,
@@ -84,6 +89,7 @@ impl CourseConfiguration {
             version,
             weeks,
             flag_types,
+            deployment,
         }
     }
     pub fn get_task_by_id(&self, id: &str) -> Option<&Task> {
@@ -98,7 +104,7 @@ impl CourseConfiguration {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Week {
     pub tasks: Vec<Task>,
     pub number: u8,
@@ -115,7 +121,7 @@ impl Week {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Task {
     pub id: String,
     pub name: String,
@@ -163,13 +169,13 @@ impl Task {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 #[non_exhaustive]
 pub struct FlagConfig {
     pub kind: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TaskElement {
     pub id: Option<String>,
     pub name: Option<String>,
@@ -195,61 +201,138 @@ impl TaskElement {
         }
     }
 }
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BuildConfig {
     pub directory: String,
-    pub entrypoint: String,
-    pub builder: String,
+    pub builder: Builder,
     pub output: Vec<BuildOutputFile>,
 }
 
 impl BuildConfig {
-    pub fn new(
-        directory: String,
-        entrypoint: String,
-        builder: String,
-        output: Vec<BuildOutputFile>,
-    ) -> BuildConfig {
+    pub fn new(directory: String, builder: Builder, output: Vec<BuildOutputFile>) -> BuildConfig {
         BuildConfig {
             directory,
-            entrypoint,
             builder,
             output,
         }
     }
 }
-#[derive(Deserialize, Clone)]
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct BuildOutputFile {
-    pub name: String,
-    // TODO create own type
-    pub kind: String,
+    pub kind: OutputKind,
 }
 
-impl BuildOutputFile {
-    pub fn new(name: String, kind: String) -> BuildOutputFile {
-        BuildOutputFile { name, kind }
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputKind {
+    Internal(String),
+    Resource(String),
+    Readme(String),
+    Meta(String),
+}
+
+impl OutputKind {
+    pub fn get_filename(&self) -> &str {
+        match self {
+            OutputKind::Internal(name) => name,
+            OutputKind::Resource(name) => name,
+            OutputKind::Readme(name) => name,
+            OutputKind::Meta(name) => name,
+        }
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct FlagsTypes {
     pub pure_random: PureRandom,
     pub user_derived: UserDerived,
     pub rng_seed: RngSeed,
 }
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PureRandom {
     pub length: u8,
 }
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct UserDerived {
     pub algorithm: flag_generator::Algorithm,
     pub secret: String,
 }
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RngSeed {
     pub secret: String,
 }
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Deployment {
+    pub build_timeout: u32,
+    pub upload: Upload,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "UPPERCASE")]
+pub struct Upload {
+    pub aws_s3_endpoint: String,
+    pub aws_region: String,
+    pub bucket_name: String,
+    pub link_expiration: u32,
+    pub file_expiration: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[non_exhaustive]
+#[serde(rename_all = "lowercase")]
+pub enum Builder {
+    Nix(Nix),
+    Shell(Shell),
+}
+impl Builder {
+    pub const fn to_str(&self) -> &str {
+        match self {
+            Builder::Nix(_) => "nix",
+            Builder::Shell(_) => "shell",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Nix {
+    #[serde(default = "Nix::default_entrypoint")]
+    pub entrypoint: String,
+}
+impl Nix {
+    pub fn default_entrypoint() -> String {
+        DEFAULT_NIX_FILENAME.to_string()
+    }
+}
+
+impl Default for Nix {
+    fn default() -> Self {
+        Nix {
+            entrypoint: DEFAULT_NIX_FILENAME.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Shell {
+    #[serde(default = "Shell::default_entrypoint")]
+    pub entrypoint: String,
+}
+impl Shell {
+    pub fn default_entrypoint() -> String {
+        DEFAULT_SH_FILENAME.to_string()
+    }
+}
+
+impl Default for Shell {
+    fn default() -> Self {
+        Shell {
+            entrypoint: Self::default_entrypoint(),
+        }
+    }
+}
+
 pub fn read_toml_content_from_file(filepath: &OsStr) -> Result<String, Box<dyn Error>> {
     let mut file = File::open(filepath)?;
     let mut file_content = String::new();

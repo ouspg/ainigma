@@ -2,7 +2,7 @@ use core::str;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::config::{BuildConfig, CourseConfiguration, Task};
+use crate::config::{BuildConfig, Builder, CourseConfiguration, Task};
 use crate::flag_generator::{self};
 
 /*
@@ -99,22 +99,26 @@ pub fn build_task(
 
     //env::set_current_dir(&task_config.build.directory)
     //    .expect("failed to locate resource directory");
+    match task_config.build.builder {
+        Builder::Shell(ref entrypoint) => {
+            let output = std::process::Command::new("sh")
+                .arg(entrypoint.entrypoint.as_str())
+                .envs(id_flag_pairs)
+                .current_dir(&task_config.build.directory)
+                .output()
+                .expect("Failed to compile task");
 
+            if output.status.success() {
+                let stdout = str::from_utf8(&output.stdout).expect("Failed to parse output");
+                let mut lines = stdout.lines();
 
-    // implement process for generic commands
-    let output = std::process::Command::new("sh")
-        .arg(task_config.build.entrypoint.clone())
-        .envs(id_flag_pairs)
-        .current_dir(&task_config.build.directory)
-        .output()
-        .expect("Failed to compile task");
-
-    if output.status.success() {
-        // Check files exist in directory
-        
-        // Return created file paths
-    }
-    if !output.status.success() {
-        eprintln!("Error: {}", str::from_utf8(&output.stderr).unwrap());
+                let path = lines.next().unwrap_or_default();
+                println!("Absolute path of the created files: {} ", path);
+            }
+            if !output.status.success() {
+                eprintln!("Error: {}", str::from_utf8(&output.stderr).unwrap());
+            }
+        }
+        Builder::Nix(_) => {}
     }
 }

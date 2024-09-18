@@ -37,35 +37,33 @@ stages = [
 
 [weeks.tasks.build]
 directory = "tasks/week1/buffer_overflow"
-entrypoint = "build.sh"                   #default
-builder = "shell"
+builder = { shell = {} }                  # Shell builder without entrypoint
+# Default is entrypoint.sh, but we could override it
+# builder = { shell = { entrypoint = "my_entrypoint.sh" } }
 
 [[weeks.tasks.build.output]]
-name = "exploitable.bin"
 # Resource means that it is provided for the end-user
-kind = "resource"
+kind = { resource = "exloitable.bin" }
 
 [[weeks.tasks.build.output]]
-name = "vulnerable_server.py"
 # Internal use to provide the challenge from cloud, for example
 # Might be rare use case
 # We might need to design tasks in mind that there is just a single server, but connection variable changes behaviour
-kind = "internal"
+kind = { internal = "vulnerable_server.py" }
+
 
 [[weeks.tasks.build.output]]
 # Specific kind of resource; instruction for the assignment and should be used as it is
 # It includes something that is expected to be different for every user doing the tasks, and as so it is needed here
 # Probably optionally generate file or as string from the builder
-name = "readme.txt"
-kind = "readme"
+kind = { readme = "readme.txt" }
 
 [[weeks.tasks.build.output]]
 # Mechanic to provide embedded metadata for the task descriptions (e.g. Moodle exam), e.g. URL, docker image name
 # Something that is expected to be different for every user doing the tasks
 # Maybe not needed as "file", rather data returned by the build system
 # Should be likely key-value storage, with some predefined keys. Custom keys allowed.
-name = "meta.json"
-kind = "meta"
+kind = { meta = "meta.json" }
 
 [[weeks.tasks]]
 id = "task002"
@@ -77,21 +75,20 @@ stages = [{ flag = { kind = "pure_random" } }]
 
 [weeks.tasks.build]
 directory = "tasks/week1/basic_crypto"
-entrypoint = "flake.nix"
-builder = "nix"
+# Default entrypoint for nix is "flake.nix"
+builder = { nix = {} }
 
 [[weeks.tasks.build.output]]
-name = "exploitable.bin"
-kind = "resource"
+kind = { resource = "exloitable.bin" }
 
 [[weeks.tasks.build.output]]
-name = "vulnerable_server.py"
-kind = "internal"
+kind = { internal = "vulnerable_server.py" }
+
 
 [[weeks.tasks.build.output]]
 # Instruction for the assignment, should be used as it is
-name = "readme.txt"
-kind = "readme"
+kind = { readme = "readme.txt" }
+
 
 [[weeks]]
 number = 2
@@ -106,16 +103,13 @@ stages = [{ flag = { kind = "pure_random" } }]
 
 [weeks.tasks.build]
 directory = "tasks/week2/sql_injection"
-entrypoint = "setup.sh"
-builder = "shell"
+builder = { shell = { entrypoint = "setup.sh" } }
 
 [[weeks.tasks.build.output]]
-name = "vulnerable_server.py"
-kind = "internal"
+kind = { internal = "vulnerable_server.py" }
 
 [[weeks.tasks.build.output]]
-name = "readme.txt"
-kind = "readme"
+kind = { readme = "readme.txt" }
 
 [[weeks.tasks]]
 id = "task004"
@@ -126,16 +120,13 @@ stages = [{ flag = { kind = "rng_seed" } }]
 
 [weeks.tasks.build]
 directory = "tasks/week2/packet_analysis"
-entrypoint = "generate_pcap.sh"
-builder = "shell"
+builder = { shell = { entrypoint = "generate_pcap.sh" } }
 
 [[weeks.tasks.build.output]]
-name = "my_traffic.pcap"
-kind = "resource"
+kind = { resource = "my_traffic.pcap" }
 
 [[weeks.tasks.build.output]]
-name = "readme.txt"
-kind = "readme"
+kind = { readme = "readme.txt" }
 
 [[weeks.tasks]]
 id = "task005"
@@ -147,12 +138,10 @@ stages = [{ flag = { kind = "pure_random" } }]
 
 [weeks.tasks.build]
 directory = "samples/tasks/simple_shell"
-entrypoint = "entrypoint.sh"
-builder = "shell"
+builder = { shell = { entrypoint = "build.sh" } }
 
 [[weeks.tasks.build.output]]
-name = "readme.txt"
-kind = "readme"
+kind = { readme = "readme.txt" }
 
 # Flag Types Configuration
 # TOML reader must raise an error if selected one is not one of these
@@ -168,10 +157,15 @@ user_derived = { algorithm = "HMAC_SHA3_256", secret = "6b2c0c4535ea5b7c7f4fc603
 rng_seed = { secret = "You must know me to predict the seed of the other users" }
 
 
-[build]
-default_timeout = 300 # seconds
+[deployment]
+build_timeout = 300 # seconds
 
-# Build-type specific confs
-# If entrypoint is not provided, it is assumed to be the default_filename
-nix = { default_filename = "flake.nix" }
-shell = { default_filename = "build.sh" }
+[deployment.upload]
+AWS_S3_ENDPOINT = "https://a3s.fi"
+AWS_REGION = "us-west-2"                   # Something to make AWS SDK happy
+BUCKET_NAME = "hardware-software-security"
+# Days when the link is valid for the user
+LINK_EXPIRATION = 7 # 7 days is currently the maximum policy for AWS S3
+# Days when the files are automatically deleted from the storage
+FILE_EXPIRATION = 21 # In days - TODO currently just manual use
+# Credentials are stored in the environment variables

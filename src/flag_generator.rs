@@ -13,7 +13,7 @@ type Hmac256 = Hmac<Sha3_256>;
 ///
 /// #### Algorithms
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
-#[derive(PartialEq, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Deserialize, Clone)]
 pub enum Algorithm {
     #[allow(non_camel_case_types)]
     HMAC_SHA3_256,
@@ -111,7 +111,7 @@ impl FlagUnit {
 
     fn return_flag(&self) -> String {
         let flag_prefix = &self.prefix;
-        let flag_suffix = &self.suffix;
+        let flag_suffix = self.suffix.as_str();
 
         flag_prefix.to_owned() + ":" + flag_suffix
     }

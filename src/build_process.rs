@@ -1,5 +1,6 @@
 use core::str;
 use std::collections::HashMap;
+use std::path::Path;
 use uuid::Uuid;
 
 use crate::config::{BuildConfig, Builder, CourseConfiguration, Task};
@@ -111,12 +112,19 @@ pub fn build_task(
             if output.status.success() {
                 // check if files exists
                 let stdout = str::from_utf8(&output.stdout).expect("Failed to parse output");
-                let mut lines = stdout.lines();
-                // return file paths
-                let path = lines.next().unwrap_or_default();
-                println!("Absolute path of the created files: {} ", path);
+                let lines = stdout.lines();
+                for line in lines {
+                    let path = Path::new(&line);
+
+                    if path.exists() {
+                        tracing::info!("File exists: {}", line);
+                    } else {
+                        tracing::info!("File not found: {}", line);
+                    }
+                }
             }
             if !output.status.success() {
+                tracing::error!("Error: {}", str::from_utf8(&output.stderr).unwrap());
                 eprintln!("Error: {}", str::from_utf8(&output.stderr).unwrap());
             }
         }

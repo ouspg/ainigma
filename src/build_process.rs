@@ -126,7 +126,7 @@ pub fn build_task(
 
                         Err(_) => {
                             tracing::error!("File does not exist: {}", path.display());
-                            panic!("File should exist when it is created");
+                            panic!("File should exist in the specified folder");
                         }
                     }
                 }

@@ -109,9 +109,10 @@ pub fn build_task(
                 .expect("Failed to compile task");
 
             if output.status.success() {
+                // check if files exists
                 let stdout = str::from_utf8(&output.stdout).expect("Failed to parse output");
                 let mut lines = stdout.lines();
-
+                // return file paths
                 let path = lines.next().unwrap_or_default();
                 println!("Absolute path of the created files: {} ", path);
             }

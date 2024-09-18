@@ -22,6 +22,8 @@ pub enum FileObjectError {
     // Failed to get presigned URL
     #[error("Failed to get presigned URL{0}")]
     PresignedUrlFailure(String),
+    #[error("Failed to read file: {0}")]
+    FileReadError(String),
     #[error("unknown data store error")]
     Unknown,
 }
@@ -33,6 +35,10 @@ pub enum CloudStorageError {
     // inner S3 error wrapped
     #[error("Inner S3 error: {0:?}")]
     S3Error(#[from] s3::error::S3Error),
+    #[error("AWS SDK error: {0}")]
+    AWSSdkError(String),
+    #[error("Failed to read file when uploading: {0}")]
+    FileReadError(String),
 }
 
 #[derive(Error, Debug)]

@@ -1,6 +1,8 @@
 use super::CloudStorage;
 use super::FileObjects;
-use crate::errors::{AccessError, CloudStorageError};
+use crate::errors::{AccessError, CloudStorageError, FileObjectError};
+use futures::future::try_join_all;
+use futures::try_join;
 
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
@@ -13,7 +15,8 @@ use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct S3Storage {
-    client: Arc<Client>,
+    // client: Arc<Client>,
+    client: Client,
     bucket: String,
     // life_cycle: BucketLifecycleConfiguration,
     link_expiration_days: u32,
@@ -47,7 +50,7 @@ impl S3Storage {
             .behavior_version_latest()
             .build();
         let link_expiration_days = config.link_expiration;
-        let client = Arc::new(Client::from_conf(client_config));
+        let client = Client::from_conf(client_config);
 
         Ok(S3Storage {
             client,
@@ -89,18 +92,15 @@ impl CloudStorage for S3Storage {
                 )));
                 let mut tasks = Vec::with_capacity(files.len());
                 for file in files.files {
-                    let shared_map = Arc::clone(&shared_map);
-                    let client = Arc::clone(&self.client);
-                    let bucket = self.bucket.clone();
-                    let link_expiration_days = self.link_expiration_days;
                     let file_key = format!("{}/{}", files.dst_location, file.0);
-                    let task = tokio::spawn(async move {
-                        let body = ByteStream::from_path(&file.1).await;
+                    let task = async {
+                        let body = ByteStream::from_path(file.1).await;
                         match body {
                             Ok(b) => {
-                                let response = client
+                                let response = self
+                                    .client
                                     .put_object()
-                                    .bucket(&bucket)
+                                    .bucket(&self.bucket)
                                     .key(&file_key)
                                     .body(b)
                                     .send()
@@ -111,13 +111,16 @@ impl CloudStorage for S3Storage {
                                             "Created or updated the file with expiration: {}",
                                             r.expiration.unwrap_or_default()
                                         );
-                                        let presigned_request = client
+                                        let presigned_request = self
+                                            .client
                                             .get_object()
-                                            .bucket(bucket)
+                                            .bucket(&self.bucket)
                                             .key(&file_key)
                                             .presigned(
                                                 PresigningConfig::expires_in(Duration::from_secs(
-                                                    link_expiration_days.wrapping_mul(86400).into(),
+                                                    self.link_expiration_days
+                                                        .wrapping_mul(86400)
+                                                        .into(),
                                                 ))
                                                 .unwrap(),
                                             )
@@ -136,27 +139,39 @@ impl CloudStorage for S3Storage {
                                                     "Failed to generate the pre-signed URL: {}",
                                                     e
                                                 );
+                                                return Err(CloudStorageError::AWSSdkError(
+                                                    e.to_string(),
+                                                ));
                                             }
                                         }
                                     }
                                     Err(e) => {
                                         tracing::error!("Failed to upload the file: {}", e);
+                                        return Err(CloudStorageError::AWSSdkError(e.to_string()));
                                     }
                                 }
                             }
                             Err(e) => {
                                 tracing::error!("Failed to read the file: {}", e);
+                                return Err(CloudStorageError::FileReadError(e.to_string()));
                             }
                         }
-                    });
+                        Ok(())
+                    };
                     tasks.push(task);
                 }
-                for task in tasks {
-                    task.await.unwrap();
+                let result = try_join_all(tasks).await;
+                match result {
+                    Ok(_) => {
+                        let mut map = shared_map.lock().await;
+                        tracing::info!("Uploaded {} files successfully.", map.len());
+                        Ok(core::mem::take(&mut map))
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to upload the files: {}", e);
+                        Err(CloudStorageError::AWSSdkError(e.to_string()))
+                    }
                 }
-                let mut map = shared_map.lock().await;
-                tracing::info!("Uploaded {} files successfully.", map.len());
-                Ok(core::mem::take(&mut map))
             }
             Err(e) => {
                 tracing::warn!("The bucket likely {} did not exist, we expect currently that you have created it manually: {}", self.bucket, e);

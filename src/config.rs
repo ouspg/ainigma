@@ -224,14 +224,11 @@ pub struct BuildOutputFile {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum OutputKind {
-    #[serde(rename = "internal")]
     Internal(String),
-    #[serde(rename = "resource")]
     Resource(String),
-    #[serde(rename = "readme")]
     Readme(String),
-    #[serde(rename = "meta")]
     Meta(String),
 }
 
@@ -271,34 +268,44 @@ pub struct Deployment {
     pub build_timeout: u32,
     pub upload: Upload,
 }
-// Uplaod
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct Upload {
     pub aws_s3_endpoint: String,
     pub aws_region: String,
+    pub bucket_name: String,
+    pub link_expiration: u32,
+    pub file_expiration: u32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[non_exhaustive]
-#[allow(non_camel_case_types)]
+#[serde(rename_all = "lowercase")]
 pub enum Builder {
-    nix(Nix),
-    shell(Shell),
+    Nix(Nix),
+    Shell(Shell),
 }
 impl Builder {
     pub const fn to_str(&self) -> &str {
         match self {
-            Builder::nix(_) => "nix",
-            Builder::shell(_) => "shell",
+            Builder::Nix(_) => "nix",
+            Builder::Shell(_) => "shell",
         }
     }
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Nix {
+    #[serde(default = "Nix::default_entrypoint")]
     pub entrypoint: String,
 }
+impl Nix {
+    pub fn default_entrypoint() -> String {
+        DEFAULT_NIX_FILENAME.to_string()
+    }
+}
+
 impl Default for Nix {
     fn default() -> Self {
         Nix {
@@ -309,12 +316,19 @@ impl Default for Nix {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Shell {
+    #[serde(default = "Shell::default_entrypoint")]
     pub entrypoint: String,
 }
+impl Shell {
+    pub fn default_entrypoint() -> String {
+        DEFAULT_SH_FILENAME.to_string()
+    }
+}
+
 impl Default for Shell {
     fn default() -> Self {
         Shell {
-            entrypoint: DEFAULT_SH_FILENAME.to_string(),
+            entrypoint: Self::default_entrypoint(),
         }
     }
 }

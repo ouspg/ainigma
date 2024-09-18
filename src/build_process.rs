@@ -122,8 +122,12 @@ pub fn build_task(
                         .join(output.kind.get_filename());
 
                     match fs::metadata(&path) {
-                        Ok(_) => tracing::info!("File exists: {}", path.display()),
-                        Err(_) => tracing::info!("File does not exist: {}", path.display()),
+                        Ok(_) => tracing::debug!("File exists: {}", path.display()),
+
+                        Err(_) => {
+                            tracing::error!("File does not exist: {}", path.display());
+                            panic!("File should exist when it is created");
+                        }
                     }
                 }
             }

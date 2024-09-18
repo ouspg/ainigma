@@ -8,7 +8,7 @@ use crate::errors::{CloudStorageError, FileObjectError};
 /// Returns the file name if the path is valid.
 pub fn validate_file_path(base_path: &Path, file: &Path) -> Result<String, FileObjectError> {
     let canonical_base_path = base_path.canonicalize()?;
-    let canonical_file_path = std::fs::canonicalize(file)?;
+    let canonical_file_path = file.canonicalize()?;
 
     if canonical_file_path.starts_with(&canonical_base_path) {
         let file_name = file
@@ -41,6 +41,7 @@ impl FileObjects {
     #[tracing::instrument]
     pub fn new(dst_location: String, files: Vec<PathBuf>) -> Result<Self, FileObjectError> {
         let mut file_map = HashMap::with_capacity(files.len());
+        // Note that not safe if program is called higher up in the directory tree.
         let cwd = std::env::current_dir()?;
         for file in files {
             let file_name = validate_file_path(&cwd, &file)?;
@@ -75,4 +76,29 @@ pub trait CloudStorage {
     ) -> Result<HashMap<String, String>, CloudStorageError>;
     /// Retrieves the URL of an uploaded file. Fily key is the fully qualified path in the remote.
     async fn get_url(&self, file_key: String) -> Result<String, Box<dyn std::error::Error>>;
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_filetraversal() {
+        let base_path = Path::new("/tmp");
+        let file = Path::new("/tmp/test123.txt");
+        let result = validate_file_path(base_path, file);
+        // File does not exist
+        assert!(result.is_err());
+        // Create the file
+        std::fs::write(file, "test").unwrap();
+        let result = validate_file_path(base_path, file);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test123.txt");
+        let file = Path::new("tmp/../../etc/passwd");
+        let result = validate_file_path(base_path, file);
+        assert!(result.is_err());
+        // clean up
+        std::fs::remove_file("/tmp/test123.txt").unwrap();
+    }
 }

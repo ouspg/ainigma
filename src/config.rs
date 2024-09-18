@@ -268,7 +268,7 @@ pub struct Deployment {
     pub build_timeout: u32,
     pub upload: Upload,
 }
-// Uplaod
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct Upload {
@@ -297,8 +297,15 @@ impl Builder {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Nix {
+    #[serde(default = "Nix::default_entrypoint")]
     pub entrypoint: String,
 }
+impl Nix {
+    pub fn default_entrypoint() -> String {
+        DEFAULT_NIX_FILENAME.to_string()
+    }
+}
+
 impl Default for Nix {
     fn default() -> Self {
         Nix {
@@ -309,12 +316,19 @@ impl Default for Nix {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Shell {
+    #[serde(default = "Shell::default_entrypoint")]
     pub entrypoint: String,
 }
+impl Shell {
+    pub fn default_entrypoint() -> String {
+        DEFAULT_SH_FILENAME.to_string()
+    }
+}
+
 impl Default for Shell {
     fn default() -> Self {
         Shell {
-            entrypoint: DEFAULT_SH_FILENAME.to_string(),
+            entrypoint: Self::default_entrypoint(),
         }
     }
 }

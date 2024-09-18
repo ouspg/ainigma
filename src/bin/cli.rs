@@ -49,18 +49,23 @@ enum Moodle {
 }
 
 fn main() {
-    // Global stdout subscriber for event tracing
+    // Global stdout subscriber for event tracing, defaults to info level
     let subscriber = tracing_subscriber::FmtSubscriber::new();
+    // let subscriber = tracing_subscriber::FmtSubscriber::builder()
+    //     .with_max_level(tracing::Level::DEBUG) // Set log level to DEBUG
+    //     .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-    // In case of env filter
-    // tracing_subscriber::fmt()
-    //         .with_env_filter(EnvFilter::from_default_env())
-    //         .init();
 
     let cli = Config::parse();
 
     if !(cli.config.exists()) {
-        panic!("configuration file doesn't exist")
+        tracing::error!(
+            "Configuration file doesn't exist in path: {:?}",
+            cli.config
+                .to_str()
+                .unwrap_or("Not valid path name. Broken Unicode or something else.")
+        );
+        std::process::exit(1);
     } else {
         match &cli.command {
             Commands::Generate {
@@ -71,8 +76,9 @@ fn main() {
             } => {
                 if *dry_run {
                     // Just parse the config for now
-                    // dbg!(result);
-                    tracing::info!("Dry run of generate..")
+                    tracing::info!("Dry run of generate...");
+                    let config = read_check_toml(cli.config.as_os_str()).unwrap();
+                    println!("{:#?}", config);
                 }
                 let cmd_moodle = moodle;
                 match cmd_moodle {
@@ -110,23 +116,31 @@ fn main() {
                                 std::process::exit(1)
                             }
                         };
+                        // Just for testing purposes right now
+                        let directory = PathBuf::from("./files").read_dir().unwrap();
+                        let mut files = Vec::with_capacity(30);
+                        // Create the array from dir content
 
-                        let files = vec![PathBuf::from("./files/foo.txt")];
-
-                        match FileObjects::new("test".to_string(), files) {
+                        for file in directory {
+                            let file = file.unwrap();
+                            files.push(file.path());
+                        }
+                        let mut links = <_>::default();
+                        match FileObjects::new("foo".to_string(), files) {
                             Ok(files) => {
                                 let rt = Runtime::new().unwrap();
                                 rt.block_on(async {
-                                    storage.upload(files).await.unwrap();
-                                    tracing::info!("Voila!");
+                                    links = storage.upload(files).await.unwrap();
                                 });
                             }
                             Err(error) => {
                                 tracing::error!("Error when creating the file objects: {}", error);
                             }
                         }
+                        tracing::info!("Voila!");
+                        println!("{:#?}", links);
                     } else {
-                        eprintln!("Error: {}", result.err().unwrap());
+                        tracing::error!("Error: {}", result.err().unwrap());
                     }
                 }
             }
@@ -136,7 +150,7 @@ fn main() {
 
 fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), ConfigError> {
     if task.is_some() {
-        println!(
+        tracing::info!(
             "Generating task for week {} and task {}",
             &week,
             &task.as_ref().unwrap()
@@ -145,7 +159,7 @@ fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), Con
         let uuid = Uuid::now_v7();
         build_task(&result, task.unwrap(), uuid)
     } else {
-        println!("Generating moodle task for week {}", &week);
+        tracing::info!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week
     }
     Ok(())
@@ -158,7 +172,7 @@ fn moodle_build(
     category: String,
 ) -> Result<(), ConfigError> {
     if task.is_some() {
-        println!(
+        tracing::info!(
             "Generating {} category {} moodle task for week {} and task {}",
             &number,
             &category,
@@ -169,7 +183,7 @@ fn moodle_build(
         let uuid = Uuid::now_v7();
         build_task(&result, task.unwrap(), uuid)
     } else {
-        println!("Generating moodle task for week {}", &week);
+        tracing::info!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week
     }
     Ok(())

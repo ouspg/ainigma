@@ -1,33 +1,26 @@
 use super::CloudStorage;
 use super::FileObjects;
 use crate::errors::{AccessError, CloudStorageError};
-use s3::{
-    bucket::Bucket,
-    creds::Credentials,
-    serde_types::{BucketLifecycleConfiguration, Expiration, LifecycleRule},
-    Region,
-};
+
+use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::{config::Region, Client};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct S3Storage {
-    bucket: Box<Bucket>,
-    life_cycle: BucketLifecycleConfiguration,
+    client: Arc<Client>,
+    bucket: String,
+    // life_cycle: BucketLifecycleConfiguration,
     link_expiration_days: u32,
 }
 
 impl S3Storage {
-    /// Creates a new instance of `S3Storage`.
-    pub fn new(
-        bucket_name: String,
-        region: Region,
-        file_expiration_days: u32,
-        link_expiration_days: u32,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        // We currently support only acquiring credentials from environment variables
+    pub fn from_config(config: crate::config::Upload) -> Result<Self, Box<dyn std::error::Error>> {
         let access_key = env::var("AWS_ACCESS_KEY_ID").map_err(|e| {
             AccessError::MissingAccessKey(
                 "AWS_ACCESS_KEY_ID - ".to_owned() + e.to_string().as_str(),
@@ -39,44 +32,28 @@ impl S3Storage {
             )
         })?;
         let session_token = env::var("AWS_SESSION_TOKEN").ok();
-        let credentials = Credentials::new(
-            Some(&access_key),
-            Some(&secret_key),
-            session_token.as_deref(),
+        let credentials = aws_sdk_s3::config::Credentials::new(
+            access_key,
+            secret_key,
+            session_token,
             None,
-            None,
-        )?;
-        let expiraton = Expiration {
-            date: None,
-            days: Some(file_expiration_days),
-            expired_object_delete_marker: None,
-        };
-        let rules = LifecycleRule::builder("Enabled")
-            .expiration(expiraton)
-            .id("Rule1");
-
-        let life_cycle = BucketLifecycleConfiguration::new(vec![rules.build()]);
-
-        let bucket = Bucket::new(&bucket_name, region, credentials)?;
+            "The Provider",
+        );
+        let region = Region::new(config.aws_region);
+        let client_config = aws_sdk_s3::config::Builder::new()
+            .endpoint_url(config.aws_s3_endpoint)
+            .region(region)
+            .credentials_provider(credentials)
+            .behavior_version_latest()
+            .build();
+        let link_expiration_days = config.link_expiration;
+        let client = Arc::new(Client::from_conf(client_config));
 
         Ok(S3Storage {
-            bucket,
-            life_cycle,
+            client,
+            bucket: config.bucket_name,
             link_expiration_days,
         })
-    }
-    pub fn from_config(config: crate::config::Upload) -> Result<Self, Box<dyn std::error::Error>> {
-        let region = Region::Custom {
-            region: config.aws_region,
-            endpoint: config.aws_s3_endpoint,
-        };
-        let link_expiration_days = config.link_expiration;
-        S3Storage::new(
-            config.bucket_name,
-            region,
-            config.file_expiration,
-            link_expiration_days,
-        )
     }
 }
 
@@ -86,89 +63,113 @@ impl CloudStorage for S3Storage {
         &self,
         files: FileObjects,
     ) -> Result<HashMap<String, String>, CloudStorageError> {
-        //
-
         tracing::info!(
             "Starting to upload {} files in to the S3 bucket '{}' in path '{}'.",
             files.len(),
-            self.bucket.name(),
+            self.bucket,
             files.dst_location
         );
-        let exists = self.bucket.exists().await?;
-        if exists {
-            tracing::info!("Bucket exists! Updating the bucket lifecycle.");
-            // let result = self
-            //     .bucket
-            //     .put_bucket_lifecycle(self.life_cycle.clone())
-            //     .await?;
-            // let result = self.bucket.get_bucket_lifecycle().await?;
-            // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
-            // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
-            // Upload the files
-            let shared_map = Arc::new(Mutex::new(HashMap::<String, String>::with_capacity(
-                files.len(),
-            )));
-            let mut tasks = Vec::with_capacity(files.len());
-            for file in files.files {
-                let shared_map = Arc::clone(&shared_map);
-                let bucket = self.bucket.clone();
-                let link_expiration_days = self.link_expiration_days;
-                let file_key = format!("/{}/{}", files.dst_location, file.0);
-                let task = tokio::spawn(async move {
-                    match tokio::fs::read(&file.1).await {
-                        Ok(bytes) => {
-                            let response = bucket.put_object(&file_key, &bytes).await;
-                            match response {
-                                Ok(_) => {
-                                    let pre_signed_url = bucket
-                                        .presign_get(
-                                            &file_key,
-                                            link_expiration_days.wrapping_mul(43200),
-                                            None,
-                                        )
-                                        .await;
-                                    match pre_signed_url {
-                                        Ok(url) => {
-                                            tracing::info!("The pre-signed URL: {}", url);
-                                            let mut map = shared_map.lock().await;
-                                            map.insert(file_key, url);
-                                        }
-                                        Err(e) => {
-                                            tracing::error!(
-                                                "Failed to generate the pre-signed URL: {}",
-                                                e
-                                            );
+
+        let exists = self
+            .client
+            .get_bucket_location()
+            .bucket(&self.bucket)
+            .send()
+            .await;
+        match exists {
+            Ok(resp) => {
+                tracing::info!(
+                    "Bucket identified: {:?}! Updating the bucket lifecycle.",
+                    resp
+                );
+                // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
+                // Upload the files
+                let shared_map = Arc::new(Mutex::new(HashMap::<String, String>::with_capacity(
+                    files.len(),
+                )));
+                let mut tasks = Vec::with_capacity(files.len());
+                for file in files.files {
+                    let shared_map = Arc::clone(&shared_map);
+                    let client = Arc::clone(&self.client);
+                    let bucket = self.bucket.clone();
+                    let link_expiration_days = self.link_expiration_days;
+                    let file_key = format!("{}/{}", files.dst_location, file.0);
+                    let task = tokio::spawn(async move {
+                        let body = ByteStream::from_path(&file.1).await;
+                        match body {
+                            Ok(b) => {
+                                let response = client
+                                    .put_object()
+                                    .bucket(&bucket)
+                                    .key(&file_key)
+                                    .body(b)
+                                    .send()
+                                    .await;
+                                match response {
+                                    Ok(r) => {
+                                        tracing::info!(
+                                            "Created or updated the file with expiration: {}",
+                                            r.expiration.unwrap_or_default()
+                                        );
+                                        let presigned_request = client
+                                            .get_object()
+                                            .bucket(bucket)
+                                            .key(&file_key)
+                                            .presigned(
+                                                PresigningConfig::expires_in(Duration::from_secs(
+                                                    link_expiration_days.wrapping_mul(86400).into(),
+                                                ))
+                                                .unwrap(),
+                                            )
+                                            .await;
+                                        match presigned_request {
+                                            Ok(url) => {
+                                                tracing::debug!(
+                                                    "The pre-signed URL: {}",
+                                                    url.uri()
+                                                );
+                                                let mut map = shared_map.lock().await;
+                                                map.insert(file_key, url.uri().to_string());
+                                            }
+                                            Err(e) => {
+                                                tracing::error!(
+                                                    "Failed to generate the pre-signed URL: {}",
+                                                    e
+                                                );
+                                            }
                                         }
                                     }
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to upload the file: {}", e);
+                                    Err(e) => {
+                                        tracing::error!("Failed to upload the file: {}", e);
+                                    }
                                 }
                             }
+                            Err(e) => {
+                                tracing::error!("Failed to read the file: {}", e);
+                            }
                         }
-                        Err(e) => tracing::error!("Failed to read the file: {}", e),
-                    }
-                });
-                tasks.push(task);
+                    });
+                    tasks.push(task);
+                }
+                for task in tasks {
+                    task.await.unwrap();
+                }
+                let mut map = shared_map.lock().await;
+                tracing::info!("Uploaded {} files successfully.", map.len());
+                Ok(core::mem::take(&mut map))
             }
-            for task in tasks {
-                task.await.unwrap();
+            Err(e) => {
+                tracing::warn!("The bucket likely {} did not exist, we expect currently that you have created it manually: {}", self.bucket, e);
+                Err(CloudStorageError::BucketNotFound(self.bucket.to_owned()))
             }
-            let mut map = shared_map.lock().await;
-            Ok(core::mem::take(&mut map))
-        } else {
-            tracing::warn!("The bucket {} did not exist, we expect currently that you have created it manually.", self.bucket.name());
-            Err(CloudStorageError::BucketNotFound(
-                self.bucket.name().to_owned(),
-            ))
         }
     }
 
     #[tracing::instrument]
     async fn get_url(&self, file_key: String) -> Result<String, Box<dyn std::error::Error>> {
         // Generate a pre-signed URL valid for 1 hour
-        let url = self.bucket.presign_get(file_key, 3600, None).await?;
-        Ok(url)
+        // let url = self.bucket.presign_get(file_key, 3600, None).await?;
+        Ok("OK".to_string())
     }
 }
 #[cfg(test)]

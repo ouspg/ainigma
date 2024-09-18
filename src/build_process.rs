@@ -1,5 +1,6 @@
 use core::str;
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 use uuid::Uuid;
 
@@ -111,15 +112,18 @@ pub fn build_task(
 
             if output.status.success() {
                 // check if files exists
-                let stdout = str::from_utf8(&output.stdout).expect("Failed to parse output");
-                let lines = stdout.lines();
-                for line in lines {
-                    let path = Path::new(&line);
+                let task_path = &task_config.build.directory;
 
-                    if path.exists() {
-                        tracing::info!("File exists: {}", line);
-                    } else {
-                        tracing::info!("File not found: {}", line);
+                for output in &task_config.build.output {
+                    let output_path = "output/";
+                    let path = Path::new(task_path)
+                        .join(output_path)
+                        .join(uuid.to_string())
+                        .join(output.kind.get_filename());
+
+                    match fs::metadata(&path) {
+                        Ok(_) => tracing::info!("File exists: {}", path.display()),
+                        Err(_) => tracing::info!("File does not exist: {}", path.display()),
                     }
                 }
             }

@@ -100,6 +100,8 @@ pub fn build_task(
     //env::set_current_dir(&task_config.build.directory)
     //    .expect("failed to locate resource directory");
 
+
+    // implement process for generic commands
     let output = std::process::Command::new("sh")
         .arg(task_config.build.entrypoint.clone())
         .envs(id_flag_pairs)
@@ -108,11 +110,9 @@ pub fn build_task(
         .expect("Failed to compile task");
 
     if output.status.success() {
-        let stdout = str::from_utf8(&output.stdout).expect("Failed to parse output");
-        let mut lines = stdout.lines();
-
-        let path = lines.next().unwrap_or_default();
-        println!("Absolute path of the created files: {} ", path);
+        // Check files exist in directory
+        
+        // Return created file paths
     }
     if !output.status.success() {
         eprintln!("Error: {}", str::from_utf8(&output.stderr).unwrap());

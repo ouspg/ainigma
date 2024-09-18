@@ -109,14 +109,14 @@ fn moodle_build(
         if number > 1 {
             // Multithread the task many times
             let mut handles = vec![];
-
-            let config = Arc::new(&result);
-
+            let config = Arc::new(result);
             for _i in 0..number {
-                let handle = thread::spawn(move || {});
                 let courseconf = Arc::clone(&config);
-                let uuid = Uuid::now_v7();
-                build_task(&courseconf, task.clone().unwrap(), uuid);
+                let task_clone = task.clone().unwrap();
+                let handle = thread::spawn(move || {
+                    let uuid = Uuid::now_v7();
+                    build_task(&courseconf, task_clone, uuid);
+                });
                 handles.push(handle)
             }
             // join multithreads together

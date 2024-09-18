@@ -4,7 +4,7 @@ use autograder::{
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{command, Parser, Subcommand};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc, thread};
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
@@ -179,9 +179,23 @@ fn moodle_build(
             &week,
             &task.as_ref().unwrap()
         );
+
         let result = read_check_toml(path.into_os_string().as_os_str())?;
-        let uuid = Uuid::now_v7();
-        build_task(&result, task.unwrap(), uuid)
+        let mut handles = vec![];
+        let config = Arc::new(result);
+        for _i in 0..number {
+            let courseconf = Arc::clone(&config);
+            let task_clone = task.clone().unwrap();
+            let handle = thread::spawn(move || {
+                let uuid = Uuid::now_v7();
+                build_task(&courseconf, task_clone, uuid);
+            });
+            handles.push(handle)
+        }
+        // join multithreads together
+        for handle in handles {
+            handle.join().unwrap();
+        }
     } else {
         tracing::info!("Generating moodle task for week {}", &week);
         // TODO: Generating all tasks from one week

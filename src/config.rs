@@ -25,7 +25,9 @@ pub enum ConfigError {
     #[error("Error in Toml file: Each week must have a unique number")]
     WeekNumberError,
     #[error("Error in Toml file: Task Id cannot be empty")]
-    TaskIdError,
+    TasksIDsNotUniqueError,
+    #[error("The following task identifier was not found: {0}")]
+    TaskIDNotFound(String),
     #[error("Error in Toml file: Each task must have a unique id")]
     TaskCountError,
     #[error("Error in Toml file: Task name cannot be empty")]
@@ -78,11 +80,11 @@ impl CourseConfiguration {
             deployment,
         }
     }
-    pub fn get_task_by_id(&self, id: &str) -> Option<&Task> {
+    pub fn get_task_by_id(&self, id: &str) -> Option<Task> {
         for week in &self.weeks {
             for task in &week.tasks {
                 if task.id == id {
-                    return Some(task);
+                    return Some(task.clone());
                 }
             }
         }
@@ -192,6 +194,11 @@ pub struct BuildConfig {
     pub directory: std::path::PathBuf,
     pub builder: Builder,
     pub output: Vec<BuildOutputFile>,
+}
+impl AsRef<BuildConfig> for BuildConfig {
+    fn as_ref(&self) -> &BuildConfig {
+        self
+    }
 }
 
 impl BuildConfig {
@@ -400,7 +407,7 @@ pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, Co
 
 pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
     if task.id.is_empty() {
-        return Err(ConfigError::TaskIdError);
+        return Err(ConfigError::TasksIDsNotUniqueError);
     }
 
     if task.name.is_empty() {

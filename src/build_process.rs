@@ -64,13 +64,12 @@ fn create_flag_id_pairs_by_task<'a>(
 #[allow(dead_code)]
 fn get_build_info(
     course_config: &mut CourseConfiguration,
-    //week_number: u8, needed?
     task_id: String,
-) -> Result<BuildConfig, String> {
+) -> Result<&BuildConfig, String> {
     for week in &mut course_config.weeks {
         for task in &week.tasks {
             if task_id == task.id {
-                return Ok(task.build.clone());
+                return Ok(task.build.as_ref());
             }
         }
     }
@@ -80,7 +79,7 @@ fn get_build_info(
     ))
 }
 
-/// Build output of the complete single task
+/// Information object that should include everything from the build process
 /// Single task can have subtasks, which requires embedding multiple flags at once
 #[derive(Debug)]
 pub struct TaskBuildProcessOutput {
@@ -122,16 +121,9 @@ impl TaskBuildProcessOutput {
 // #[tracing::instrument]
 pub fn build_task(
     course_config: &CourseConfiguration,
-    task_id: &str,
+    task_config: &Task,
     uuid: Uuid,
 ) -> Result<TaskBuildProcessOutput, Box<dyn std::error::Error>> {
-    let task_config = course_config.get_task_by_id(task_id).unwrap_or_else(|| {
-        tracing::error!(
-            "Task with id {} not found in the course configuration. Cannot continue.",
-            task_id
-        );
-        std::process::exit(1);
-    });
     let (flags, mut build_envs) = create_flag_id_pairs_by_task(task_config, course_config, uuid);
 
     match task_config.build.builder {
@@ -150,14 +142,14 @@ pub fn build_task(
                 Err(e) => {
                     tracing::error!(
                         "Failed to create the output directory for task {}: {}. Confirm the task build directory is correct.",
-                        task_id,
+                        task_config.id,
                         e
                     );
                     std::process::exit(1);
                 }
             }
-            // The current working directory is set to be the build directory
-            // This means that output directory is right after relatively referenced
+            // The process's current working directory is set to be the build directory
+            // This means that output directory should relatively referenced based on the CWD of this program
             build_envs.insert(
                 "OUTPUT_DIR".to_string(),
                 build_output.to_str().unwrap_or_default().to_string(),
@@ -174,7 +166,7 @@ pub fn build_task(
                 Err(e) => {
                     tracing::error!(
                         "The build process of task {} failed prematurely: {}",
-                        task_id,
+                        task_config.id,
                         e
                     );
                     std::process::exit(1);
@@ -204,14 +196,14 @@ pub fn build_task(
                 }
                 Ok(TaskBuildProcessOutput::new(
                     uuid,
-                    task_id.to_owned(),
+                    task_config.id.to_owned(),
                     flags,
                     outputs,
                 ))
             } else {
                 tracing::error!(
                     "The build process for task {} ended with non-zero exit code: {}",
-                    task_id,
+                    task_config.id,
                     std::str::from_utf8(&output.stderr).unwrap()
                 );
                 std::process::exit(1);

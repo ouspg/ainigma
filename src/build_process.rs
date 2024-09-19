@@ -85,11 +85,12 @@ fn get_build_info(
 #[derive(Debug)]
 pub struct TaskBuildProcessOutput {
     pub uiid: Uuid,
+    pub task_id: String,
     pub flags: Vec<Flag>,
     pub files: Vec<OutputKind>,
 }
 impl TaskBuildProcessOutput {
-    pub fn new(uuid: Uuid, flags: Vec<Flag>, files: Vec<OutputKind>) -> Self {
+    pub fn new(uuid: Uuid, task_id: String, flags: Vec<Flag>, files: Vec<OutputKind>) -> Self {
         // The task can have only one file related to instructions
         let readme_count = files
             .iter()
@@ -104,6 +105,7 @@ impl TaskBuildProcessOutput {
         }
         Self {
             uiid: uuid,
+            task_id,
             flags,
             files,
         }
@@ -147,7 +149,7 @@ pub fn build_task(
                 Ok(_) => (),
                 Err(e) => {
                     tracing::error!(
-                        "Failed to create the output directory for task {}: {}. Confirm the task build directory configuration.",
+                        "Failed to create the output directory for task {}: {}. Confirm the task build directory is correct.",
                         task_id,
                         e
                     );
@@ -200,7 +202,12 @@ pub fn build_task(
                         }
                     }
                 }
-                Ok(TaskBuildProcessOutput::new(uuid, flags, outputs))
+                Ok(TaskBuildProcessOutput::new(
+                    uuid,
+                    task_id.to_owned(),
+                    flags,
+                    outputs,
+                ))
             } else {
                 tracing::error!(
                     "The build process for task {} ended with non-zero exit code: {}",

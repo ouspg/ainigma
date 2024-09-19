@@ -5,7 +5,11 @@ use autograder::{
 };
 use clap::{command, Parser, Subcommand};
 use std::collections::HashMap;
-use std::{path::PathBuf, sync::Arc, thread};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+};
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
@@ -43,7 +47,7 @@ enum Commands {
 enum Moodle {
     Moodle {
         #[arg(short, long)]
-        number: u8,
+        number: usize,
         #[arg(short, long)]
         category: String,
     },
@@ -145,13 +149,14 @@ fn main() {
                     let result = read_check_toml(cli.config.as_os_str());
                     match result {
                         Ok(config) => {
-                            let result = s3_upload(config, "".into(), "".into());
+                            let result = s3_upload(config, "files".into(), "mytestdir".into());
                             match result {
                                 Ok(links) => {
                                     println!("{:#?}", links);
                                 }
                                 Err(error) => {
-                                    eprintln!("{}", error);
+                                    tracing::error!("Error when uploading the files: {}", error);
+                                    std::process::exit(1);
                                 }
                             }
                         }
@@ -173,7 +178,7 @@ fn parallel_build(
 ) -> Result<(), ConfigError> {
     if task.is_some() {
         tracing::info!(
-            "Building the task {} for week {}. Variation count: {}",
+            "Building the task '{}' for week {} with the variation count {}",
             &task.as_ref().unwrap(),
             &week,
             number
@@ -181,13 +186,16 @@ fn parallel_build(
         let result = read_check_toml(path.into_os_string().as_os_str())?;
         let mut handles = Vec::with_capacity(number);
         let config = Arc::new(result);
+        let all_outputs = Arc::new(Mutex::new(Vec::with_capacity(number)));
         if number > 1 {
             for _i in 0..number {
                 let courseconf = Arc::clone(&config);
+                let outputs = Arc::clone(&all_outputs);
                 let task_clone = task.clone().unwrap();
                 let handle = thread::spawn(move || {
                     let uuid = Uuid::now_v7();
-                    let _outputs = build_task(&courseconf, task_clone.as_str(), uuid);
+                    let output = build_task(&courseconf, task_clone.as_str(), uuid);
+                    outputs.lock().unwrap().push(output.unwrap());
                 });
                 handles.push(handle)
             }
@@ -198,9 +206,14 @@ fn parallel_build(
         } else {
             let uuid = Uuid::now_v7();
             let outputs = build_task(&config, task.as_ref().unwrap(), uuid).unwrap();
-            dbg!(outputs);
-            tracing::info!("Task {} build succesfully", &task.unwrap_or_default());
+            all_outputs.lock().unwrap().push(outputs);
+            tracing::info!("Task '{}' build succesfully", &task.unwrap_or_default());
         }
+        let vec = Arc::try_unwrap(all_outputs)
+            .expect("There are still other Arc references")
+            .into_inner()
+            .expect("Mutex cannot be locked");
+        dbg!(vec);
 
         // Ok(())
     } else {
@@ -213,38 +226,10 @@ fn moodle_build(
     path: PathBuf,
     week: u8,
     task: Option<String>,
-    number: u8,
-    category: String,
+    number: usize,
+    _category: String,
 ) -> Result<(), ConfigError> {
-    if task.is_some() {
-        tracing::info!(
-            "Generating {} category {} moodle task for week {} and task {}",
-            &number,
-            &category,
-            &week,
-            &task.as_ref().unwrap()
-        );
-
-        let result = read_check_toml(path.into_os_string().as_os_str())?;
-        let mut handles = vec![];
-        let config = Arc::new(result);
-        for _i in 0..number {
-            let courseconf = Arc::clone(&config);
-            let task_clone = task.clone().unwrap();
-            let handle = thread::spawn(move || {
-                let uuid = Uuid::now_v7();
-                let _ = build_task(&courseconf, task_clone.as_str(), uuid);
-            });
-            handles.push(handle)
-        }
-        // join multithreads together
-        for handle in handles {
-            handle.join().unwrap();
-        }
-    } else {
-        tracing::info!("Generating moodle task for week {}", &week);
-        // TODO: Generating all tasks from one week
-    }
+    let _result = parallel_build(path, week, task, number);
     Ok(())
 }
 

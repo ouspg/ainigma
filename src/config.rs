@@ -203,13 +203,17 @@ impl TaskElement {
 }
 #[derive(Debug, Deserialize, Clone)]
 pub struct BuildConfig {
-    pub directory: String,
+    pub directory: std::path::PathBuf,
     pub builder: Builder,
     pub output: Vec<BuildOutputFile>,
 }
 
 impl BuildConfig {
-    pub fn new(directory: String, builder: Builder, output: Vec<BuildOutputFile>) -> BuildConfig {
+    pub fn new(
+        directory: std::path::PathBuf,
+        builder: Builder,
+        output: Vec<BuildOutputFile>,
+    ) -> BuildConfig {
         BuildConfig {
             directory,
             builder,
@@ -239,6 +243,14 @@ impl OutputKind {
             OutputKind::Resource(name) => name,
             OutputKind::Readme(name) => name,
             OutputKind::Meta(name) => name,
+        }
+    }
+    pub const fn kind(&self) -> &str {
+        match self {
+            OutputKind::Internal(_) => "internal",
+            OutputKind::Resource(_) => "resource",
+            OutputKind::Readme(_) => "readme",
+            OutputKind::Meta(_) => "meta",
         }
     }
 }

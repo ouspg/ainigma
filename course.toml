@@ -43,6 +43,7 @@ builder = { shell = {} }                  # Shell builder without entrypoint
 
 [[weeks.tasks.build.output]]
 # Resource means that it is provided for the end-user
+# Resource will always generate a download link, appended to the bottom of the instructions.
 kind = { resource = "exloitable.bin" }
 
 [[weeks.tasks.build.output]]

@@ -91,6 +91,8 @@ impl CloudStorage for S3Storage {
                 let mut tasks = Vec::with_capacity(files.len());
                 for file in files.files {
                     let file_key = format!("{}/{}", files.dst_location, file.0);
+                    // Use structured concurrency whenever possible
+                    // Avoid using tokio::spawn, as we lose the control
                     let task = async {
                         let body = ByteStream::from_path(file.1).await;
                         match body {
@@ -116,6 +118,7 @@ impl CloudStorage for S3Storage {
                                             .key(&file_key)
                                             .presigned(
                                                 PresigningConfig::expires_in(Duration::from_secs(
+                                                    // Days to seconds
                                                     self.link_expiration_days
                                                         .wrapping_mul(86400)
                                                         .into(),

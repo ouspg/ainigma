@@ -1,17 +1,18 @@
 use autograder::{
     build_process::build_task,
-    config::{read_check_toml, ConfigError},
+    config::{read_check_toml, ConfigError, CourseConfiguration},
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{command, Parser, Subcommand};
+use std::collections::HashMap;
 use std::{path::PathBuf, sync::Arc, thread};
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 /// Autograder CLI Application
 #[derive(Parser)]
-#[command(name = "Autograder", version = "1.0", about = "Cli for Autograder")]
-pub struct Config {
+#[command(name = "aínigma", version = "1.0", about = "CLI for aínigma")]
+pub struct RootArguments {
     #[arg(short, long, value_name = "FILE")]
     config: PathBuf,
     #[command(subcommand)]
@@ -48,6 +49,44 @@ enum Moodle {
     },
 }
 
+fn s3_upload(
+    config: CourseConfiguration,
+    src_dir: PathBuf,
+    dst_dir: String,
+) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+    // Check if the bucket exists
+    let storage = S3Storage::from_config(config.deployment.upload);
+    let storage = match storage {
+        Ok(storage) => storage,
+        Err(error) => {
+            tracing::error!("Error when creating the S3 storage: {}", error);
+            tracing::error!("Cannot continue with the file upload.");
+            return Err(error);
+        }
+    };
+
+    let mut files = Vec::with_capacity(30);
+    for file in src_dir.read_dir()? {
+        let file = file.unwrap();
+        files.push(file.path());
+    }
+    let mut links = <_>::default();
+    match FileObjects::new(dst_dir, files) {
+        Ok(files) => {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async {
+                links = storage.upload(files).await.unwrap();
+            });
+        }
+        Err(error) => {
+            tracing::error!("Error when creating the file objects: {}", error);
+        }
+    }
+    tracing::info!("Voila!");
+    println!("{:#?}", links);
+    Ok(links)
+}
+
 fn main() {
     // Global stdout subscriber for event tracing, defaults to info level
     let subscriber = tracing_subscriber::FmtSubscriber::new();
@@ -56,14 +95,14 @@ fn main() {
     //     .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let cli = Config::parse();
+    let cli = RootArguments::parse();
 
     if !(cli.config.exists()) {
         tracing::error!(
             "Configuration file doesn't exist in path: {:?}",
             cli.config
                 .to_str()
-                .unwrap_or("Not valid path name. Broken Unicode or something else.")
+                .unwrap_or("The configuration file does not have valid path name. Broken Unicode or something else.")
         );
         std::process::exit(1);
     } else {
@@ -80,8 +119,7 @@ fn main() {
                     let config = read_check_toml(cli.config.as_os_str()).unwrap();
                     println!("{:#?}", config);
                 }
-                let cmd_moodle = moodle;
-                match cmd_moodle {
+                match moodle {
                     Some(cmd_moodle) => match cmd_moodle {
                         Moodle::Moodle { number, category } => {
                             match moodle_build(
@@ -96,7 +134,7 @@ fn main() {
                             }
                         }
                     },
-                    None => match normal_build(cli.config, *week, task.clone()) {
+                    None => match parallel_build(cli.config, *week, task.clone(), 1) {
                         Ok(()) => (),
                         Err(error) => eprintln!("{}", error),
                     },
@@ -105,42 +143,21 @@ fn main() {
             Commands::Upload { check_bucket } => {
                 if *check_bucket {
                     let result = read_check_toml(cli.config.as_os_str());
-                    if let Ok(config) = result {
-                        // Check if the bucket exists
-                        let storage = S3Storage::from_config(config.deployment.upload);
-                        let storage = match storage {
-                            Ok(storage) => storage,
-                            Err(error) => {
-                                tracing::error!("Error when creating the S3 storage: {}", error);
-                                tracing::error!("Cannot continue with the file upload.");
-                                std::process::exit(1)
-                            }
-                        };
-                        // Just for testing purposes right now
-                        let directory = PathBuf::from("./files").read_dir().unwrap();
-                        let mut files = Vec::with_capacity(30);
-                        // Create the array from dir content
-
-                        for file in directory {
-                            let file = file.unwrap();
-                            files.push(file.path());
-                        }
-                        let mut links = <_>::default();
-                        match FileObjects::new("foo".to_string(), files) {
-                            Ok(files) => {
-                                let rt = Runtime::new().unwrap();
-                                rt.block_on(async {
-                                    links = storage.upload(files).await.unwrap();
-                                });
-                            }
-                            Err(error) => {
-                                tracing::error!("Error when creating the file objects: {}", error);
+                    match result {
+                        Ok(config) => {
+                            let result = s3_upload(config, "".into(), "".into());
+                            match result {
+                                Ok(links) => {
+                                    println!("{:#?}", links);
+                                }
+                                Err(error) => {
+                                    eprintln!("{}", error);
+                                }
                             }
                         }
-                        tracing::info!("Voila!");
-                        println!("{:#?}", links);
-                    } else {
-                        tracing::error!("Error: {}", result.err().unwrap());
+                        Err(error) => {
+                            tracing::error!("Error when reading the configuration file: {}", error);
+                        }
                     }
                 }
             }
@@ -148,18 +165,46 @@ fn main() {
     }
 }
 
-fn normal_build(path: PathBuf, week: u8, task: Option<String>) -> Result<(), ConfigError> {
+fn parallel_build(
+    path: PathBuf,
+    week: u8,
+    task: Option<String>,
+    number: usize,
+) -> Result<(), ConfigError> {
     if task.is_some() {
         tracing::info!(
-            "Generating task for week {} and task {}",
+            "Building the task {} for week {}. Variation count: {}",
+            &task.as_ref().unwrap(),
             &week,
-            &task.as_ref().unwrap()
+            number
         );
+
         let result = read_check_toml(path.into_os_string().as_os_str())?;
-        let uuid = Uuid::now_v7();
-        build_task(&result, task.unwrap(), uuid)
+        let mut handles = Vec::with_capacity(number);
+        let config = Arc::new(result);
+        if number > 1 {
+            for _i in 0..number {
+                let courseconf = Arc::clone(&config);
+                let task_clone = task.clone().unwrap();
+                let handle = thread::spawn(move || {
+                    let uuid = Uuid::now_v7();
+                    build_task(&courseconf, task_clone.as_str(), uuid);
+                });
+                handles.push(handle)
+            }
+            // join multithreads together
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        } else {
+            let uuid = Uuid::now_v7();
+            build_task(&config, task.as_ref().unwrap(), uuid);
+            tracing::info!("Task {} build succesfully", &task.unwrap_or_default());
+        }
+
+        // Ok(())
     } else {
-        tracing::info!("Generating moodle task for week {}", &week);
+        tracing::info!("Generating all Moodle tasks for week {}", &week);
         // TODO: Generating all tasks from one week
     }
     Ok(())
@@ -188,7 +233,7 @@ fn moodle_build(
             let task_clone = task.clone().unwrap();
             let handle = thread::spawn(move || {
                 let uuid = Uuid::now_v7();
-                build_task(&courseconf, task_clone, uuid);
+                build_task(&courseconf, task_clone.as_str(), uuid);
             });
             handles.push(handle)
         }

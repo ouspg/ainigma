@@ -16,7 +16,7 @@ use uuid::Uuid;
 /// Autograder CLI Application
 #[derive(Parser)]
 #[command(name = "aínigma", version = "1.0", about = "CLI for aínigma")]
-pub struct RootArguments {
+pub struct OptsRoot {
     #[arg(short, long, value_name = "FILE")]
     config: PathBuf,
     #[command(subcommand)]
@@ -99,7 +99,7 @@ fn main() {
     //     .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let cli = RootArguments::parse();
+    let cli = OptsRoot::parse();
 
     if !(cli.config.exists()) {
         tracing::error!(
@@ -138,7 +138,7 @@ fn main() {
                             }
                         }
                     },
-                    None => match parallel_build(cli.config, *week, task.clone(), 1) {
+                    None => match parallel_task_build(cli.config, task.as_ref().unwrap(), 30) {
                         Ok(()) => (),
                         Err(error) => eprintln!("{}", error),
                     },
@@ -170,67 +170,74 @@ fn main() {
     }
 }
 
-fn parallel_build(
-    path: PathBuf,
-    week: u8,
-    task: Option<String>,
-    number: usize,
-) -> Result<(), ConfigError> {
-    if task.is_some() {
-        tracing::info!(
-            "Building the task '{}' for week {} with the variation count {}",
-            &task.as_ref().unwrap(),
-            &week,
-            number
-        );
-        let result = read_check_toml(path.into_os_string().as_os_str())?;
-        let mut handles = Vec::with_capacity(number);
-        let config = Arc::new(result);
-        let all_outputs = Arc::new(Mutex::new(Vec::with_capacity(number)));
-        if number > 1 {
-            for _i in 0..number {
-                let courseconf = Arc::clone(&config);
-                let outputs = Arc::clone(&all_outputs);
-                let task_clone = task.clone().unwrap();
-                let handle = thread::spawn(move || {
-                    let uuid = Uuid::now_v7();
-                    let output = build_task(&courseconf, task_clone.as_str(), uuid);
-                    outputs.lock().unwrap().push(output.unwrap());
-                });
-                handles.push(handle)
-            }
-            // join multithreads together
-            for handle in handles {
-                handle.join().unwrap();
-            }
-        } else {
-            let uuid = Uuid::now_v7();
-            let outputs = build_task(&config, task.as_ref().unwrap(), uuid).unwrap();
-            all_outputs.lock().unwrap().push(outputs);
-            tracing::info!("Task '{}' build succesfully", &task.unwrap_or_default());
+fn parallel_task_build(path: PathBuf, task: &str, number: usize) -> Result<(), ConfigError> {
+    tracing::info!(
+        "Building the task '{}' with the variation count {}",
+        &task,
+        number
+    );
+    let result = read_check_toml(path.into_os_string().as_os_str())?;
+    let mut handles = Vec::with_capacity(number);
+    let config = Arc::new(result);
+    let all_outputs = Arc::new(Mutex::new(Vec::with_capacity(number)));
+    if number > 1 {
+        for i in 0..number {
+            let courseconf = Arc::clone(&config);
+            let outputs = Arc::clone(&all_outputs);
+            let task_clone = task.to_string();
+            let handle = thread::spawn(move || {
+                tracing::info!("Starting building the variant {}", i + 1);
+                let uuid = Uuid::now_v7();
+                let output = build_task(&courseconf, &task_clone, uuid);
+                match output {
+                    Ok(output) => {
+                        outputs
+                                .lock()
+                                .expect(
+                                    "Another thread paniced while owning the mutex when building the task.",
+                                )
+                                .push(output);
+                    }
+                    Err(error) => {
+                        tracing::error!("Error when building the task: {}", error);
+                    }
+                }
+                tracing::info!("Variant {} building finished.", i);
+            });
+            handles.push(handle)
         }
-        let vec = Arc::try_unwrap(all_outputs)
-            .expect("There are still other Arc references")
-            .into_inner()
-            .expect("Mutex cannot be locked");
-        dbg!(vec);
-
-        // Ok(())
+        // join multithreads together
+        for handle in handles {
+            handle.join().unwrap();
+        }
     } else {
-        tracing::info!("Generating all Moodle tasks for week {}", &week);
-        // TODO: Generating all tasks from one week
+        let uuid = Uuid::now_v7();
+        let outputs = build_task(&config, task, uuid).unwrap();
+        all_outputs.lock().unwrap().push(outputs);
+        tracing::info!("Task '{}' build succesfully", &task);
     }
+    let vec = Arc::try_unwrap(all_outputs)
+        .expect("There are still other Arc references")
+        .into_inner()
+        .expect("Mutex cannot be locked");
+    dbg!(vec);
+
     Ok(())
 }
 fn moodle_build(
     path: PathBuf,
-    week: u8,
+    _week: u8,
     task: Option<String>,
     number: usize,
     _category: String,
 ) -> Result<(), ConfigError> {
-    let _result = parallel_build(path, week, task, number);
-    Ok(())
+    match task {
+        Some(task) => parallel_task_build(path, task.as_str(), number),
+        None => {
+            todo!("Complete week build todo")
+            // let _result = parallel_build(path, week, task, number);
+        }
+    }
 }
 
 #[cfg(test)]

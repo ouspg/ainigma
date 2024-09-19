@@ -1,64 +1,49 @@
+use crate::flag_generator;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::error::Error;
 use std::ffi::OsStr;
-use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
 const DEFAULT_SH_FILENAME: &str = "entrypoint.sh";
 
-use crate::flag_generator;
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ConfigError {
+    #[error("Error in Toml file: Course Uuid must be valid")]
     UuidError,
+    #[error("{message}")]
     TomlParseError { message: String },
+    #[error("Error in Toml file: Course name must not be empty")]
     CourseNameError,
+    #[error("Error in Toml file: Course version must not be empty")]
     CourseVersionError,
+    #[error("Error in Toml file: Each week must have a unique number")]
     WeekNumberError,
+    #[error("Error in Toml file: Task Id cannot be empty")]
     TaskIdError,
+    #[error("Error in Toml file: Each task must have a unique id")]
     TaskCountError,
+    #[error("Error in Toml file: Task name cannot be empty")]
     TaskNameError,
+    #[error("Error in Toml file: Task point amount must be non-negative")]
     TaskPointError,
+    #[error("Error in Toml file: Flag type must be one of the three \"user_derived\", \"pure_random\", \"rng_seed\"")]
     FlagTypeError,
+    #[error("Error in Toml file: Task flags must have a unique id")]
     FlagCountError,
+    #[error("Error in Toml file: Each task subtask must have a unique ID")]
     SubTaskCountError,
+    #[error("Error in Toml file: Each subtask ID must include the current task ID as prefix")]
     SubTaskIdMatchError,
+    #[error("Error in Toml file: Each task points must match subtask point total")]
     SubTaskPointError,
+    #[error("Error in Toml file: Each task subtask name must not be empty")]
     SubTaskNameError,
-}
-impl fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConfigError::UuidError => write!(f, "Error in Toml file: Course Uuid must be valid"),
-            ConfigError::TomlParseError { message } => write!(f, "{}", message),
-            ConfigError::CourseNameError => {
-                write!(f, "Error in Toml file: Course name must not be empty")
-            }
-            ConfigError::CourseVersionError => {
-                write!(f, "Error in Toml file: Course version must not be empty")
-            }
-            ConfigError::WeekNumberError => {
-                write!(f, "Error in Toml file: Each week must have a unique number")
-            }
-            ConfigError::TaskIdError => {
-                write!(f, "Error in Toml file: Task Id cannot be empty")
-            }
-            ConfigError::TaskCountError => write!(f, "Error in Toml file: Each task must have a unique id"),
-            ConfigError::TaskNameError => write!(f, "Error in Toml file: Task name cannot be empty"),
-            ConfigError::TaskPointError => write!(f, "Error in Toml file: Task point amount must be non-negative"),
-            ConfigError::FlagTypeError => write!(f, "Error in Toml file: Flag type must be one of the three \"user_derived\", \"pure_random\", \"rng_seed\""),
-            ConfigError::FlagCountError => write!(f, "Error in Toml file: Task flags must have a unique id"),
-            ConfigError::SubTaskCountError => write!(f, "Error in Toml file: Each task subtask must have a unique ID"),
-            ConfigError::SubTaskIdMatchError => write!(f,"Error in Toml file: Each subtask ID must include the current task ID as prefix."),
-            ConfigError::SubTaskPointError => write!(f, "Error in Toml file: Each task points much match subtask point total"),
-            ConfigError::SubTaskNameError => write!(f, "Error in Toml file: Each task subtask name must not be empty"),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

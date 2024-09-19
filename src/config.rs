@@ -5,6 +5,7 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
@@ -230,14 +231,22 @@ pub struct BuildOutputFile {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputKind {
-    Internal(String),
-    Resource(String),
-    Readme(String),
-    Meta(String),
+    Internal(PathBuf),
+    Resource(PathBuf),
+    Readme(PathBuf),
+    Meta(PathBuf),
 }
 
 impl OutputKind {
-    pub fn get_filename(&self) -> &str {
+    pub fn with_new_path(&self, new_content: PathBuf) -> OutputKind {
+        match self {
+            OutputKind::Internal(_) => OutputKind::Internal(new_content),
+            OutputKind::Resource(_) => OutputKind::Resource(new_content),
+            OutputKind::Readme(_) => OutputKind::Readme(new_content),
+            OutputKind::Meta(_) => OutputKind::Meta(new_content),
+        }
+    }
+    pub fn get_filename(&self) -> &Path {
         match self {
             OutputKind::Internal(name) => name,
             OutputKind::Resource(name) => name,

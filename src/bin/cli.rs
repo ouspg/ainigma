@@ -178,7 +178,6 @@ fn parallel_build(
             &week,
             number
         );
-
         let result = read_check_toml(path.into_os_string().as_os_str())?;
         let mut handles = Vec::with_capacity(number);
         let config = Arc::new(result);
@@ -188,7 +187,7 @@ fn parallel_build(
                 let task_clone = task.clone().unwrap();
                 let handle = thread::spawn(move || {
                     let uuid = Uuid::now_v7();
-                    build_task(&courseconf, task_clone.as_str(), uuid);
+                    let _outputs = build_task(&courseconf, task_clone.as_str(), uuid);
                 });
                 handles.push(handle)
             }
@@ -198,7 +197,8 @@ fn parallel_build(
             }
         } else {
             let uuid = Uuid::now_v7();
-            build_task(&config, task.as_ref().unwrap(), uuid);
+            let outputs = build_task(&config, task.as_ref().unwrap(), uuid).unwrap();
+            dbg!(outputs);
             tracing::info!("Task {} build succesfully", &task.unwrap_or_default());
         }
 
@@ -233,7 +233,7 @@ fn moodle_build(
             let task_clone = task.clone().unwrap();
             let handle = thread::spawn(move || {
                 let uuid = Uuid::now_v7();
-                build_task(&courseconf, task_clone.as_str(), uuid);
+                let _ = build_task(&courseconf, task_clone.as_str(), uuid);
             });
             handles.push(handle)
         }

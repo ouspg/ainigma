@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::config::{BuildConfig, Builder, CourseConfiguration, OutputKind, Task};
-use crate::flag_generator::{self};
+use crate::flag_generator::Flag;
 
 const OUTPUT_DIRECTORY: &str = "output/";
 
@@ -12,8 +12,9 @@ fn create_flag_id_pairs_by_task<'a>(
     task_config: &'a Task,
     course_config: &'a CourseConfiguration,
     uuid: Uuid,
-) -> HashMap<String, String> {
-    let mut flags = HashMap::with_capacity(3);
+) -> (Vec<Flag>, HashMap<String, String>) {
+    let mut flags_pairs = HashMap::with_capacity(task_config.stages.len());
+    let mut flags = Vec::with_capacity(task_config.stages.len());
     for stage in &task_config.stages {
         // let task_id = part.id.clone();
         let id: &str;
@@ -24,42 +25,40 @@ fn create_flag_id_pairs_by_task<'a>(
         }
         match stage.flag.kind.as_str() {
             "user_derived" => {
-                let flag_value = flag_generator::Flag::user_flag(
+                let flag = Flag::new_user_flag(
                     id.into(),
-                    course_config.flag_types.user_derived.algorithm.clone(),
-                    course_config.flag_types.user_derived.secret.clone(),
-                    id.into(),
-                    uuid,
-                )
-                .flag_string();
-                let flag_key = format!("FLAG_USER_DERIVED_{}", id);
-                flags.insert(flag_key.to_uppercase(), flag_value);
+                    &course_config.flag_types.user_derived.algorithm,
+                    &course_config.flag_types.user_derived.secret,
+                    id,
+                    &uuid,
+                );
+                let (flag_key, flag_value) = flag.get_flag_type_value_pair();
+                flags_pairs.insert(flag_key, flag_value);
+                flags.push(flag);
             }
             "pure_random" => {
-                let flag_value = flag_generator::Flag::random_flag(
-                    id.into(),
-                    course_config.flag_types.pure_random.length,
-                )
-                .flag_string();
-                let flag_key = format!("FLAG_PURE_RANDOM_{}", id);
-                flags.insert(flag_key.to_uppercase(), flag_value);
+                let flag =
+                    Flag::new_random_flag(id.into(), course_config.flag_types.pure_random.length);
+                let (flag_key, flag_value) = flag.get_flag_type_value_pair();
+                flags_pairs.insert(flag_key, flag_value);
+                flags.push(flag);
             }
             "rng_seed" => {
-                let flag_value = flag_generator::Flag::user_seed_flag(
+                let flag = Flag::new_user_seed_flag(
                     id.into(),
-                    course_config.flag_types.user_derived.algorithm.clone(),
-                    course_config.flag_types.user_derived.secret.clone(),
-                    id.into(),
-                    uuid,
-                )
-                .flag_string();
-                let flag_key = format!("FLAG_USER_SEED_{}", id);
-                flags.insert(flag_key.to_uppercase(), flag_value);
+                    &course_config.flag_types.user_derived.algorithm,
+                    &course_config.flag_types.user_derived.secret,
+                    id,
+                    &uuid,
+                );
+                let (flag_key, flag_value) = flag.get_flag_type_value_pair();
+                flags_pairs.insert(flag_key, flag_value);
+                flags.push(flag);
             }
             _ => panic!("Invalid flag type"),
         };
     }
-    flags
+    (flags, flags_pairs)
 }
 
 #[allow(dead_code)]
@@ -81,20 +80,36 @@ fn get_build_info(
     ))
 }
 
+/// Build output of the complete single task
+/// Single task can have subtasks, which requires embedding multiple flags at once
+#[derive(Debug)]
 pub struct TaskBuildProcessOutput {
     pub uiid: Uuid,
-    pub flags: Vec<String>,
+    pub flags: Vec<Flag>,
     pub files: Vec<OutputKind>,
 }
 impl TaskBuildProcessOutput {
-    // pub fn new(uuid: Uuid, flags: Vec<String>, relative_dir: PathBuf) -> Self {
-    //     Self {
-    //         uiid: uuid,
-    //         flags,
-    //         relative_dir,
-    //     }
-    // }
-    pub fn get_resource_files(&self) -> impl Iterator<Item = &String> {
+    pub fn new(uuid: Uuid, flags: Vec<Flag>, files: Vec<OutputKind>) -> Self {
+        // The task can have only one file related to instructions
+        let readme_count = files
+            .iter()
+            .filter(|output| matches!(output, OutputKind::Readme(_)))
+            .count();
+        if readme_count != 1 {
+            tracing::error!(
+                "The build process output must have exactly one readme file, found {}.",
+                readme_count
+            );
+            std::process::exit(1);
+        }
+        Self {
+            uiid: uuid,
+            flags,
+            files,
+        }
+    }
+    /// Files that should be delivered for the player or student
+    pub fn get_resource_files(&self) -> impl Iterator<Item = &PathBuf> {
         self.files.iter().filter_map(|output| match output {
             OutputKind::Resource(path) => Some(path),
             _ => None,
@@ -103,7 +118,11 @@ impl TaskBuildProcessOutput {
 }
 
 // #[tracing::instrument]
-pub fn build_task(course_config: &CourseConfiguration, task_id: &str, uuid: Uuid) {
+pub fn build_task(
+    course_config: &CourseConfiguration,
+    task_id: &str,
+    uuid: Uuid,
+) -> Result<TaskBuildProcessOutput, Box<dyn std::error::Error>> {
     let task_config = course_config.get_task_by_id(task_id).unwrap_or_else(|| {
         tracing::error!(
             "Task with id {} not found in the course configuration. Cannot continue.",
@@ -111,7 +130,7 @@ pub fn build_task(course_config: &CourseConfiguration, task_id: &str, uuid: Uuid
         );
         std::process::exit(1);
     });
-    let mut build_envs = create_flag_id_pairs_by_task(task_config, course_config, uuid);
+    let (flags, mut build_envs) = create_flag_id_pairs_by_task(task_config, course_config, uuid);
 
     match task_config.build.builder {
         Builder::Shell(ref entrypoint) => {
@@ -139,11 +158,12 @@ pub fn build_task(course_config: &CourseConfiguration, task_id: &str, uuid: Uuid
             // This means that output directory is right after relatively referenced
             build_envs.insert(
                 "OUTPUT_DIR".to_string(),
-                build_output.to_str().unwrap().to_string(),
+                build_output.to_str().unwrap_or_default().to_string(),
             );
             let output = std::process::Command::new("sh")
                 .arg(&entrypoint.entrypoint)
-                .envs(build_envs)
+                .env_clear()
+                .envs(&build_envs)
                 .current_dir(&task_config.build.directory)
                 .output();
 
@@ -158,12 +178,17 @@ pub fn build_task(course_config: &CourseConfiguration, task_id: &str, uuid: Uuid
                     std::process::exit(1);
                 }
             };
-
+            let mut outputs = Vec::with_capacity(task_config.build.output.len());
             if output.status.success() {
                 for output in &task_config.build.output {
-                    let path = builder_relative_dir.join(output.kind.get_filename());
+                    let path = builder_relative_dir
+                        .join(output.kind.get_filename())
+                        .canonicalize()?;
                     match fs::metadata(&path) {
-                        Ok(_) => tracing::debug!("File exists: {}", path.display()),
+                        Ok(_) => {
+                            tracing::debug!("File exists: {}", path.display());
+                            outputs.push(output.kind.with_new_path(path));
+                        }
 
                         Err(_) => {
                             tracing::error!("File does not exist: {}", path.display());
@@ -175,14 +200,16 @@ pub fn build_task(course_config: &CourseConfiguration, task_id: &str, uuid: Uuid
                         }
                     }
                 }
+                Ok(TaskBuildProcessOutput::new(uuid, flags, outputs))
             } else {
                 tracing::error!(
                     "The build process for task {} ended with non-zero exit code: {}",
                     task_id,
                     std::str::from_utf8(&output.stderr).unwrap()
                 );
+                std::process::exit(1);
             }
         }
-        Builder::Nix(_) => {}
+        Builder::Nix(_) => todo!("Nix builder not implemented"),
     }
 }

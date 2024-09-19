@@ -5,7 +5,7 @@ Think of it as a CTF challenge generator, but with a twist: every participant ge
 
 It may or may not be completed. Heavily work-in-progress.
 
-# License
+#### License
 
 <sup>
 Licensed under the <a href="LICENSE">MIT License</a>.

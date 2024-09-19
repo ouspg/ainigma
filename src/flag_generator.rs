@@ -14,8 +14,8 @@ type Hmac256 = Hmac<Sha3_256>;
 /// #### Algorithms
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
 #[derive(Debug, PartialEq, Deserialize, Clone)]
+#[allow(non_camel_case_types)]
 pub enum Algorithm {
-    #[allow(non_camel_case_types)]
     HMAC_SHA3_256,
 }
 
@@ -33,7 +33,7 @@ pub enum Algorithm {
 /// - `user_seed_flag()` - `UserSeedFlag` generator
 /// - `user_flag()` - `UserDerivedFlag` generator
 /// - `flag_string()` - returns Flag as a one string
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
@@ -41,30 +41,34 @@ pub enum Flag {
 }
 impl Flag {
     /// Generates a random hexstring flag with given prefix and lenght
-    pub fn random_flag(prefix: String, length: u8) -> Self {
+    pub fn new_random_flag(prefix: String, length: u8) -> Self {
         Flag::RngFlag(FlagUnit::rng_flag(prefix, length))
     }
     /// Generates a random hexstring flag with given prefix, algorithm, secret, taskid and Uuid
-    pub fn user_flag(
-        prefix: String,
-        algorithm: Algorithm,
-        secret: String,
-        taskid: String,
-        uuid: Uuid,
+    pub fn new_user_flag(
+        identifier: String,
+        algorithm: &Algorithm,
+        secret: &str,
+        taskid: &str,
+        uuid: &Uuid,
     ) -> Self {
-        Flag::UserDerivedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid))
+        Flag::UserDerivedFlag(FlagUnit::user_flag(
+            identifier, algorithm, secret, taskid, uuid,
+        ))
     }
     /// Generates a random hexstring flag with given prefix and user id (UUID)
-    pub fn user_seed_flag(
-        prefix: String,
-        algorithm: Algorithm,
-        secret: String,
-        taskid: String,
-        uuid: Uuid,
+    pub fn new_user_seed_flag(
+        identifier: String,
+        algorithm: &Algorithm,
+        secret: &str,
+        taskid: &str,
+        uuid: &Uuid,
     ) -> Self {
-        Flag::UserSeedFlag(FlagUnit::user_flag(prefix, algorithm, secret, taskid, uuid))
+        Flag::UserSeedFlag(FlagUnit::user_flag(
+            identifier, algorithm, secret, taskid, uuid,
+        ))
     }
-    /// Returns flag as one string
+    /// Returns the flag as one string
     pub fn flag_string(&self) -> String {
         match self {
             Flag::RngFlag(rngflag) => rngflag.return_flag(),
@@ -72,30 +76,56 @@ impl Flag {
             Flag::UserDerivedFlag(userflag) => userflag.return_flag(),
         }
     }
+    /// Gets the identifier of the flag
+    pub fn get_identifier(&self) -> &str {
+        match self {
+            Flag::RngFlag(rngflag) => rngflag.identifier.as_str(),
+            Flag::UserSeedFlag(userseedflag) => userseedflag.identifier.as_str(),
+            Flag::UserDerivedFlag(userflag) => userflag.identifier.as_str(),
+        }
+    }
+    /// Returns the flag as a key value pair, typically passed as ENV variable as part of `HashMap`
+    pub fn get_flag_type_value_pair(&self) -> (String, String) {
+        match self {
+            Flag::RngFlag(rngflag) => {
+                let flag_key = format!("FLAG_PURE_RANDOM_{}", rngflag.identifier.to_uppercase());
+                (flag_key, self.flag_string())
+            }
+            Flag::UserSeedFlag(userseedflag) => {
+                let flag_key = format!("FLAG_USER_SEED_{}", userseedflag.identifier.to_uppercase());
+                (flag_key, self.flag_string())
+            }
+            Flag::UserDerivedFlag(userflag) => {
+                let flag_key = format!("FLAG_USER_DERIVED_{}", userflag.identifier.to_uppercase());
+                (flag_key, self.flag_string())
+            }
+        }
+    }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct FlagUnit {
-    prefix: String,
+    /// Identifier is typically the same as task id
+    identifier: String,
+    /// Suffix is the varying part of the flag
     suffix: String,
 }
 impl FlagUnit {
-    fn rng_flag(flag_prefix: String, lenght: u8) -> Self {
+    fn rng_flag(identifier: String, lenght: u8) -> Self {
         let flag_suffix_result = pure_random_flag(lenght);
 
         FlagUnit {
-            prefix: flag_prefix,
+            identifier,
             suffix: flag_suffix_result,
         }
     }
 
     fn user_flag(
-        flag_prefix: String,
-        algorithm: Algorithm,
-        secret: String,
-        taskid: String,
-        uuid: Uuid,
+        identifier: String,
+        algorithm: &Algorithm,
+        secret: &str,
+        taskid: &str,
+        uuid: &Uuid,
     ) -> Self {
         let flag_suffix_result = user_derived_flag(algorithm, uuid, secret, taskid);
 
@@ -104,16 +134,13 @@ impl FlagUnit {
             Err(_error) => panic!("Error generating flag"),
         };
         FlagUnit {
-            prefix: flag_prefix,
+            identifier,
             suffix: flag_suffix,
         }
     }
 
     fn return_flag(&self) -> String {
-        let flag_prefix = &self.prefix;
-        let flag_suffix = self.suffix.as_str();
-
-        flag_prefix.to_owned() + ":" + flag_suffix
+        format!("{}:{}", self.identifier, self.suffix)
     }
 }
 
@@ -131,10 +158,10 @@ fn pure_random_flag(lenght: u8) -> String {
 }
 
 fn user_derived_flag(
-    algorithm: Algorithm,
-    uuid: Uuid,
-    secret: String,
-    taskid: String,
+    algorithm: &Algorithm,
+    uuid: &Uuid,
+    secret: &str,
+    taskid: &str,
 ) -> Result<String, InvalidLength> {
     match algorithm {
         Algorithm::HMAC_SHA3_256 => {
@@ -185,7 +212,8 @@ mod tests {
         let taskid = "task1".to_string();
         let secret2 = "Work".to_string();
         let taskid2 = "task1".to_string();
-        let hash = user_derived_flag(Algorithm::HMAC_SHA3_256, id, secret, taskid).expect("error");
+        let hash =
+            user_derived_flag(&Algorithm::HMAC_SHA3_256, &id, &secret, &taskid).expect("error");
         print!("{}", hash);
         assert!(compare_hmac(hash, id, secret2, taskid2).expect("should work"))
     }
@@ -204,15 +232,16 @@ mod tests {
 
         let answer1 = pure_random_flag(32);
         let answer2 =
-            user_derived_flag(Algorithm::HMAC_SHA3_256, id, secret, taskid).expect("works");
+            user_derived_flag(&Algorithm::HMAC_SHA3_256, &id, &secret, &taskid).expect("works");
 
         println!("{}", answer1);
         println!("{}", answer2);
 
-        let flag = Flag::user_flag(prefix, Algorithm::HMAC_SHA3_256, secret2, taskid2, id);
+        let flag = Flag::new_user_flag(prefix, &Algorithm::HMAC_SHA3_256, &secret2, &taskid2, &id);
         let result = flag.flag_string();
         println!("{}", result);
-        let flag2 = Flag::user_flag(prefix2, Algorithm::HMAC_SHA3_256, secret3, taskid3, id);
+        let flag2 =
+            Flag::new_user_flag(prefix2, &Algorithm::HMAC_SHA3_256, &secret3, &taskid3, &id);
         let result2 = flag2.flag_string();
         println!("{}", result2);
     }
@@ -223,20 +252,14 @@ mod tests {
         let prefix = "task1".to_string();
         let prefix2 = "task1".to_string();
         let prefix3 = "task1".to_string();
-        let flag = Flag::random_flag(prefix, 32);
-        let flag2 = Flag::user_flag(
-            prefix2,
-            Algorithm::HMAC_SHA3_256,
-            "This works".to_string(),
-            "A".to_string(),
-            id,
-        );
-        let flag3 = Flag::user_seed_flag(
+        let flag = Flag::new_random_flag(prefix, 32);
+        let flag2 = Flag::new_user_flag(prefix2, &Algorithm::HMAC_SHA3_256, "This works", "A", &id);
+        let flag3 = Flag::new_user_seed_flag(
             prefix3,
-            Algorithm::HMAC_SHA3_256,
-            "this also works".to_string(),
-            "B".to_string(),
-            id,
+            &Algorithm::HMAC_SHA3_256,
+            "this also works",
+            "B",
+            &id,
         );
         let string = flag.flag_string();
         let string2 = flag2.flag_string();

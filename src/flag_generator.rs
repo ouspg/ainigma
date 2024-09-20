@@ -76,6 +76,9 @@ impl Flag {
             Flag::UserDerivedFlag(userflag) => userflag.return_flag(),
         }
     }
+    pub fn encase_flag(&self) -> String {
+        format!("flag{{{}}}", self.flag_string())
+    }
     /// Gets the identifier of the flag
     pub fn get_identifier(&self) -> &str {
         match self {

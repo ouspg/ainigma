@@ -60,6 +60,29 @@ impl S3Storage {
 }
 
 impl CloudStorage for S3Storage {
+    async fn health_check(&self) -> Result<(), CloudStorageError> {
+        let exist = self
+            .client
+            .get_bucket_location()
+            .bucket(&self.bucket)
+            .send()
+            .await;
+        match exist {
+            Ok(resp) => {
+                tracing::info!(
+                    "Bucket identified: {:?}! Updating the bucket lifecycle.",
+                    resp
+                );
+                // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
+                Ok(())
+            }
+            Err(e) => {
+                tracing::warn!("The bucket likely {} did not exist or upstream connection issues, we expect currently that you have created it manually: {}", self.bucket, e);
+                Err(CloudStorageError::BucketNotFound(self.bucket.to_owned()))
+            }
+        }
+    }
+
     // #[tracing::instrument]
     async fn upload(&self, files: FileObjects) -> Result<Vec<OutputItem>, CloudStorageError> {
         tracing::info!(
@@ -68,112 +91,85 @@ impl CloudStorage for S3Storage {
             self.bucket,
             files.dst_location
         );
-
-        let exists = self
-            .client
-            .get_bucket_location()
-            .bucket(&self.bucket)
-            .send()
-            .await;
-        match exists {
-            Ok(resp) => {
-                tracing::info!(
-                    "Bucket identified: {:?}! Updating the bucket lifecycle.",
-                    resp
-                );
-                // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
-                // Upload the files
-                let shared_vec = Arc::new(Mutex::new(Vec::with_capacity(files.len())));
-                let mut tasks = Vec::with_capacity(files.len());
-                for mut file in files.files {
-                    let file_key = format!("{}/{}", files.dst_location, file.0);
-                    // Use structured concurrency whenever possible
-                    // Avoid using tokio::spawn, as we lose the control
-                    let body = ByteStream::from_path(file.1.kind.get_filename()).await;
-                    let task = async {
-                        match body {
-                            Ok(b) => {
-                                let response = self
+        // Upload the files
+        let shared_vec = Arc::new(Mutex::new(Vec::with_capacity(files.len())));
+        let mut tasks = Vec::with_capacity(files.len());
+        for mut file in files.files {
+            let file_key = format!("{}/{}", files.dst_location, file.0);
+            // Use structured concurrency whenever possible
+            // Avoid using tokio::spawn, as we lose the control
+            let body = ByteStream::from_path(file.1.kind.get_filename()).await;
+            let task = async {
+                match body {
+                    Ok(b) => {
+                        let response = self
+                            .client
+                            .put_object()
+                            .bucket(&self.bucket)
+                            .key(&file_key)
+                            .body(b)
+                            .send()
+                            .await;
+                        match response {
+                            Ok(r) => {
+                                tracing::info!(
+                                    "Created or updated the file with expiration: {}",
+                                    r.expiration.unwrap_or_default()
+                                );
+                                let presigned_request = self
                                     .client
-                                    .put_object()
+                                    .get_object()
                                     .bucket(&self.bucket)
-                                    .key(&file_key)
-                                    .body(b)
-                                    .send()
+                                    .key(file_key)
+                                    .presigned(
+                                        PresigningConfig::expires_in(Duration::from_secs(
+                                            // Days to seconds
+                                            self.link_expiration_days.wrapping_mul(86400).into(),
+                                        ))
+                                        .unwrap(),
+                                    )
                                     .await;
-                                match response {
-                                    Ok(r) => {
-                                        tracing::info!(
-                                            "Created or updated the file with expiration: {}",
-                                            r.expiration.unwrap_or_default()
-                                        );
-                                        let presigned_request = self
-                                            .client
-                                            .get_object()
-                                            .bucket(&self.bucket)
-                                            .key(file_key)
-                                            .presigned(
-                                                PresigningConfig::expires_in(Duration::from_secs(
-                                                    // Days to seconds
-                                                    self.link_expiration_days
-                                                        .wrapping_mul(86400)
-                                                        .into(),
-                                                ))
-                                                .unwrap(),
-                                            )
-                                            .await;
-                                        match presigned_request {
-                                            Ok(url) => {
-                                                tracing::debug!(
-                                                    "The pre-signed URL: {}",
-                                                    url.uri()
-                                                );
-                                                let mut vec = shared_vec.lock().await;
-                                                file.1.set_link(url.uri().to_string());
-                                                vec.push(file.1);
-                                            }
-                                            Err(e) => {
-                                                tracing::error!(
-                                                    "Failed to generate the pre-signed URL: {}",
-                                                    e
-                                                );
-                                                return Err(CloudStorageError::AWSSdkError(
-                                                    e.to_string(),
-                                                ));
-                                            }
-                                        }
+                                match presigned_request {
+                                    Ok(url) => {
+                                        tracing::debug!("The pre-signed URL: {}", url.uri());
+                                        let mut vec = shared_vec.lock().await;
+                                        file.1.set_link(url.uri().to_string());
+                                        vec.push(file.1);
                                     }
                                     Err(e) => {
-                                        tracing::error!("Failed to upload the file: {}", e);
+                                        tracing::error!(
+                                            "Failed to generate the pre-signed URL: {}",
+                                            e
+                                        );
                                         return Err(CloudStorageError::AWSSdkError(e.to_string()));
                                     }
                                 }
                             }
                             Err(e) => {
-                                tracing::error!("Failed to read the file: {}", e);
-                                return Err(CloudStorageError::FileReadError(e.to_string()));
+                                tracing::error!("Failed to upload the file: {}", e);
+                                return Err(CloudStorageError::AWSSdkError(e.to_string()));
                             }
                         }
-                        Ok(())
-                    };
-                    tasks.push(task);
-                }
-                let result = try_join_all(tasks).await;
-                match result {
-                    Ok(_) => {
-                        let mut vec = shared_vec.lock().await;
-                        tracing::info!("Uploaded {} files successfully.", vec.len());
-                        Ok(core::mem::take(&mut vec))
                     }
                     Err(e) => {
-                        tracing::error!("Failed to upload the files: {}", e);
-                        Err(CloudStorageError::AWSSdkError(e.to_string()))
+                        tracing::error!("Failed to read the file: {}", e);
+                        return Err(CloudStorageError::FileReadError(e.to_string()));
                     }
                 }
+                Ok(())
+            };
+            tasks.push(task);
+        }
+        let result = try_join_all(tasks).await;
+        match result {
+            Ok(_) => {
+                let mut vec = shared_vec.lock().await;
+                tracing::info!("Uploaded {} files successfully.", vec.len());
+                Ok(core::mem::take(&mut vec))
             }
             Err(e) => {
-                tracing::warn!("The bucket likely {} did not exist, we expect currently that you have created it manually: {}", self.bucket, e);
-                Err(CloudStorageError::BucketNotFound(self.bucket.to_owned()))
+                tracing::error!("Failed to upload the files: {}", e);
+                Err(CloudStorageError::AWSSdkError(e.to_string()))
             }
         }
     }

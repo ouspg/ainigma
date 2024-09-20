@@ -72,6 +72,10 @@ pub trait CloudStorage {
     /// Uploads all files from the `FileObjects` instance to the storage service.
     /// Returns updated list of `OutputItem` with the URL of the uploaded files.
     async fn upload(&self, files: FileObjects) -> Result<Vec<OutputItem>, CloudStorageError>;
+
+    /// Check if the storage service is available. Typically bucket
+    async fn health_check(&self) -> Result<(), CloudStorageError>;
+
     /// Retrieves the URL of an uploaded file. Fily key is the fully qualified path in the remote.
     async fn get_url(&self, file_key: String) -> Result<String, Box<dyn std::error::Error>>;
 }

@@ -1,10 +1,10 @@
 use ainigma::{
     build_process::{build_task, TaskBuildProcessOutput},
     config::{read_check_toml, ConfigError, ModuleConfiguration},
+    moodle::create_exam,
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{crate_description, Args, Parser, Subcommand};
-use std::collections::HashMap;
 use std::process::ExitCode;
 use std::{
     path::PathBuf,
@@ -85,6 +85,25 @@ fn s3_upload(
 
     let mut tasks = Vec::with_capacity(files.len());
 
+    let rt = Runtime::new().unwrap();
+
+    let health = rt.block_on(async {
+        match storage.health_check().await {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                tracing::error!("Error when checking the health of the storage: {}", error);
+                Err(error)
+            }
+        }
+    });
+    match health {
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!("Cannot continue with the file upload.");
+            return Err(e.into());
+        }
+    }
+
     for mut file in files {
         let module_nro = config
             .get_domain_number_by_task_id(&file.task_id)
@@ -110,7 +129,6 @@ fn s3_upload(
         };
         tasks.push(future);
     }
-    let rt = Runtime::new().unwrap();
     let result = rt.block_on(async { futures::future::try_join_all(tasks).await });
     match result {
         Ok(files) => Ok(files),
@@ -184,7 +202,7 @@ fn main() -> std::process::ExitCode {
                     Some(cmd_moodle) => match cmd_moodle {
                         Moodle::Moodle { category } => {
                             let results = s3_upload(config, outputs).unwrap();
-                            dbg!(results);
+                            let _examp = create_exam(results, category);
                         }
                     },
                     None => match parallel_task_build(&config, "test", 30) {

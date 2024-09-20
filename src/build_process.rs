@@ -134,8 +134,20 @@ impl TaskBuildProcessOutput {
             })
             .collect()
     }
+    pub fn get_readme(&self) -> Option<&OutputItem> {
+        self.files
+            .iter()
+            .find(|output| matches!(output.kind, OutputKind::Readme(_)))
+    }
+
     pub fn refresh_files(&mut self, items: Vec<OutputItem>) {
-        self.files = items;
+        for item in items {
+            if let Some(index) = self.files.iter().position(|x| x.kind == item.kind) {
+                self.files[index] = item;
+            } else {
+                self.files.push(item);
+            }
+        }
     }
 }
 

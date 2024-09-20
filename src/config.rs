@@ -230,7 +230,7 @@ pub struct BuildOutputFile {
     pub kind: OutputKind,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputKind {
     Internal(PathBuf),

@@ -71,9 +71,9 @@ impl Flag {
     /// Returns the flag as one string
     pub fn flag_string(&self) -> String {
         match self {
-            Flag::RngFlag(rngflag) => rngflag.return_flag(),
-            Flag::UserSeedFlag(userseedflag) => userseedflag.return_flag(),
-            Flag::UserDerivedFlag(userflag) => userflag.return_flag(),
+            Flag::RngFlag(rngflag) => rngflag.return_flag().trim().to_string(),
+            Flag::UserSeedFlag(userseedflag) => userseedflag.return_flag().trim().to_string(),
+            Flag::UserDerivedFlag(userflag) => userflag.return_flag().trim().to_string(),
         }
     }
     pub fn encase_flag(&self) -> String {

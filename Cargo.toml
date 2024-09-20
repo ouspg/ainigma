@@ -1,5 +1,5 @@
 [package]
-name = "autograder"
+name = "ainigma"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,8 +7,6 @@ edition = "2021"
 name = "cli"
 
 [dependencies]
-# For AWS S3
-rust-s3 = "0.35"
 # Our async runtime
 tokio = { version = "1.40", default-features = false, features = [
     "macros",
@@ -24,10 +22,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 toml = "0.8"
 
 # Cli
-clap = { version = "4.5", default-features = false, features = [
-    "std",
-    "derive",
-] }
+clap = { version = "4.5", features = ["derive", "cargo"] }
 thiserror = "1.0.63"
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = [] }
@@ -40,6 +35,7 @@ aws-config = { version = "1.5.6", default-features = false, features = [
     "rustls",
 ] }
 futures = "0.3.30"
+moodle-xml = "0.1.1"
 [dependencies.uuid]
 version = "1.9"
 features = [

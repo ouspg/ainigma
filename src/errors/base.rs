@@ -32,9 +32,6 @@ pub enum FileObjectError {
 pub enum CloudStorageError {
     #[error("Bucket not found: {0}")]
     BucketNotFound(String),
-    // inner S3 error wrapped
-    #[error("Inner S3 error: {0:?}")]
-    S3Error(#[from] s3::error::S3Error),
     #[error("AWS SDK error: {0}")]
     AWSSdkError(String),
     #[error("Failed to read the file when uploading: {0}")]

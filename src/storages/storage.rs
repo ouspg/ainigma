@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use crate::build_process::OutputItem;
 use crate::errors::{CloudStorageError, FileObjectError};
 
 /// Check for file traversal and unicode errors, just in case
@@ -34,17 +35,17 @@ pub fn validate_file_path(base_path: &Path, file: &Path) -> Result<String, FileO
 pub struct FileObjects {
     /// Typically a directory in the storage service.
     pub dst_location: String,
-    pub files: HashMap<String, PathBuf>,
+    pub files: HashMap<String, OutputItem>,
 }
 impl FileObjects {
     /// Creates a new instance of `FileObjects`. Main purpose is to validate the input files path and that they exists.
     #[tracing::instrument]
-    pub fn new(dst_location: String, files: Vec<PathBuf>) -> Result<Self, FileObjectError> {
+    pub fn new(dst_location: String, files: Vec<OutputItem>) -> Result<Self, FileObjectError> {
         let mut file_map = HashMap::with_capacity(files.len());
         // Note that not safe if program is called higher up in the directory tree.
         let cwd = std::env::current_dir()?;
         for file in files {
-            let file_name = validate_file_path(&cwd, &file)?;
+            let file_name = validate_file_path(&cwd, file.kind.get_filename())?;
             if file_map.contains_key(&file_name) {
                 return Err(FileObjectError::FilesNotUnique(format!(
                     "File {} already exists in the list",
@@ -69,11 +70,12 @@ impl FileObjects {
 #[allow(async_fn_in_trait)]
 pub trait CloudStorage {
     /// Uploads all files from the `FileObjects` instance to the storage service.
-    /// Returns HashMap with the filename and the URL.
-    async fn upload(
-        &self,
-        files: FileObjects,
-    ) -> Result<HashMap<String, String>, CloudStorageError>;
+    /// Returns updated list of `OutputItem` with the URL of the uploaded files.
+    async fn upload(&self, files: FileObjects) -> Result<Vec<OutputItem>, CloudStorageError>;
+
+    /// Check if the storage service is available. Typically bucket
+    async fn health_check(&self) -> Result<(), CloudStorageError>;
+
     /// Retrieves the URL of an uploaded file. Fily key is the fully qualified path in the remote.
     async fn get_url(&self, file_key: String) -> Result<String, Box<dyn std::error::Error>>;
 }

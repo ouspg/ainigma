@@ -1,4 +1,5 @@
-# Course Configuration
+# Module Configuration
+# Can be a course, subpart of the course, CTF competition, or something else.
 
 # UUIDv7
 identifier = "01908498-ac98-708d-b886-b6f2747ef785"                              # mandatory
@@ -7,12 +8,13 @@ description = "A comprehensive course covering various aspects of cybersecurity"
 # We likely need to think this further. If some task is changed, this should be changed as well.
 version = "0.0.1" # mandatory
 
-# Weeks Configuration
-[[weeks]]
-number = 1                              # mandatory
-theme = "Introduction to Cybersecurity"
+# Domains are the main sections of the course
+# For a more general setting, we use word "domain" instead of "week" or "module"
+[[domains]]
+number = 1                             # mandatory
+name = "Introduction to Cybersecurity"
 
-[[weeks.tasks]]
+[[domains.tasks]]
 # Tasks can be a single whole task or tasks with stages (sub-parts like a, b c)
 id = "task001"                                              # mandatory
 name = "Challenge 1"                                        # mandatory
@@ -22,11 +24,11 @@ points = 1.0 # mandatory
 
 # Same build can embed many flags at once
 # As a result, it is more clear to introduce list of `stages here instead of repeating multiple tasks without build
-# `id` is used to make order explicit and tie flag into task, must be unique in the whole course
+# `id` is used to make order explicit and tie flag into task, must be unique in the whole module/course
 # E.g. consider a scenario where we build exploitable binary with many vulnerabilities. We need to build it once.
 # If we have only one part, `name` and `description` and `weight` are optional
 
-# As long as identifier is unique on course level, we need to use something which reminds us about the actual task relation
+# As long as identifier is unique on module level, we need to use something which reminds us about the actual task relation
 # Task ID is used as flag prefix. Maybe further obfuscation needed for that but maybe not necessary
 # Task ID must contain the overall task ID as prefix
 stages = [
@@ -35,37 +37,38 @@ stages = [
     { id = "task001C", name = "Subpart C", description = "Task C", weight = 1, flag = { kind = "rng_seed" } },
 ]
 
-[weeks.tasks.build]
-directory = "tasks/week1/buffer_overflow"
-builder = { shell = {} }                  # Shell builder without entrypoint
+[domains.tasks.build]
+directory = "tasks/domain1/buffer_overflow"
+builder = { shell = {} }                    # Shell builder without entrypoint
 # Default is entrypoint.sh, but we could override it
 # builder = { shell = { entrypoint = "my_entrypoint.sh" } }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 # Resource means that it is provided for the end-user
+# Resource will always generate a download link, appended to the bottom of the instructions.
 kind = { resource = "exloitable.bin" }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 # Internal use to provide the challenge from cloud, for example
 # Might be rare use case
 # We might need to design tasks in mind that there is just a single server, but connection variable changes behaviour
 kind = { internal = "vulnerable_server.py" }
 
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 # Specific kind of resource; instruction for the assignment and should be used as it is
 # It includes something that is expected to be different for every user doing the tasks, and as so it is needed here
 # Probably optionally generate file or as string from the builder
 kind = { readme = "readme.txt" }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 # Mechanic to provide embedded metadata for the task descriptions (e.g. Moodle exam), e.g. URL, docker image name
 # Something that is expected to be different for every user doing the tasks
 # Maybe not needed as "file", rather data returned by the build system
 # Should be likely key-value storage, with some predefined keys. Custom keys allowed.
 kind = { meta = "meta.json" }
 
-[[weeks.tasks]]
+[[domains.tasks]]
 id = "task002"
 name = "Challenge 2"
 description = "Previous exploit was trivial. Try harder."
@@ -73,62 +76,62 @@ points = 2.0
 # Minimalistic flag configuration since just single flag which provides all the points
 stages = [{ flag = { kind = "pure_random" } }]
 
-[weeks.tasks.build]
-directory = "tasks/week1/basic_crypto"
+[domains.tasks.build]
+directory = "tasks/domain1/basic_crypto"
 # Default entrypoint for nix is "flake.nix"
 builder = { nix = {} }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { resource = "exloitable.bin" }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { internal = "vulnerable_server.py" }
 
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 # Instruction for the assignment, should be used as it is
 kind = { readme = "readme.txt" }
 
 
-[[weeks]]
+[[domains]]
 number = 2
-theme = "Network Security Fundamentals"
+name = "Network Security Fundamentals"
 
-[[weeks.tasks]]
+[[domains.tasks]]
 id = "task003"
 name = "SQL Injection Attack"
 description = "Perform a SQL injection attack on a vulnerable web application"
 points = 1.0
 stages = [{ flag = { kind = "pure_random" } }]
 
-[weeks.tasks.build]
-directory = "tasks/week2/sql_injection"
+[domains.tasks.build]
+directory = "tasks/domain2/sql_injection"
 builder = { shell = { entrypoint = "setup.sh" } }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { internal = "vulnerable_server.py" }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
-[[weeks.tasks]]
+[[domains.tasks]]
 id = "task004"
 name = "Network Packet Analysis"
 description = "Analyze network packets to identify a security breach"
 points = 1.0
 stages = [{ flag = { kind = "rng_seed" } }]
 
-[weeks.tasks.build]
-directory = "tasks/week2/packet_analysis"
+[domains.tasks.build]
+directory = "tasks/domain2/packet_analysis"
 builder = { shell = { entrypoint = "generate_pcap.sh" } }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { resource = "my_traffic.pcap" }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
-[[weeks.tasks]]
+[[domains.tasks]]
 id = "task005"
 name = "Challenge 5"
 description = "Previous exploit was trivial. Try harder."
@@ -136,11 +139,11 @@ points = 2.0
 # Minimalistic flag configuration since just single flag which provides all the points
 stages = [{ flag = { kind = "pure_random" } }]
 
-[weeks.tasks.build]
+[domains.tasks.build]
 directory = "samples/tasks/simple_shell"
 builder = { shell = { entrypoint = "build.sh" } }
 
-[[weeks.tasks.build.output]]
+[[domains.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
 # Flag Types Configuration

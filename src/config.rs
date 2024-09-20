@@ -22,8 +22,8 @@ pub enum ConfigError {
     CourseNameError,
     #[error("Error in Toml file: Course version must not be empty")]
     CourseVersionError,
-    #[error("Error in Toml file: Each week must have a unique number")]
-    WeekNumberError,
+    #[error("Error in Toml file: Each domain must have a unique number")]
+    DomainNumberError,
     #[error("Error in Toml file: Task Id cannot be empty")]
     TasksIDsNotUniqueError,
     #[error("The following task identifier was not found: {0}")]
@@ -49,42 +49,52 @@ pub enum ConfigError {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct CourseConfiguration {
+pub struct ModuleConfiguration {
     //TODO:Change to UUID
     pub identifier: String,
     pub name: String,
     pub description: String,
     pub version: String,
-    pub weeks: Vec<Week>,
+    pub domains: Vec<Domain>,
     pub flag_types: FlagsTypes,
     pub deployment: Deployment,
 }
 
-impl CourseConfiguration {
+impl ModuleConfiguration {
     pub fn new(
         identifier: String,
         name: String,
         description: String,
         version: String,
-        weeks: Vec<Week>,
+        domains: Vec<Domain>,
         flag_types: FlagsTypes,
         deployment: Deployment,
-    ) -> CourseConfiguration {
-        CourseConfiguration {
+    ) -> ModuleConfiguration {
+        ModuleConfiguration {
             identifier,
             name,
             description,
             version,
-            weeks,
+            domains,
             flag_types,
             deployment,
         }
     }
     pub fn get_task_by_id(&self, id: &str) -> Option<Task> {
-        for week in &self.weeks {
-            for task in &week.tasks {
+        for domain in &self.domains {
+            for task in &domain.tasks {
                 if task.id == id {
                     return Some(task.clone());
+                }
+            }
+        }
+        None
+    }
+    pub fn get_domain_number_by_task_id(&self, id: &str) -> Option<u8> {
+        for domain in &self.domains {
+            for task in &domain.tasks {
+                if task.id == id {
+                    return Some(domain.number);
                 }
             }
         }
@@ -93,18 +103,18 @@ impl CourseConfiguration {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Week {
+pub struct Domain {
     pub tasks: Vec<Task>,
     pub number: u8,
-    pub theme: String,
+    pub name: String,
 }
 
-impl Week {
-    pub fn new(tasks: Vec<Task>, number: u8, theme: String) -> Week {
-        Week {
+impl Domain {
+    pub fn new(tasks: Vec<Task>, number: u8, name: String) -> Domain {
+        Domain {
             tasks,
             number,
-            theme,
+            name,
         }
     }
 }
@@ -354,55 +364,55 @@ pub fn read_toml_content_from_file(filepath: &OsStr) -> Result<String, Box<dyn E
 }
 
 //TODO: Add warnings for unspecified fields
-pub fn toml_content(file_content: String) -> Result<CourseConfiguration, ConfigError> {
-    let course_config = toml::from_str(&file_content);
-    course_config.map_err(|err| ConfigError::TomlParseError {
+pub fn toml_content(file_content: String) -> Result<ModuleConfiguration, ConfigError> {
+    let module_config = toml::from_str(&file_content);
+    module_config.map_err(|err| ConfigError::TomlParseError {
         message: err.to_string(),
     })
 }
 
-pub fn check_toml(course: CourseConfiguration) -> Result<CourseConfiguration, ConfigError> {
-    let id = course.identifier.as_str();
+pub fn check_toml(module: ModuleConfiguration) -> Result<ModuleConfiguration, ConfigError> {
+    let id = module.identifier.as_str();
     match Uuid::parse_str(id) {
         Ok(ok) => ok,
         Err(_err) => return Err(ConfigError::UuidError),
     };
-    let course_name = &course.name;
-    if course_name.is_empty() {
+    let module_name = &module.name;
+    if module_name.is_empty() {
         return Err(ConfigError::CourseNameError);
     }
-    let course_version = &course.version;
-    if course_version.is_empty() {
+    let module_version = &module.version;
+    if module_version.is_empty() {
         return Err(ConfigError::CourseVersionError);
     }
 
     // check number uniques
-    let numbers = course
-        .weeks
+    let numbers = module
+        .domains
         .iter()
-        .map(|week| week.number)
+        .map(|domain| domain.number)
         .collect::<std::collections::HashSet<u8>>();
-    if numbers.len() != course.weeks.len() {
-        return Err(ConfigError::WeekNumberError);
+    if numbers.len() != module.domains.len() {
+        return Err(ConfigError::DomainNumberError);
     }
-    // Use set to check course task id uniques
+    // Use set to check module task id uniques
     let mut task_ids = HashSet::new();
 
-    // Check each task in each week
-    for week in &course.weeks {
-        for task in &week.tasks {
+    // Check each task in each domain
+    for domain in &module.domains {
+        for task in &domain.tasks {
             for id in task.get_task_ids() {
                 if !task_ids.insert(id) {
                     return Err(ConfigError::TaskCountError);
                 }
             }
         }
-        for task in &week.tasks {
+        for task in &domain.tasks {
             let _task_result = check_task(task)?;
         }
     }
     // Continue
-    Ok(course)
+    Ok(module)
 }
 
 pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
@@ -482,10 +492,10 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
     Ok(true)
 }
 
-pub fn read_check_toml(filepath: &OsStr) -> Result<CourseConfiguration, ConfigError> {
+pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigError> {
     let tomlstring = read_toml_content_from_file(filepath).expect("No reading errors");
-    let courseconfig = toml_content(tomlstring)?;
-    check_toml(courseconfig)
+    let module_config = toml_content(tomlstring)?;
+    check_toml(module_config)
 }
 #[cfg(test)]
 mod tests {

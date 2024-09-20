@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use uuid::Uuid;
 
-use crate::config::{BuildConfig, Builder, CourseConfiguration, OutputKind, Task};
+use crate::config::{BuildConfig, Builder, ModuleConfiguration, OutputKind, Task};
 use crate::flag_generator::Flag;
 
 const OUTPUT_DIRECTORY: &str = "output/";
 
 fn create_flag_id_pairs_by_task<'a>(
     task_config: &'a Task,
-    course_config: &'a CourseConfiguration,
+    module_config: &'a ModuleConfiguration,
     uuid: Uuid,
 ) -> (Vec<Flag>, HashMap<String, String>) {
     let mut flags_pairs = HashMap::with_capacity(task_config.stages.len());
@@ -27,8 +27,8 @@ fn create_flag_id_pairs_by_task<'a>(
             "user_derived" => {
                 let flag = Flag::new_user_flag(
                     id.into(),
-                    &course_config.flag_types.user_derived.algorithm,
-                    &course_config.flag_types.user_derived.secret,
+                    &module_config.flag_types.user_derived.algorithm,
+                    &module_config.flag_types.user_derived.secret,
                     id,
                     &uuid,
                 );
@@ -38,7 +38,7 @@ fn create_flag_id_pairs_by_task<'a>(
             }
             "pure_random" => {
                 let flag =
-                    Flag::new_random_flag(id.into(), course_config.flag_types.pure_random.length);
+                    Flag::new_random_flag(id.into(), module_config.flag_types.pure_random.length);
                 let (flag_key, flag_value) = flag.get_flag_type_value_pair();
                 flags_pairs.insert(flag_key, flag_value);
                 flags.push(flag);
@@ -46,8 +46,8 @@ fn create_flag_id_pairs_by_task<'a>(
             "rng_seed" => {
                 let flag = Flag::new_user_seed_flag(
                     id.into(),
-                    &course_config.flag_types.user_derived.algorithm,
-                    &course_config.flag_types.user_derived.secret,
+                    &module_config.flag_types.user_derived.algorithm,
+                    &module_config.flag_types.user_derived.secret,
                     id,
                     &uuid,
                 );
@@ -63,11 +63,11 @@ fn create_flag_id_pairs_by_task<'a>(
 
 #[allow(dead_code)]
 fn get_build_info(
-    course_config: &mut CourseConfiguration,
+    module_config: &mut ModuleConfiguration,
     task_id: String,
 ) -> Result<&BuildConfig, String> {
-    for week in &mut course_config.weeks {
-        for task in &week.tasks {
+    for domain in &mut module_config.domains {
+        for task in &domain.tasks {
             if task_id == task.id {
                 return Ok(task.build.as_ref());
             }
@@ -78,22 +78,37 @@ fn get_build_info(
         task_id
     ))
 }
+/// Couple output items together, so we link points to the correct output
+#[derive(Debug, Clone)]
+pub struct OutputItem {
+    pub kind: OutputKind,
+    pub link: Option<String>,
+}
 
-/// Information object that should include everything from the build process
-/// Single task can have subtasks, which requires embedding multiple flags at once
+impl OutputItem {
+    pub fn new(kind: OutputKind) -> Self {
+        Self { kind, link: None }
+    }
+    pub fn set_link(&mut self, link: String) {
+        self.link = Some(link);
+    }
+}
+
+/// Meta object that should include everything from the build process
+/// Single task can have multiple subtasks, which requires embedding multiple flags at once
 #[derive(Debug)]
 pub struct TaskBuildProcessOutput {
     pub uiid: Uuid,
     pub task_id: String,
     pub flags: Vec<Flag>,
-    pub files: Vec<OutputKind>,
+    pub files: Vec<OutputItem>,
 }
 impl TaskBuildProcessOutput {
-    pub fn new(uuid: Uuid, task_id: String, flags: Vec<Flag>, files: Vec<OutputKind>) -> Self {
+    pub fn new(uuid: Uuid, task_id: String, flags: Vec<Flag>, files: Vec<OutputItem>) -> Self {
         // The task can have only one file related to instructions
         let readme_count = files
             .iter()
-            .filter(|output| matches!(output, OutputKind::Readme(_)))
+            .filter(|output| matches!(output.kind, OutputKind::Readme(_)))
             .count();
         if readme_count != 1 {
             tracing::error!(
@@ -109,22 +124,27 @@ impl TaskBuildProcessOutput {
             files,
         }
     }
-    /// Files that should be delivered for the player or student
-    pub fn get_resource_files(&self) -> impl Iterator<Item = &PathBuf> {
-        self.files.iter().filter_map(|output| match output {
-            OutputKind::Resource(path) => Some(path),
-            _ => None,
-        })
+    /// Files that should be delivered for the end-user
+    pub fn get_resource_files(&self) -> Vec<OutputItem> {
+        self.files
+            .iter()
+            .filter_map(|output| match output.kind {
+                OutputKind::Resource(_) => Some(output.to_owned()),
+                _ => None,
+            })
+            .collect()
+    }
+    pub fn refresh_files(&mut self, items: Vec<OutputItem>) {
+        self.files = items;
     }
 }
 
-// #[tracing::instrument]
 pub fn build_task(
-    course_config: &CourseConfiguration,
+    module_config: &ModuleConfiguration,
     task_config: &Task,
     uuid: Uuid,
 ) -> Result<TaskBuildProcessOutput, Box<dyn std::error::Error>> {
-    let (flags, mut build_envs) = create_flag_id_pairs_by_task(task_config, course_config, uuid);
+    let (flags, mut build_envs) = create_flag_id_pairs_by_task(task_config, module_config, uuid);
 
     match task_config.build.builder {
         Builder::Shell(ref entrypoint) => {
@@ -181,7 +201,7 @@ pub fn build_task(
                     match fs::metadata(&path) {
                         Ok(_) => {
                             tracing::debug!("File exists: {}", path.display());
-                            outputs.push(output.kind.with_new_path(path));
+                            outputs.push(OutputItem::new(output.kind.with_new_path(path)));
                         }
 
                         Err(_) => {

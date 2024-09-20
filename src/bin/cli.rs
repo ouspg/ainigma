@@ -1,6 +1,6 @@
 use ainigma::{
     build_process::{build_task, TaskBuildProcessOutput},
-    config::{read_check_toml, ConfigError, CourseConfiguration},
+    config::{read_check_toml, ConfigError, ModuleConfiguration},
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{crate_description, Args, Parser, Subcommand};
@@ -32,7 +32,7 @@ enum Commands {
     Generate {
         #[command(flatten)]
         selection: BuildSelection,
-        /// Moodle subcommand is used to automatically upload the files into the cloud storage and generate Moodle exam.
+        /// Moodle subcommand is used to automatically upload the files into the cloud storage and then generate a Moodle exam.
         #[command(subcommand)]
         moodle: Option<Moodle>,
         /// The number of build variants to generate
@@ -54,9 +54,9 @@ struct BuildSelection {
     task: Option<String>,
     /// Specify the week which will be built completely
     #[arg(short, long, value_name = "NUMBER")]
-    week: Option<usize>,
+    domain: Option<usize>,
     /// Check if the configuration has correct syntax and pretty print it
-    #[arg(short, long, action = clap::ArgAction::SetTrue)]
+    #[arg(long, action = clap::ArgAction::SetTrue)]
     dry_run: Option<bool>,
 }
 
@@ -69,12 +69,11 @@ enum Moodle {
 }
 
 fn s3_upload(
-    config: CourseConfiguration,
-    src_dir: PathBuf,
-    dst_dir: String,
-) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+    config: ModuleConfiguration,
+    files: Vec<TaskBuildProcessOutput>,
+) -> Result<Vec<TaskBuildProcessOutput>, Box<dyn std::error::Error>> {
     // Check if the bucket exists
-    let storage = S3Storage::from_config(config.deployment.upload);
+    let storage = S3Storage::from_config(config.deployment.upload.clone());
     let storage = match storage {
         Ok(storage) => storage,
         Err(error) => {
@@ -84,26 +83,42 @@ fn s3_upload(
         }
     };
 
-    let mut files = Vec::with_capacity(30);
-    for file in src_dir.read_dir()? {
-        let file = file.unwrap();
-        files.push(file.path());
-    }
-    let mut links = <_>::default();
-    match FileObjects::new(dst_dir, files) {
-        Ok(files) => {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async {
-                links = storage.upload(files).await.unwrap();
+    let mut tasks = Vec::with_capacity(files.len());
+
+    for mut file in files {
+        let module_nro = config
+            .get_domain_number_by_task_id(&file.task_id)
+            .unwrap_or_else(|| {
+                panic!("Cannot find module number based on task '{}'", file.task_id)
             });
-        }
+        let dst_location = format!("module{}/{}/{}", module_nro, file.task_id, file.uiid);
+        let future = async {
+            match FileObjects::new(dst_location, file.get_resource_files()) {
+                Ok(files) => {
+                    let items = storage.upload(files).await.unwrap_or_else(|error| {
+                        tracing::error!("Error when uploading the files: {}", error);
+                        <_>::default()
+                    });
+                    file.refresh_files(items);
+                    Ok(file)
+                }
+                Err(error) => {
+                    tracing::error!("Error when creating the file objects: {}", error);
+                    Err(error)
+                }
+            }
+        };
+        tasks.push(future);
+    }
+    let rt = Runtime::new().unwrap();
+    let result = rt.block_on(async { futures::future::try_join_all(tasks).await });
+    match result {
+        Ok(files) => Ok(files),
         Err(error) => {
-            tracing::error!("Error when creating the file objects: {}", error);
+            tracing::error!("Error when uploading the files: {}", error);
+            Err(error.into())
         }
     }
-    tracing::info!("Voila!");
-    println!("{:#?}", links);
-    Ok(links)
 }
 
 fn main() -> std::process::ExitCode {
@@ -129,84 +144,79 @@ fn main() -> std::process::ExitCode {
             Commands::Generate {
                 selection,
                 number,
-                moodle: _,
+                moodle,
             } => {
-                if selection.dry_run.unwrap_or(false) {
-                    let config = read_check_toml(cli.config.as_os_str());
-                    match config {
-                        Ok(config) => {
+                let config = read_check_toml(cli.config.as_os_str());
+                let config = match config {
+                    Ok(config) => {
+                        if selection.dry_run.unwrap_or(false) {
                             println!("{:#?}", config);
-                        }
-                        Err(error) => {
-                            tracing::error!("Error when reading the configuration file: {}", error);
-                            return ExitCode::FAILURE;
+                            return ExitCode::SUCCESS;
+                        } else {
+                            config
                         }
                     }
-                }
+                    Err(error) => {
+                        tracing::error!("Error when reading the configuration file: {}", error);
+                        return ExitCode::FAILURE;
+                    }
+                };
 
                 let outputs = match selection.task {
-                    Some(ref task) => match parallel_task_build(cli.config, task, *number) {
+                    Some(ref task) => match parallel_task_build(&config, task, *number) {
                         Ok(out) => out,
                         Err(error) => {
                             tracing::error!("Error when building the task: {}", error);
                             return ExitCode::FAILURE;
                         }
                     },
-                    None => match selection.week {
-                        Some(_week) => {
-                            todo!("Implement week build");
+                    None => match selection.domain {
+                        Some(_domain) => {
+                            todo!("Implement domain build");
                         }
                         None => {
-                            todo!("Implement week build");
+                            todo!("Implement domain build");
                         }
                     },
                 };
                 dbg!(&outputs);
-                // match moodle {
-                //     Some(cmd_moodle) => match cmd_moodle {
-                //         Moodle::Moodle { number, category } => {
-                //             match moodle_build(
-                //                 cli.config,
-                //                 None,
-                //                 Some("test"),
-                //                 *number,
-                //                 category.to_string(),
-                //             ) {
-                //                 Ok(()) => (),
-                //                 Err(error) => eprintln!("{}", error),
-                //             }
-                //         }
-                //     },
-                //     None => match parallel_task_build(cli.config, "test", 30) {
-                //         Ok(()) => (),
-                //         Err(error) => eprintln!("{}", error),
-                //     },
-                // }
+                match moodle {
+                    Some(cmd_moodle) => match cmd_moodle {
+                        Moodle::Moodle { category } => {
+                            let results = s3_upload(config, outputs).unwrap();
+                            dbg!(results);
+                        }
+                    },
+                    None => match parallel_task_build(&config, "test", 30) {
+                        Ok(_) => (),
+                        Err(error) => eprintln!("{}", error),
+                    },
+                }
                 ExitCode::SUCCESS
             }
             Commands::Upload { check_bucket } => {
                 if *check_bucket {
-                    let result = read_check_toml(cli.config.as_os_str());
-                    match result {
-                        Ok(config) => {
-                            let result = s3_upload(config, "files".into(), "mytestdir".into());
-                            match result {
-                                Ok(links) => {
-                                    println!("{:#?}", links);
-                                }
-                                Err(error) => {
-                                    tracing::error!("Error when uploading the files: {}", error);
-                                    drop(error);
-                                    std::process::exit(1);
-                                }
-                            }
-                        }
-                        Err(error) => {
-                            tracing::error!("Error when reading the configuration file: {}", error);
-                            drop(error);
-                            std::process::exit(1);
-                        }
-                    }
+                    // let result = read_check_toml(cli.config.as_os_str());
+                    // match result {
+                    //     Ok(config) => {
+                    //         let result = s3_upload(config, "files".into(), "mytestdir".into());
+                    //         match result {
+                    //             Ok(links) => {
+                    //                 println!("{:#?}", links);
+                    //             }
+                    //             Err(error) => {
+                    //                 tracing::error!("Error when uploading the files: {}", error);
+                    //                 drop(error);
+                    //                 std::process::exit(1);
+                    //             }
+                    //         }
+                    //     }
+                    //     Err(error) => {
+                    //         tracing::error!("Error when reading the configuration file: {}", error);
+                    //         drop(error);
+                    //         std::process::exit(1);
+                    //     }
+                    // }
                 }
                 ExitCode::SUCCESS
             }
@@ -215,7 +225,7 @@ fn main() -> std::process::ExitCode {
 }
 
 fn parallel_task_build(
-    path: PathBuf,
+    config: &ModuleConfiguration,
     task: &str,
     number: usize,
 ) -> Result<Vec<TaskBuildProcessOutput>, ConfigError> {
@@ -224,14 +234,14 @@ fn parallel_task_build(
         &task,
         number
     );
-    let result = read_check_toml(path.into_os_string().as_os_str())?;
-    let task_config = result
+    // Fail fast so check if the task exists alrady here
+    let task_config = config
         .get_task_by_id(task)
         .ok_or_else(|| ConfigError::TaskIDNotFound(task.to_string()))?;
     let all_outputs = Arc::new(Mutex::new(Vec::with_capacity(number)));
     if number > 1 {
         let mut handles = Vec::with_capacity(number);
-        let course_config = Arc::new(result);
+        let course_config = Arc::new(config.clone());
         let task_config = Arc::new(task_config);
         for i in 0..number {
             let courseconf = Arc::clone(&course_config);
@@ -246,7 +256,7 @@ fn parallel_task_build(
                         outputs
                                 .lock()
                                 .expect(
-                                    "Another thread paniced while owning the mutex when building the task.",
+                                    "Another thread panicked while owning the mutex when building the task.",
                                 )
                                 .push(output);
                     }
@@ -260,16 +270,21 @@ fn parallel_task_build(
         }
         // join multithreads together
         for handle in handles {
-            handle.join().unwrap();
+            handle.join().unwrap_or_else(|error| {
+                tracing::error!(
+                    "Error when joining the thread. Some files might not be built: {:?}",
+                    error
+                );
+            })
         }
     } else {
         let uuid = Uuid::now_v7();
-        let outputs = build_task(&result, &task_config, uuid).unwrap();
+        let outputs = build_task(config, &task_config, uuid).unwrap();
         all_outputs.lock().unwrap().push(outputs);
         tracing::info!("Task '{}' build succesfully", &task);
     }
     let vec = Arc::try_unwrap(all_outputs)
-        .expect("There are still other Arc references")
+        .expect("There are still other Arc references when there should not")
         .into_inner()
         .expect("Mutex cannot be locked");
 
@@ -277,14 +292,14 @@ fn parallel_task_build(
 }
 #[allow(dead_code)]
 fn moodle_build(
-    path: PathBuf,
+    config: ModuleConfiguration,
     _week: Option<u8>,
     task: Option<&str>,
     number: usize,
     _category: String,
 ) -> Result<Vec<TaskBuildProcessOutput>, ConfigError> {
     match task {
-        Some(task) => parallel_task_build(path, task, number),
+        Some(task) => parallel_task_build(&config, task, number),
         None => {
             todo!("Complete week build todo")
             // let _result = parallel_build(path, week, task, number);

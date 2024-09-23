@@ -39,6 +39,7 @@ enum Commands {
         #[arg(short, long, default_value_t = 1, group = "buildselection")]
         number: usize,
     },
+    /// Attempt to upload previously built files to the cloud storage
     Upload {
         /// Check if the bucket exists
         #[arg(short, long)]
@@ -213,7 +214,7 @@ fn main() -> std::process::ExitCode {
                                     }
                                     None => {
                                         tracing::error!(
-                                            "Invalid task identifier {} when generating the Moodle exam.", task
+                                            "Task identifier {} not found from the module configuration when generating the Moodle exam.", task
                                         );
                                         return ExitCode::FAILURE;
                                     }

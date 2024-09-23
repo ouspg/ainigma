@@ -39,6 +39,7 @@ enum Commands {
         #[arg(short, long, default_value_t = 1, group = "buildselection")]
         number: usize,
     },
+    /// Attempt to upload previously built files to the cloud storage
     Upload {
         /// Check if the bucket exists
         #[arg(short, long)]
@@ -65,6 +66,9 @@ enum Moodle {
     Moodle {
         #[arg(short, long)]
         category: String,
+        /// Output file name
+        #[arg(short, long, default_value = "quiz.xml")]
+        output: String,
     },
 }
 
@@ -197,13 +201,32 @@ fn main() -> std::process::ExitCode {
                         }
                     },
                 };
-                dbg!(&outputs);
                 match moodle {
                     Some(cmd_moodle) => match cmd_moodle {
-                        Moodle::Moodle { category } => {
-                            let results = s3_upload(config, outputs).unwrap();
-                            let _examp = create_exam(results, category);
-                        }
+                        Moodle::Moodle { category, output } => match selection.task {
+                            Some(ref task) => {
+                                let task_config = config.get_task_by_id(task);
+                                match task_config {
+                                    Some(task_config) => {
+                                        let results = s3_upload(config, outputs).unwrap();
+                                        let _examp =
+                                            create_exam(&task_config, results, category, output);
+                                    }
+                                    None => {
+                                        tracing::error!(
+                                            "Task identifier {} not found from the module configuration when generating the Moodle exam.", task
+                                        );
+                                        return ExitCode::FAILURE;
+                                    }
+                                }
+                            }
+                            None => {
+                                tracing::error!(
+                                    "Task must be specified when generating the Moodle exam."
+                                );
+                                return ExitCode::FAILURE;
+                            }
+                        },
                     },
                     None => match parallel_task_build(&config, "test", 30) {
                         Ok(_) => (),

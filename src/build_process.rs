@@ -66,8 +66,8 @@ fn get_build_info(
     module_config: &mut ModuleConfiguration,
     task_id: String,
 ) -> Result<&BuildConfig, String> {
-    for domain in &mut module_config.domains {
-        for task in &domain.tasks {
+    for category in &mut module_config.categories {
+        for task in &category.tasks {
             if task_id == task.id {
                 return Ok(task.build.as_ref());
             }

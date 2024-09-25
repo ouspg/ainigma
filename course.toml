@@ -9,12 +9,12 @@ description = "A comprehensive course covering various aspects of cybersecurity"
 version = "0.0.1" # mandatory
 
 # Domains are the main sections of the course
-# For a more general setting, we use word "domain" instead of "week" or "module"
-[[domains]]
+# For a more general setting, we use word "category" instead of "week" or "module"
+[[categories]]
 number = 1                             # mandatory
 name = "Introduction to Cybersecurity"
 
-[[domains.tasks]]
+[[categories.tasks]]
 # Tasks can be a single whole task or tasks with stages (sub-parts like a, b c)
 id = "task001"                                              # mandatory
 name = "Challenge 1"                                        # mandatory
@@ -37,40 +37,40 @@ stages = [
     { id = "task001C", name = "Subpart C", description = "Task C", weight = 1, flag = { kind = "rng_seed" } },
 ]
 
-[domains.tasks.build]
+[categories.tasks.build]
 # Directory where the task configuration files are located
 # Can be symbolic link to the actual task directory as well
-directory = "tasks/domain1/buffer_overflow"
-builder = { shell = {} }                    # Shell builder without entrypoint
+directory = "tasks/category1/buffer_overflow"
+builder = { shell = {} }                      # Shell builder without entrypoint
 # Default is entrypoint.sh, but we could override it
 # builder = { shell = { entrypoint = "my_entrypoint.sh" } }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 # Resource means that it is provided for the end-user
 # Resource will always generate a download link, appended to the bottom of the instructions.
 kind = { resource = "exloitable.bin" }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 # Internal use to provide the challenge from cloud, for example
 # Might be rare use case
 # We might need to design tasks in mind that there is just a single server, but connection variable changes behaviour
 kind = { internal = "vulnerable_server.py" }
 
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 # Specific kind of resource; instruction for the assignment and should be used as it is
 # It includes something that is expected to be different for every user doing the tasks, and as so it is needed here
 # Probably optionally generate file or as string from the builder
 kind = { readme = "readme.txt" }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 # Mechanic to provide embedded metadata for the task descriptions (e.g. Moodle exam), e.g. URL, docker image name
 # Something that is expected to be different for every user doing the tasks
 # Maybe not needed as "file", rather data returned by the build system
 # Should be likely key-value storage, with some predefined keys. Custom keys allowed.
 kind = { meta = "meta.json" }
 
-[[domains.tasks]]
+[[categories.tasks]]
 id = "task002"
 name = "Challenge 2"
 description = "Previous exploit was trivial. Try harder."
@@ -78,62 +78,62 @@ points = 2.0
 # Minimalistic flag configuration since just single flag which provides all the points
 stages = [{ flag = { kind = "pure_random" } }]
 
-[domains.tasks.build]
-directory = "tasks/domain1/basic_crypto"
+[categories.tasks.build]
+directory = "tasks/category1/basic_crypto"
 # Default entrypoint for nix is "flake.nix"
 builder = { nix = {} }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { resource = "exloitable.bin" }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { internal = "vulnerable_server.py" }
 
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 # Instruction for the assignment, should be used as it is
 kind = { readme = "readme.txt" }
 
 
-[[domains]]
+[[categories]]
 number = 2
 name = "Network Security Fundamentals"
 
-[[domains.tasks]]
+[[categories.tasks]]
 id = "task003"
 name = "SQL Injection Attack"
 description = "Perform a SQL injection attack on a vulnerable web application"
 points = 1.0
 stages = [{ flag = { kind = "pure_random" } }]
 
-[domains.tasks.build]
-directory = "tasks/domain2/sql_injection"
+[categories.tasks.build]
+directory = "tasks/category2/sql_injection"
 builder = { shell = { entrypoint = "setup.sh" } }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { internal = "vulnerable_server.py" }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
-[[domains.tasks]]
+[[categories.tasks]]
 id = "task004"
 name = "Network Packet Analysis"
 description = "Analyze network packets to identify a security breach"
 points = 1.0
 stages = [{ flag = { kind = "rng_seed" } }]
 
-[domains.tasks.build]
-directory = "tasks/domain2/packet_analysis"
+[categories.tasks.build]
+directory = "tasks/category2/packet_analysis"
 builder = { shell = { entrypoint = "generate_pcap.sh" } }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { resource = "my_traffic.pcap" }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
-[[domains.tasks]]
+[[categories.tasks]]
 id = "task005"
 name = "Challenge 5"
 description = "Previous exploit was trivial. Try harder."
@@ -141,11 +141,11 @@ points = 2.0
 # Minimalistic flag configuration since just single flag which provides all the points
 stages = [{ flag = { kind = "pure_random" } }]
 
-[domains.tasks.build]
+[categories.tasks.build]
 directory = "samples/tasks/simple_shell"
 builder = { shell = { entrypoint = "build.sh" } }
 
-[[domains.tasks.build.output]]
+[[categories.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
 # Flag Types Configuration

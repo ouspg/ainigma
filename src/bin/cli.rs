@@ -57,7 +57,7 @@ struct BuildSelection {
     task: Option<String>,
     /// Specify the week which will be built completely
     #[arg(short, long, value_name = "NUMBER")]
-    domain: Option<usize>,
+    category: Option<usize>,
     /// Check if the configuration has correct syntax and pretty print it
     #[arg(long, action = clap::ArgAction::SetTrue)]
     dry_run: Option<bool>,
@@ -112,7 +112,7 @@ fn s3_upload(
 
     for mut file in files {
         let module_nro = config
-            .get_domain_number_by_task_id(&file.task_id)
+            .get_category_number_by_task_id(&file.task_id)
             .unwrap_or_else(|| {
                 panic!("Cannot find module number based on task '{}'", file.task_id)
             });
@@ -125,7 +125,12 @@ fn s3_upload(
             write!(&mut hex_string, "{:02x}", byte)
                 .unwrap_or_else(|e| panic!("Error when writing to the hex string: {}", e))
         }
-        let dst_location = format!("module{}/{}/{}", module_nro, file.task_id, hex_string);
+        let dst_location = format!(
+            "category{}/{}/{}",
+            module_nro,
+            file.task_id.trim_end_matches("/"),
+            hex_string
+        );
         let future = async {
             match FileObjects::new(dst_location, file.get_resource_files()) {
                 Ok(files) => {
@@ -217,12 +222,12 @@ fn main() -> std::process::ExitCode {
                             return ExitCode::FAILURE;
                         }
                     },
-                    None => match selection.domain {
-                        Some(_domain) => {
-                            todo!("Implement domain build");
+                    None => match selection.category {
+                        Some(_category) => {
+                            todo!("Implement category build");
                         }
                         None => {
-                            todo!("Implement domain build");
+                            todo!("Implement category build");
                         }
                     },
                 };

@@ -71,7 +71,11 @@ impl FileObjects {
 pub trait CloudStorage {
     /// Uploads all files from the `FileObjects` instance to the storage service.
     /// Returns updated list of `OutputItem` with the URL of the uploaded files.
-    async fn upload(&self, files: FileObjects) -> Result<Vec<OutputItem>, CloudStorageError>;
+    async fn upload(
+        &self,
+        files: FileObjects,
+        pre_signed_urls: bool,
+    ) -> Result<Vec<OutputItem>, CloudStorageError>;
 
     /// Check if the storage service is available. Typically bucket
     async fn health_check(&self) -> Result<(), CloudStorageError>;

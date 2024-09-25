@@ -118,10 +118,13 @@ fn s3_upload(
         let future = async {
             match FileObjects::new(dst_location, file.get_resource_files()) {
                 Ok(files) => {
-                    let items = storage.upload(files).await.unwrap_or_else(|error| {
-                        tracing::error!("Error when uploading the files: {}", error);
-                        <_>::default()
-                    });
+                    let items = storage
+                        .upload(files, config.deployment.upload.use_pre_signed)
+                        .await
+                        .unwrap_or_else(|error| {
+                            tracing::error!("Error when uploading the files: {}", error);
+                            <_>::default()
+                        });
                     file.refresh_files(items);
                     Ok(file)
                 }

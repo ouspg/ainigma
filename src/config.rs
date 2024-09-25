@@ -298,6 +298,7 @@ pub struct Upload {
     pub aws_s3_endpoint: String,
     pub aws_region: String,
     pub bucket_name: String,
+    pub use_pre_signed: bool,
     pub link_expiration: u32,
     pub file_expiration: u32,
 }

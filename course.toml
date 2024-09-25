@@ -167,8 +167,11 @@ build_timeout = 300 # seconds
 AWS_S3_ENDPOINT = "https://a3s.fi"
 AWS_REGION = "us-west-2"                   # Something to make AWS SDK happy
 BUCKET_NAME = "hardware-software-security"
+# Whether to use pre-signed URLs for the uploads with lifetime
+# If not set, uploaded files are public and not tied to expiration or access token
+USE_PRE_SIGNED = false
 # Days when the link is valid for the user
-LINK_EXPIRATION = 7 # 7 days is currently the maximum policy for AWS S3
+LINK_EXPIRATION = 7 # 7 days is currently the maximum policy for AWS S3, if you need more, use public files
 # Days when the files are automatically deleted from the storage
 FILE_EXPIRATION = 21 # In days - TODO currently just manual use
 # Credentials are stored in the environment variables

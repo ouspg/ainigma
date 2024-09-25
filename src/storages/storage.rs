@@ -45,7 +45,29 @@ impl FileObjects {
         // Note that not safe if program is called higher up in the directory tree.
         let cwd = std::env::current_dir()?;
         for file in files {
-            let file_name = validate_file_path(&cwd, file.kind.get_filename())?;
+            // During development, we allow all filepaths to be used.
+            let file_name = if cfg!(debug_assertions) {
+                file.kind
+                    .get_filename()
+                    .file_name()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "File {} does not have a file name",
+                            file.kind.get_filename().display()
+                        )
+                    })
+                    .to_str()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "File {} has an invalid unicode name",
+                            file.kind.get_filename().display()
+                        )
+                    })
+                    .to_string()
+            } else {
+                validate_file_path(&cwd, file.kind.get_filename())?
+            };
+
             if file_map.contains_key(&file_name) {
                 return Err(FileObjectError::FilesNotUnique(format!(
                     "File {} already exists in the list",

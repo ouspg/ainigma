@@ -58,6 +58,43 @@ impl S3Storage {
             link_expiration_days,
         })
     }
+    /// Makes all files in the bucket available for download
+    /// Does not give listing permissions
+    pub async fn set_public_access(&self) -> Result<(), CloudStorageError> {
+        // Modify with care, can potentially open up the path in the bucket public
+        let json_policy = json!({
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicReadGetObject",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": format!("arn:aws:s3:::{}/*", self.bucket)
+                }
+            ]
+        });
+        let result = self
+            .client
+            .put_bucket_policy()
+            .bucket(&self.bucket)
+            .set_policy(Some(json_policy.to_string()))
+            .send()
+            .await;
+        match result {
+            Ok(_) => {
+                tracing::info!(
+                    "Updated the bucket policy successfully for '{}'.",
+                    self.bucket
+                );
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!("Failed to update the bucket policy: {}", e);
+                Err(CloudStorageError::AWSSdkError(e.to_string()))?
+            }
+        }
+    }
 }
 
 impl CloudStorage for S3Storage {
@@ -70,10 +107,8 @@ impl CloudStorage for S3Storage {
             .await;
         match exist {
             Ok(resp) => {
-                tracing::info!(
-                    "Bucket identified: {:?}! Updating the bucket lifecycle.",
-                    resp
-                );
+                tracing::info!("Bucket identified: {:?}!", resp);
+                // TODO - Implement the lifecycle configuration
                 // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
                 Ok(())
             }
@@ -186,40 +221,6 @@ impl CloudStorage for S3Storage {
 
         match upload_results {
             Ok(_) => {
-                if !pre_signed_urls {
-                    // Modify with care, can potentially open up the path in the bucket public
-                    let json_policy = json!({
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Sid": "PublicReadGetObject",
-                                "Effect": "Allow",
-                                "Principal": "*",
-                                "Action": "s3:GetObject",
-                                "Resource": format!("arn:aws:s3:::{}/{}/*", self.bucket, files.dst_location)
-                            }
-                        ]
-                    });
-                    let result = self
-                        .client
-                        .put_bucket_policy()
-                        .bucket(&self.bucket)
-                        .set_policy(Some(json_policy.to_string()))
-                        .send()
-                        .await;
-                    match result {
-                        Ok(_) => {
-                            tracing::debug!(
-                                "Updated the bucket policy successfully for '{}'.",
-                                files.dst_location
-                            );
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to update the bucket policy: {}", e);
-                            Err(CloudStorageError::AWSSdkError(e.to_string()))?;
-                        }
-                    }
-                }
                 let mut vec = shared_vec.lock().await;
                 tracing::info!("Uploaded {} files successfully.", vec.len());
                 Ok(core::mem::take(&mut vec))

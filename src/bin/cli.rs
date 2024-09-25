@@ -5,9 +5,11 @@ use ainigma::{
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{crate_description, Args, Parser, Subcommand};
-use std::process::ExitCode;
+use sha3::{Digest, Sha3_256};
 use std::{
+    fmt::Write,
     path::PathBuf,
+    process::ExitCode,
     sync::{Arc, Mutex},
     thread,
 };
@@ -114,7 +116,16 @@ fn s3_upload(
             .unwrap_or_else(|| {
                 panic!("Cannot find module number based on task '{}'", file.task_id)
             });
-        let dst_location = format!("module{}/{}/{}", module_nro, file.task_id, file.uiid);
+        // Make a hash of the UUID, so that url is less predictable
+        let mut hasher = Sha3_256::new();
+        hasher.update(file.uiid.as_bytes());
+        let uuid_hash = hasher.finalize();
+        let mut hex_string = String::with_capacity(uuid_hash.as_slice().len() * 2); // Pre-allocate String capacity
+        for byte in &uuid_hash {
+            write!(&mut hex_string, "{:02x}", byte)
+                .unwrap_or_else(|e| panic!("Error when writing to the hex string: {}", e))
+        }
+        let dst_location = format!("module{}/{}/{}", module_nro, file.task_id, hex_string);
         let future = async {
             match FileObjects::new(dst_location, file.get_resource_files()) {
                 Ok(files) => {
@@ -138,7 +149,18 @@ fn s3_upload(
     }
     let result = rt.block_on(async { futures::future::try_join_all(tasks).await });
     match result {
-        Ok(files) => Ok(files),
+        Ok(files) => {
+            if !config.deployment.upload.use_pre_signed {
+                let result = rt.block_on(async { storage.set_public_access().await });
+                match result {
+                    Ok(_) => {}
+                    Err(error) => {
+                        tracing::error!("Error when setting the public access: {}", error);
+                    }
+                }
+            }
+            Ok(files)
+        }
         Err(error) => {
             tracing::error!("Error when uploading the files: {}", error);
             Err(error.into())

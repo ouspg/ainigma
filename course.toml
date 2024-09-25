@@ -38,6 +38,8 @@ stages = [
 ]
 
 [domains.tasks.build]
+# Directory where the task configuration files are located
+# Can be symbolic link to the actual task directory as well
 directory = "tasks/domain1/buffer_overflow"
 builder = { shell = {} }                    # Shell builder without entrypoint
 # Default is entrypoint.sh, but we could override it
@@ -168,7 +170,8 @@ AWS_S3_ENDPOINT = "https://a3s.fi"
 AWS_REGION = "us-west-2"                   # Something to make AWS SDK happy
 BUCKET_NAME = "hardware-software-security"
 # Whether to use pre-signed URLs for the uploads with lifetime
-# If not set, uploaded files are public and not tied to expiration or access token
+# If not set, *all* uploaded files in the bucket are public and not tied to expiration or access token
+# As long as someone knows the object key, they can download the file.
 USE_PRE_SIGNED = false
 # Days when the link is valid for the user
 LINK_EXPIRATION = 7 # 7 days is currently the maximum policy for AWS S3, if you need more, use public files

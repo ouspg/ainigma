@@ -71,7 +71,7 @@ pub fn create_exam(
                 questions.push(question.into());
             }
             None => {
-                panic!("No instructions provided for Moodle exam for unkown reason.");
+                panic!("No instructions provided for Moodle exam for unkown reason. Verify that you have `readme` type in output files.");
             }
         }
     }

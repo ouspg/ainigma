@@ -61,7 +61,7 @@ impl S3Storage {
     /// Makes all files in the bucket available for download
     /// Does not give listing permissions
     pub async fn set_public_access(&self) -> Result<(), CloudStorageError> {
-        // Modify with care, can potentially open up the path in the bucket public
+        // Modify with care, has potential security implications
         let json_policy = json!({
             "Version": "2012-10-17",
             "Statement": [

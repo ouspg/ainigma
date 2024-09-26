@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::config::{BuildConfig, Builder, ModuleConfiguration, OutputKind, Task};
 use crate::flag_generator::Flag;
 
-const OUTPUT_DIRECTORY: &str = "output/";
+pub const OUTPUT_DIRECTORY: &str = "output/";
 
 fn create_flag_id_pairs_by_task<'a>(
     task_config: &'a Task,

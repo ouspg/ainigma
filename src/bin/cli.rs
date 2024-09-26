@@ -1,13 +1,11 @@
 use ainigma::{
-    build_process::{build_task, TaskBuildProcessOutput},
+    build_process::{build_task, TaskBuildProcessOutput, OUTPUT_DIRECTORY},
     config::{read_check_toml, ConfigError, ModuleConfiguration},
     moodle::create_exam,
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{crate_description, Args, Parser, Subcommand};
-use sha3::{Digest, Sha3_256};
 use std::{
-    fmt::Write,
     path::PathBuf,
     process::ExitCode,
     sync::{Arc, Mutex},
@@ -116,20 +114,11 @@ fn s3_upload(
             .unwrap_or_else(|| {
                 panic!("Cannot find module number based on task '{}'", file.task_id)
             });
-        // Make a hash of the UUID, so that url is less predictable
-        let mut hasher = Sha3_256::new();
-        hasher.update(file.uiid.as_bytes());
-        let uuid_hash = hasher.finalize();
-        let mut hex_string = String::with_capacity(uuid_hash.as_slice().len() * 2); // Pre-allocate String capacity
-        for byte in &uuid_hash {
-            write!(&mut hex_string, "{:02x}", byte)
-                .unwrap_or_else(|e| panic!("Error when writing to the hex string: {}", e))
-        }
         let dst_location = format!(
             "category{}/{}/{}",
             module_nro,
             file.task_id.trim_end_matches("/"),
-            hex_string
+            file.uiid
         );
         let future = async {
             match FileObjects::new(dst_location, file.get_resource_files()) {
@@ -219,6 +208,31 @@ fn main() -> std::process::ExitCode {
                         Ok(out) => out,
                         Err(error) => {
                             tracing::error!("Error when building the task: {}", error);
+                            let task_config = config
+                                .get_task_by_id(task)
+                                .expect("No configuration found for the provided task.");
+                            let output_dir = task_config.build.directory.join(OUTPUT_DIRECTORY);
+                            if output_dir.exists() {
+                                tracing::error!(
+                                    "Starting to remove all build-output files from folder: {}",
+                                    output_dir.display()
+                                );
+                                let result = std::fs::remove_dir_all(&output_dir);
+                                match result {
+                                    Ok(_) => {
+                                        tracing::info!(
+                                            "All build-output files removed from folder: {}",
+                                            output_dir.display()
+                                        );
+                                    }
+                                    Err(error) => {
+                                        tracing::error!(
+                                            "Error when removing the build-output files: {}",
+                                            error
+                                        );
+                                    }
+                                }
+                            }
                             return ExitCode::FAILURE;
                         }
                     },

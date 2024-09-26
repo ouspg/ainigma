@@ -1,6 +1,7 @@
 use ainigma::{
     build_process::{build_task, TaskBuildProcessOutput},
     config::{read_check_toml, ConfigError, ModuleConfiguration},
+    errors::CloudStorageError,
     moodle::create_exam,
     storages::{CloudStorage, FileObjects, S3Storage},
 };
@@ -116,6 +117,10 @@ fn s3_upload(
             return Err(e.into());
         }
     }
+    tracing::info!(
+        "Strating the file upload into the bucket: {}",
+        config.deployment.upload.bucket_name.as_str()
+    );
 
     for mut file in files {
         let module_nro = config
@@ -130,16 +135,14 @@ fn s3_upload(
             file.uiid
         );
         let future = async {
-            match FileObjects::new(dst_location, file.get_resource_files()) {
+            match FileObjects::new(dst_location, file.get_resource_files())
+                .map_err(CloudStorageError::FileObjectError)
+            {
                 Ok(files) => {
                     let items = storage
                         .upload(files, config.deployment.upload.use_pre_signed)
-                        .await
-                        .unwrap_or_else(|error| {
-                            tracing::error!("Error when uploading the files: {}", error);
-                            <_>::default()
-                        });
-                    file.refresh_files(items);
+                        .await?;
+                    file.update_files(items);
                     Ok(file)
                 }
                 Err(error) => {
@@ -162,10 +165,12 @@ fn s3_upload(
                     }
                 }
             }
+            tracing::info!("All {} files uploaded successfully.", files.len());
             Ok(files)
         }
         Err(error) => {
-            tracing::error!("Error when uploading the files: {}", error);
+            tracing::error!("Overall file upload process resulted with error: {}", error);
+            tracing::error!("There is a chance that you are rate limited by the cloud storage. Please try again later.");
             Err(error.into())
         }
     }

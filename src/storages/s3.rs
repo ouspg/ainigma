@@ -107,7 +107,7 @@ impl CloudStorage for S3Storage {
             .await;
         match exist {
             Ok(resp) => {
-                tracing::info!("Bucket identified: {:?}!", resp);
+                tracing::debug!("Bucket identified: {:?}!", resp);
                 // TODO - Implement the lifecycle configuration
                 // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
                 Ok(())
@@ -125,7 +125,7 @@ impl CloudStorage for S3Storage {
         files: FileObjects,
         pre_signed_urls: bool,
     ) -> Result<Vec<OutputItem>, CloudStorageError> {
-        tracing::info!(
+        tracing::debug!(
             "Starting to upload {} files in to the S3 bucket '{}' in path '{}'.",
             files.len(),
             self.bucket,
@@ -152,7 +152,7 @@ impl CloudStorage for S3Storage {
                             .await;
                         match response {
                             Ok(r) => {
-                                tracing::info!(
+                                tracing::debug!(
                                     "Created or updated the file with expiration: {}",
                                     r.expiration.unwrap_or_default()
                                 );
@@ -222,7 +222,7 @@ impl CloudStorage for S3Storage {
         match upload_results {
             Ok(_) => {
                 let mut vec = shared_vec.lock().await;
-                tracing::info!("Uploaded {} files successfully.", vec.len());
+                tracing::debug!("Uploaded {} files successfully.", vec.len());
                 Ok(core::mem::take(&mut vec))
             }
             Err(e) => {

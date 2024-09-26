@@ -138,7 +138,7 @@ impl TaskBuildProcessOutput {
             .find(|output| matches!(output.kind, OutputKind::Readme(_)))
     }
 
-    pub fn refresh_files(&mut self, items: Vec<OutputItem>) {
+    pub fn update_files(&mut self, items: Vec<OutputItem>) {
         for item in items {
             if let Some(index) = self.files.iter().position(|x| x.kind == item.kind) {
                 self.files[index] = item;

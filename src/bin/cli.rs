@@ -1,18 +1,26 @@
 use ainigma::{
     build_process::{build_task, TaskBuildProcessOutput},
     config::{read_check_toml, ConfigError, ModuleConfiguration},
+    errors::CloudStorageError,
     moodle::create_exam,
     storages::{CloudStorage, FileObjects, S3Storage},
 };
 use clap::{crate_description, Args, Parser, Subcommand};
-use std::process::ExitCode;
+use once_cell::sync::Lazy;
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
+    process::ExitCode,
     sync::{Arc, Mutex},
     thread,
 };
+
+use tempfile::TempDir;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
+
+// Lazily create a single global Tokio runtime
+static RUNTIME: Lazy<Runtime> =
+    Lazy::new(|| Runtime::new().expect("Failed to create Tokio runtime"));
 
 /// Autograder CLI Application
 #[derive(Parser, Debug)]
@@ -30,6 +38,10 @@ enum Commands {
     /// Build the specified tasks.
     #[command(arg_required_else_help = true)]
     Generate {
+        /// The output directory where the build files will be stored. If not set, using temporary directory.
+        /// Must exist and be writable if provided.
+        #[arg(short, long, value_name = "DIRECTORY")]
+        output_dir: Option<PathBuf>,
         #[command(flatten)]
         selection: BuildSelection,
         /// Moodle subcommand is used to automatically upload the files into the cloud storage and then generate a Moodle exam.
@@ -53,9 +65,9 @@ struct BuildSelection {
     /// Specify if you want to build a single task. Note that task IDs should be unique within the entire configuration
     #[arg(short, long, value_name = "IDENTIFIER")]
     task: Option<String>,
-    /// Specify the week which will be built completely
+    /// Specify the category which will be built completely at once
     #[arg(short, long, value_name = "NUMBER")]
-    domain: Option<usize>,
+    category: Option<usize>,
     /// Check if the configuration has correct syntax and pretty print it
     #[arg(long, action = clap::ArgAction::SetTrue)]
     dry_run: Option<bool>,
@@ -89,9 +101,7 @@ fn s3_upload(
 
     let mut tasks = Vec::with_capacity(files.len());
 
-    let rt = Runtime::new().unwrap();
-
-    let health = rt.block_on(async {
+    let health = RUNTIME.block_on(async {
         match storage.health_check().await {
             Ok(_) => Ok(()),
             Err(error) => {
@@ -107,22 +117,32 @@ fn s3_upload(
             return Err(e.into());
         }
     }
+    tracing::info!(
+        "Strating the file upload into the bucket: {}",
+        config.deployment.upload.bucket_name.as_str()
+    );
 
     for mut file in files {
         let module_nro = config
-            .get_domain_number_by_task_id(&file.task_id)
+            .get_category_number_by_task_id(&file.task_id)
             .unwrap_or_else(|| {
                 panic!("Cannot find module number based on task '{}'", file.task_id)
             });
-        let dst_location = format!("module{}/{}/{}", module_nro, file.task_id, file.uiid);
+        let dst_location = format!(
+            "category{}/{}/{}",
+            module_nro,
+            file.task_id.trim_end_matches("/"),
+            file.uiid
+        );
         let future = async {
-            match FileObjects::new(dst_location, file.get_resource_files()) {
+            match FileObjects::new(dst_location, file.get_resource_files())
+                .map_err(CloudStorageError::FileObjectError)
+            {
                 Ok(files) => {
-                    let items = storage.upload(files).await.unwrap_or_else(|error| {
-                        tracing::error!("Error when uploading the files: {}", error);
-                        <_>::default()
-                    });
-                    file.refresh_files(items);
+                    let items = storage
+                        .upload(files, config.deployment.upload.use_pre_signed)
+                        .await?;
+                    file.update_files(items);
                     Ok(file)
                 }
                 Err(error) => {
@@ -133,12 +153,39 @@ fn s3_upload(
         };
         tasks.push(future);
     }
-    let result = rt.block_on(async { futures::future::try_join_all(tasks).await });
+    let result = RUNTIME.block_on(async { futures::future::try_join_all(tasks).await });
     match result {
-        Ok(files) => Ok(files),
+        Ok(files) => {
+            if !config.deployment.upload.use_pre_signed {
+                let result = RUNTIME.block_on(async { storage.set_public_access().await });
+                match result {
+                    Ok(_) => {}
+                    Err(error) => {
+                        tracing::error!("Error when setting the public access: {}", error);
+                    }
+                }
+            }
+            tracing::info!("All {} files uploaded successfully.", files.len());
+            Ok(files)
+        }
         Err(error) => {
-            tracing::error!("Error when uploading the files: {}", error);
+            tracing::error!("Overall file upload process resulted with error: {}", error);
+            tracing::error!("There is a chance that you are rate limited by the cloud storage. Please try again later.");
             Err(error.into())
+        }
+    }
+}
+
+#[derive(Debug)]
+enum OutputDirectory {
+    Temprarory(TempDir),
+    Provided(PathBuf),
+}
+impl OutputDirectory {
+    fn path(&self) -> &Path {
+        match self {
+            OutputDirectory::Temprarory(dir) => dir.path(),
+            OutputDirectory::Provided(path) => path.as_path(),
         }
     }
 }
@@ -164,6 +211,7 @@ fn main() -> std::process::ExitCode {
     } else {
         match &cli.command {
             Commands::Generate {
+                output_dir,
                 selection,
                 number,
                 moodle,
@@ -183,21 +231,59 @@ fn main() -> std::process::ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
+                let output_dir: OutputDirectory = match output_dir {
+                    Some(output_dir) => {
+                        if !output_dir.exists() {
+                            tracing::error!(
+                                "The provided output directory did not exist: {}",
+                                output_dir.display()
+                            );
+                            return ExitCode::FAILURE;
+                        } else if !output_dir.is_dir() {
+                            tracing::error!(
+                                "The provided output directory is not a directory: {}",
+                                output_dir.display()
+                            );
+                            return ExitCode::FAILURE;
+                        } else {
+                            OutputDirectory::Provided(output_dir.to_path_buf())
+                        }
+                    }
+                    None => {
+                        let temp_dir = match TempDir::new() {
+                            Ok(dir) => dir,
+                            Err(error) => {
+                                tracing::error!(
+                                    "Error when creating a temporal directory: {}",
+                                    error
+                                );
+                                return ExitCode::FAILURE;
+                            }
+                        };
+                        tracing::info!(
+                            "No output directory provided, using a temporal directory in path '{}'",
+                            temp_dir.path().display()
+                        );
+                        OutputDirectory::Temprarory(temp_dir)
+                    }
+                };
 
                 let outputs = match selection.task {
-                    Some(ref task) => match parallel_task_build(&config, task, *number) {
-                        Ok(out) => out,
-                        Err(error) => {
-                            tracing::error!("Error when building the task: {}", error);
-                            return ExitCode::FAILURE;
+                    Some(ref task) => {
+                        match parallel_task_build(&config, task, *number, output_dir.path()) {
+                            Ok(out) => out,
+                            Err(error) => {
+                                tracing::error!("Error when building the task: {}", error);
+                                return ExitCode::FAILURE;
+                            }
                         }
-                    },
-                    None => match selection.domain {
-                        Some(_domain) => {
-                            todo!("Implement domain build");
+                    }
+                    None => match selection.category {
+                        Some(_category) => {
+                            todo!("Implement category build");
                         }
                         None => {
-                            todo!("Implement domain build");
+                            todo!("Implement category build");
                         }
                     },
                 };
@@ -228,11 +314,27 @@ fn main() -> std::process::ExitCode {
                             }
                         },
                     },
-                    None => match parallel_task_build(&config, "test", 30) {
-                        Ok(_) => (),
-                        Err(error) => eprintln!("{}", error),
-                    },
+                    None => {
+                        match output_dir {
+                            OutputDirectory::Temprarory(output_dir) => {
+                                let path = output_dir.into_path();
+                                tracing::info!(
+                                    "Build has been finished and the files are located in the temporal output directory: {}",
+                                    path.display()
+                                );
+                            }
+                            OutputDirectory::Provided(path) => {
+                                tracing::info!(
+                                    "Build finished and the files are located in the provided output directory: {}",
+                                    path.display()
+                                );
+                            }
+                        }
+                        return ExitCode::SUCCESS;
+                    }
                 }
+                // Ensure that possible temporal directory is removed at this point, not earlier
+                drop(output_dir);
                 ExitCode::SUCCESS
             }
             Commands::Upload { check_bucket } => {
@@ -269,6 +371,7 @@ fn parallel_task_build(
     config: &ModuleConfiguration,
     task: &str,
     number: usize,
+    output_dir: &Path,
 ) -> Result<Vec<TaskBuildProcessOutput>, ConfigError> {
     tracing::info!(
         "Building the task '{}' with the variation count {}",
@@ -284,14 +387,16 @@ fn parallel_task_build(
         let mut handles = Vec::with_capacity(number);
         let course_config = Arc::new(config.clone());
         let task_config = Arc::new(task_config);
+        let output_dir = Arc::new(output_dir.to_path_buf());
         for i in 0..number {
             let courseconf = Arc::clone(&course_config);
             let taskconf = Arc::clone(&task_config);
             let outputs = Arc::clone(&all_outputs);
+            let outdir = Arc::clone(&output_dir);
             let handle = thread::spawn(move || {
                 tracing::info!("Starting building the variant {}", i + 1);
                 let uuid = Uuid::now_v7();
-                let output = build_task(&courseconf, &taskconf, uuid);
+                let output = build_task(&courseconf, &taskconf, uuid, &outdir);
                 match output {
                     Ok(output) => {
                         outputs
@@ -320,7 +425,7 @@ fn parallel_task_build(
         }
     } else {
         let uuid = Uuid::now_v7();
-        let outputs = build_task(config, &task_config, uuid).unwrap();
+        let outputs = build_task(config, &task_config, uuid, output_dir).unwrap();
         all_outputs.lock().unwrap().push(outputs);
         tracing::info!("Task '{}' build succesfully", &task);
     }
@@ -330,22 +435,6 @@ fn parallel_task_build(
         .expect("Mutex cannot be locked");
 
     Ok(vec)
-}
-#[allow(dead_code)]
-fn moodle_build(
-    config: ModuleConfiguration,
-    _week: Option<u8>,
-    task: Option<&str>,
-    number: usize,
-    _category: String,
-) -> Result<Vec<TaskBuildProcessOutput>, ConfigError> {
-    match task {
-        Some(task) => parallel_task_build(&config, task, number),
-        None => {
-            todo!("Complete week build todo")
-            // let _result = parallel_build(path, week, task, number);
-        }
-    }
 }
 
 #[cfg(test)]

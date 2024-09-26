@@ -147,6 +147,7 @@ impl FlagUnit {
     }
 }
 
+/// Generates a completely random flag
 fn pure_random_flag(lenght: u8) -> String {
     let mut rng = StdRng::from_entropy();
     let size = lenght.into();
@@ -160,6 +161,7 @@ fn pure_random_flag(lenght: u8) -> String {
     })
 }
 
+/// Generates a flag which is derived from user identifier and uses secret
 fn user_derived_flag(
     algorithm: &Algorithm,
     uuid: &Uuid,
@@ -197,8 +199,8 @@ fn compare_hmac(
     let s = format!("{:x}", bytes);
     Ok(s == hmac)
 }
-/// generates a random seed using uuid as a base
 
+/// Generates a UUID version 7
 pub fn generate_uuid() -> Result<Uuid, uuid::Error> {
     Ok(Uuid::now_v7())
 }

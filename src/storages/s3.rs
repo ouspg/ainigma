@@ -7,7 +7,8 @@ use futures::future::try_join_all;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::{config::Region, Client};
-// use std::collections::HashMap;
+use serde_json::json;
+
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -43,7 +44,7 @@ impl S3Storage {
         );
         let region = Region::new(config.aws_region);
         let client_config = aws_sdk_s3::config::Builder::new()
-            .endpoint_url(config.aws_s3_endpoint)
+            .endpoint_url(&config.aws_s3_endpoint)
             .region(region)
             .credentials_provider(credentials)
             .behavior_version_latest()
@@ -53,9 +54,46 @@ impl S3Storage {
 
         Ok(S3Storage {
             client,
-            bucket: config.bucket_name,
+            bucket: config.bucket_name.trim_end_matches("/").to_string(),
             link_expiration_days,
         })
+    }
+    /// Makes all files in the bucket available for download
+    /// Does not give listing permissions
+    pub async fn set_public_access(&self) -> Result<(), CloudStorageError> {
+        // Modify with care, has potential security implications
+        let json_policy = json!({
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicReadGetObject",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": format!("arn:aws:s3:::{}/*", self.bucket)
+                }
+            ]
+        });
+        let result = self
+            .client
+            .put_bucket_policy()
+            .bucket(&self.bucket)
+            .set_policy(Some(json_policy.to_string()))
+            .send()
+            .await;
+        match result {
+            Ok(_) => {
+                tracing::info!(
+                    "Updated the bucket policy successfully for '{}'.",
+                    self.bucket
+                );
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!("Failed to update the bucket policy: {}", e);
+                Err(CloudStorageError::AWSSdkError(e.to_string()))?
+            }
+        }
     }
 }
 
@@ -69,10 +107,8 @@ impl CloudStorage for S3Storage {
             .await;
         match exist {
             Ok(resp) => {
-                tracing::info!(
-                    "Bucket identified: {:?}! Updating the bucket lifecycle.",
-                    resp
-                );
+                tracing::debug!("Bucket identified: {:?}!", resp);
+                // TODO - Implement the lifecycle configuration
                 // tracing::info!("The result of the bucket lifecycle update: {:?}", result);
                 Ok(())
             }
@@ -84,8 +120,12 @@ impl CloudStorage for S3Storage {
     }
 
     // #[tracing::instrument]
-    async fn upload(&self, files: FileObjects) -> Result<Vec<OutputItem>, CloudStorageError> {
-        tracing::info!(
+    async fn upload(
+        &self,
+        files: FileObjects,
+        pre_signed_urls: bool,
+    ) -> Result<Vec<OutputItem>, CloudStorageError> {
+        tracing::debug!(
             "Starting to upload {} files in to the S3 bucket '{}' in path '{}'.",
             files.len(),
             self.bucket,
@@ -95,7 +135,7 @@ impl CloudStorage for S3Storage {
         let shared_vec = Arc::new(Mutex::new(Vec::with_capacity(files.len())));
         let mut tasks = Vec::with_capacity(files.len());
         for mut file in files.files {
-            let file_key = format!("{}/{}", files.dst_location, file.0);
+            let file_key = format!("{}/{}", files.dst_location.trim_end_matches("/"), file.0);
             // Use structured concurrency whenever possible
             // Avoid using tokio::spawn, as we lose the control
             let body = ByteStream::from_path(file.1.kind.get_filename()).await;
@@ -112,7 +152,7 @@ impl CloudStorage for S3Storage {
                             .await;
                         match response {
                             Ok(r) => {
-                                tracing::info!(
+                                tracing::debug!(
                                     "Created or updated the file with expiration: {}",
                                     r.expiration.unwrap_or_default()
                                 );
@@ -131,10 +171,27 @@ impl CloudStorage for S3Storage {
                                     .await;
                                 match presigned_request {
                                     Ok(url) => {
-                                        tracing::debug!("The pre-signed URL: {}", url.uri());
-                                        let mut vec = shared_vec.lock().await;
-                                        file.1.set_link(url.uri().to_string());
-                                        vec.push(file.1);
+                                        if pre_signed_urls {
+                                            tracing::debug!("The pre-signed URL: {}", url.uri());
+                                            let mut vec = shared_vec.lock().await;
+                                            file.1.set_link(url.uri().to_string());
+                                            vec.push(file.1);
+                                        } else {
+                                            // strip the url by '?' to get the working public link in all scenarios
+                                            let url = url
+                                                .uri()
+                                                .to_string()
+                                                .split_once("?")
+                                                .map(|(base, _)| base.to_string())
+                                                .ok_or_else(|| {
+                                                    CloudStorageError::UrlParseError(
+                                                        "Failed to parse the pre-signed URL when constructing the public base by splitting with '?'.".to_string()
+                                                    )
+                                                })?;
+                                            let mut vec = shared_vec.lock().await;
+                                            file.1.set_link(url);
+                                            vec.push(file.1);
+                                        }
                                     }
                                     Err(e) => {
                                         tracing::error!(
@@ -160,11 +217,12 @@ impl CloudStorage for S3Storage {
             };
             tasks.push(task);
         }
-        let result = try_join_all(tasks).await;
-        match result {
+        let upload_results = try_join_all(tasks).await;
+
+        match upload_results {
             Ok(_) => {
                 let mut vec = shared_vec.lock().await;
-                tracing::info!("Uploaded {} files successfully.", vec.len());
+                tracing::debug!("Uploaded {} files successfully.", vec.len());
                 Ok(core::mem::take(&mut vec))
             }
             Err(e) => {
@@ -176,9 +234,7 @@ impl CloudStorage for S3Storage {
 
     #[tracing::instrument]
     async fn get_url(&self, file_key: String) -> Result<String, Box<dyn std::error::Error>> {
-        // Generate a pre-signed URL valid for 1 hour
-        // let url = self.bucket.presign_get(file_key, 3600, None).await?;
-        Ok("OK".to_string())
+        todo!("Implement the get_url method for S3 storage.")
     }
 }
 #[cfg(test)]

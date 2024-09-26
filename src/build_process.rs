@@ -6,8 +6,6 @@ use uuid::Uuid;
 use crate::config::{BuildConfig, Builder, ModuleConfiguration, OutputKind, Task};
 use crate::flag_generator::Flag;
 
-const OUTPUT_DIRECTORY: &str = "output/";
-
 fn create_flag_id_pairs_by_task<'a>(
     task_config: &'a Task,
     module_config: &'a ModuleConfiguration,
@@ -66,8 +64,8 @@ fn get_build_info(
     module_config: &mut ModuleConfiguration,
     task_id: String,
 ) -> Result<&BuildConfig, String> {
-    for domain in &mut module_config.domains {
-        for task in &domain.tasks {
+    for category in &mut module_config.categories {
+        for task in &category.tasks {
             if task_id == task.id {
                 return Ok(task.build.as_ref());
             }
@@ -140,7 +138,7 @@ impl TaskBuildProcessOutput {
             .find(|output| matches!(output.kind, OutputKind::Readme(_)))
     }
 
-    pub fn refresh_files(&mut self, items: Vec<OutputItem>) {
+    pub fn update_files(&mut self, items: Vec<OutputItem>) {
         for item in items {
             if let Some(index) = self.files.iter().position(|x| x.kind == item.kind) {
                 self.files[index] = item;
@@ -155,21 +153,23 @@ pub fn build_task(
     module_config: &ModuleConfiguration,
     task_config: &Task,
     uuid: Uuid,
+    output_directory: &Path,
 ) -> Result<TaskBuildProcessOutput, Box<dyn std::error::Error>> {
     let (flags, mut build_envs) = create_flag_id_pairs_by_task(task_config, module_config, uuid);
 
     match task_config.build.builder {
         Builder::Shell(ref entrypoint) => {
-            let build_output = Path::new(OUTPUT_DIRECTORY).join(uuid.to_string());
-            let builder_relative_dir = Path::new(&task_config.build.directory).join(&build_output);
+            let builder_output_dir = output_directory
+                .join(uuid.to_string())
+                .join(&task_config.id);
             tracing::debug!(
                 "Running shell command: {} with flags: {:?} in directory: {}",
                 entrypoint.entrypoint,
                 build_envs,
-                &builder_relative_dir.display()
+                &builder_output_dir.display()
             );
             // Create all required directories in the path
-            match fs::create_dir_all(&builder_relative_dir) {
+            match fs::create_dir_all(&builder_output_dir) {
                 Ok(_) => (),
                 Err(e) => {
                     tracing::error!(
@@ -184,7 +184,7 @@ pub fn build_task(
             // This means that output directory should relatively referenced based on the CWD of this program
             build_envs.insert(
                 "OUTPUT_DIR".to_string(),
-                build_output.to_str().unwrap_or_default().to_string(),
+                builder_output_dir.to_str().unwrap_or_default().to_string(),
             );
             let output = std::process::Command::new("sh")
                 .arg(&entrypoint.entrypoint)
@@ -207,7 +207,7 @@ pub fn build_task(
             let mut outputs = Vec::with_capacity(task_config.build.output.len());
             if output.status.success() {
                 for output in &task_config.build.output {
-                    let path = builder_relative_dir
+                    let path = builder_output_dir
                         .join(output.kind.get_filename())
                         .canonicalize()?;
                     match fs::metadata(&path) {

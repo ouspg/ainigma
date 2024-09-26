@@ -22,8 +22,8 @@ pub enum ConfigError {
     CourseNameError,
     #[error("Error in Toml file: Course version must not be empty")]
     CourseVersionError,
-    #[error("Error in Toml file: Each domain must have a unique number")]
-    DomainNumberError,
+    #[error("Error in Toml file: Each category must have a unique number")]
+    CategoryNumberError,
     #[error("Error in Toml file: Task Id cannot be empty")]
     TasksIDsNotUniqueError,
     #[error("The following task identifier was not found: {0}")]
@@ -55,7 +55,7 @@ pub struct ModuleConfiguration {
     pub name: String,
     pub description: String,
     pub version: String,
-    pub domains: Vec<Domain>,
+    pub categories: Vec<Category>,
     pub flag_types: FlagsTypes,
     pub deployment: Deployment,
 }
@@ -66,7 +66,7 @@ impl ModuleConfiguration {
         name: String,
         description: String,
         version: String,
-        domains: Vec<Domain>,
+        categories: Vec<Category>,
         flag_types: FlagsTypes,
         deployment: Deployment,
     ) -> ModuleConfiguration {
@@ -75,14 +75,14 @@ impl ModuleConfiguration {
             name,
             description,
             version,
-            domains,
+            categories,
             flag_types,
             deployment,
         }
     }
     pub fn get_task_by_id(&self, id: &str) -> Option<Task> {
-        for domain in &self.domains {
-            for task in &domain.tasks {
+        for category in &self.categories {
+            for task in &category.tasks {
                 if task.id == id {
                     return Some(task.clone());
                 }
@@ -90,11 +90,11 @@ impl ModuleConfiguration {
         }
         None
     }
-    pub fn get_domain_number_by_task_id(&self, id: &str) -> Option<u8> {
-        for domain in &self.domains {
-            for task in &domain.tasks {
+    pub fn get_category_number_by_task_id(&self, id: &str) -> Option<u8> {
+        for category in &self.categories {
+            for task in &category.tasks {
                 if task.id == id {
-                    return Some(domain.number);
+                    return Some(category.number);
                 }
             }
         }
@@ -103,15 +103,15 @@ impl ModuleConfiguration {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Domain {
+pub struct Category {
     pub tasks: Vec<Task>,
     pub number: u8,
     pub name: String,
 }
 
-impl Domain {
-    pub fn new(tasks: Vec<Task>, number: u8, name: String) -> Domain {
-        Domain {
+impl Category {
+    pub fn new(tasks: Vec<Task>, number: u8, name: String) -> Category {
+        Category {
             tasks,
             number,
             name,
@@ -298,6 +298,7 @@ pub struct Upload {
     pub aws_s3_endpoint: String,
     pub aws_region: String,
     pub bucket_name: String,
+    pub use_pre_signed: bool,
     pub link_expiration: u32,
     pub file_expiration: u32,
 }
@@ -388,26 +389,26 @@ pub fn check_toml(module: ModuleConfiguration) -> Result<ModuleConfiguration, Co
 
     // check number uniques
     let numbers = module
-        .domains
+        .categories
         .iter()
-        .map(|domain| domain.number)
+        .map(|category| category.number)
         .collect::<std::collections::HashSet<u8>>();
-    if numbers.len() != module.domains.len() {
-        return Err(ConfigError::DomainNumberError);
+    if numbers.len() != module.categories.len() {
+        return Err(ConfigError::CategoryNumberError);
     }
     // Use set to check module task id uniques
     let mut task_ids = HashSet::new();
 
-    // Check each task in each domain
-    for domain in &module.domains {
-        for task in &domain.tasks {
+    // Check each task in each category
+    for category in &module.categories {
+        for task in &category.tasks {
             for id in task.get_task_ids() {
                 if !task_ids.insert(id) {
                     return Err(ConfigError::TaskCountError);
                 }
             }
         }
-        for task in &domain.tasks {
+        for task in &category.tasks {
             let _task_result = check_task(task)?;
         }
     }

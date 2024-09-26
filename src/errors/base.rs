@@ -36,6 +36,14 @@ pub enum CloudStorageError {
     AWSSdkError(String),
     #[error("Failed to read the file when uploading: {0}")]
     FileReadError(String),
+    #[error("Failed to parse URL: {0}")]
+    UrlParseError(String),
+    // wrap FileObjectError
+    #[error(transparent)]
+    FileObjectError(#[from] FileObjectError),
+    // upload error
+    #[error("Failed to upload file: {0}")]
+    UploadError(String),
 }
 
 #[derive(Error, Debug)]

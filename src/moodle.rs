@@ -25,7 +25,7 @@ pub fn create_exam(
                 let mut lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
                 lines.push("".to_string());
 
-                lines.push("<br><br><b>Please, see the download links below. Exam questions are randomised and the link is different if you retry the exam.</b>".to_string());
+                lines.push("<br><br><b>Please, see the download links below. Exam questions are randomised and the links are different if you retry the exam.</b>".to_string());
                 lines.push("<br>".to_string());
                 lines.push(
                     "<div style=\"display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;\">"

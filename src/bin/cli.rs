@@ -64,7 +64,7 @@ struct BuildSelection {
     /// Specify if you want to build a single task. Note that task IDs should be unique within the entire configuration
     #[arg(short, long, value_name = "IDENTIFIER")]
     task: Option<String>,
-    /// Specify the week which will be built completely
+    /// Specify the category which will be built completely at once
     #[arg(short, long, value_name = "NUMBER")]
     category: Option<usize>,
     /// Check if the configuration has correct syntax and pretty print it
@@ -171,6 +171,20 @@ fn s3_upload(
     }
 }
 
+#[derive(Debug)]
+enum OutputDirectory {
+    Temprarory(TempDir),
+    Provided(PathBuf),
+}
+impl OutputDirectory {
+    fn path(&self) -> &Path {
+        match self {
+            OutputDirectory::Temprarory(dir) => dir.path(),
+            OutputDirectory::Provided(path) => path.as_path(),
+        }
+    }
+}
+
 fn main() -> std::process::ExitCode {
     // Global stdout subscriber for event tracing, defaults to info level
     let subscriber = tracing_subscriber::FmtSubscriber::new();
@@ -212,7 +226,7 @@ fn main() -> std::process::ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
-                let output_dir: Box<dyn AsRef<std::path::Path>> = match output_dir {
+                let output_dir: OutputDirectory = match output_dir {
                     Some(output_dir) => {
                         if !output_dir.exists() {
                             tracing::error!(
@@ -227,7 +241,7 @@ fn main() -> std::process::ExitCode {
                             );
                             return ExitCode::FAILURE;
                         } else {
-                            Box::new(output_dir)
+                            OutputDirectory::Provided(output_dir.to_path_buf())
                         }
                     }
                     None => {
@@ -245,23 +259,20 @@ fn main() -> std::process::ExitCode {
                             "No output directory provided, using a temporal directory in path '{}'",
                             temp_dir.path().display()
                         );
-                        Box::new(temp_dir)
+                        OutputDirectory::Temprarory(temp_dir)
                     }
                 };
 
                 let outputs = match selection.task {
-                    Some(ref task) => match parallel_task_build(
-                        &config,
-                        task,
-                        *number,
-                        output_dir.as_ref().as_ref(),
-                    ) {
-                        Ok(out) => out,
-                        Err(error) => {
-                            tracing::error!("Error when building the task: {}", error);
-                            return ExitCode::FAILURE;
+                    Some(ref task) => {
+                        match parallel_task_build(&config, task, *number, output_dir.path()) {
+                            Ok(out) => out,
+                            Err(error) => {
+                                tracing::error!("Error when building the task: {}", error);
+                                return ExitCode::FAILURE;
+                            }
                         }
-                    },
+                    }
                     None => match selection.category {
                         Some(_category) => {
                             todo!("Implement category build");
@@ -299,11 +310,22 @@ fn main() -> std::process::ExitCode {
                         },
                     },
                     None => {
-                        match parallel_task_build(&config, "test", 30, output_dir.as_ref().as_ref())
-                        {
-                            Ok(_) => (),
-                            Err(error) => eprintln!("{}", error),
+                        match output_dir {
+                            OutputDirectory::Temprarory(output_dir) => {
+                                let path = output_dir.into_path();
+                                tracing::info!(
+                                    "Build has been finished and the files are located in the temporal output directory: {}",
+                                    path.display()
+                                );
+                            }
+                            OutputDirectory::Provided(path) => {
+                                tracing::info!(
+                                    "Build finished and the files are located in the provided output directory: {}",
+                                    path.display()
+                                );
+                            }
                         }
+                        return ExitCode::SUCCESS;
                     }
                 }
                 // Ensure that possible temporal directory is removed at this point, not earlier

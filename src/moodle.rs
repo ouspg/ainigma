@@ -52,18 +52,18 @@ pub fn create_exam(
                 let mut question =
                     ShortAnswerQuestion::new(task_config.name.clone(), instructions_string, None);
                 let answers = if item.flags.len() == 1 {
-                       vec![
-                        Answer::new(
-                            100,
-                            item.flags[0].encase_flag(),
-                            "Correct!".to_string().into(),
-                        ),
-                        Answer::new(
-                            100,
-                            item.flags[0].flag_string(),
-                            "Correct!".to_string().into(),
-                        ),
-                        ] 
+                    vec![
+                    Answer::new(
+                        100,
+                        item.flags[0].encase_flag(),
+                        "Correct!".to_string().into(),
+                    ),
+                    Answer::new(
+                        100,
+                        item.flags[0].flag_string(),
+                        "Correct!".to_string().into(),
+                    ),
+                    ] 
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
                     process_multiple_flags(item.flags.clone(), ";")

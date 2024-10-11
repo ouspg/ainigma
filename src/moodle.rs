@@ -53,16 +53,16 @@ pub fn create_exam(
                     ShortAnswerQuestion::new(task_config.name.clone(), instructions_string, None);
                 let answers = if item.flags.len() == 1 {
                     vec![
-                    Answer::new(
-                        100,
-                        item.flags[0].encase_flag(),
-                        "Correct!".to_string().into(),
-                    ),
-                    Answer::new(
-                        100,
-                        item.flags[0].flag_string(),
-                        "Correct!".to_string().into(),
-                    ),
+                        Answer::new(
+                            100,
+                            item.flags[0].encase_flag(),
+                            "Correct!".to_string().into(),
+                        ),
+                        Answer::new(
+                            100,
+                            item.flags[0].flag_string(),
+                            "Correct!".to_string().into(),
+                        ),
                     ] 
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
@@ -104,15 +104,24 @@ fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
     for r in 1..=total_flags {
         for combination in flags.iter().combinations(r) {
             for perm in combination.iter().permutations(r) {
-                let perm_flags: Vec<Flag> = perm.iter().cloned().map(|&flag| flag.clone()).collect();
+                let perm_flags: Vec<Flag> = 
+                    perm.iter().cloned().map(|&flag| flag.clone()).collect();
                 let encased_combined_answer = encase_each_flag(&perm_flags, separator); // Pass as a slice
                 let combined_answer = join_flags(&perm_flags, separator); // Pass as a slice
 
                 // Calculate points based on the number of flags
                 let points = ((r as f64 / total_flags as f64) * 100.0).round() as u8;
 
-                answers.push(Answer::new(points, encased_combined_answer.clone(), "Correct!".to_string().into()));
-                answers.push(Answer::new(points, combined_answer.clone(), "Correct!".to_string().into()));
+                answers.push(Answer::new(
+                    points,
+                    encased_combined_answer.clone(),
+                    "Correct!".to_string().into()
+                ));
+                answers.push(Answer::new(
+                    points,
+                    combined_answer.clone(),
+                    "Correct!".to_string().into()
+                ));
             }
         }
     }
@@ -123,9 +132,9 @@ fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use crate::flag_generator::Algorithm;
-    
+    use uuid::Uuid;
+
     #[test]
     fn test_multiple_flags() {
         let mut flags = Vec::new();
@@ -139,7 +148,7 @@ mod tests {
         let taskid3 = "kdosogkdo".to_string();
         let prefix = "task_prefix".to_string();
 
-        let flag1 = Flag::new_random_flag(taskid2,32);
+        let flag1 = Flag::new_random_flag(taskid2, 32);
         let flag2 = Flag::new_user_flag(taskid, &Algorithm::HMAC_SHA3_256, &secret, &secret3, &id);
         let flag3 = Flag::new_user_flag(prefix, &Algorithm::HMAC_SHA3_256, &secret2, &taskid3, &id);
 

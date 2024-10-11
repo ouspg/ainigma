@@ -6,6 +6,8 @@ use moodle_xml::{
     quiz::Quiz,
 };
 use std::io::{self, BufRead, BufReader};
+use itertools::Itertools;
+use crate::flag_generator::Flag;
 
 /// Create an exam from a list of task build process outputs, which includes the question as well
 pub fn create_exam(
@@ -50,7 +52,7 @@ pub fn create_exam(
                 let mut question =
                     ShortAnswerQuestion::new(task_config.name.clone(), instructions_string, None);
                 let answers = if item.flags.len() == 1 {
-                    vec![
+                       vec![
                         Answer::new(
                             100,
                             item.flags[0].encase_flag(),
@@ -61,9 +63,10 @@ pub fn create_exam(
                             item.flags[0].flag_string(),
                             "Correct!".to_string().into(),
                         ),
-                    ]
+                        ] 
                 } else {
-                    todo!("Multiple flags in subtasks not supported yet")
+                    // Adds 1-inf flags as answer with chosen separator
+                    process_multiple_flags(item.flags.clone(), ";")
                 };
                 question
                     .add_answers(answers)
@@ -81,4 +84,72 @@ pub fn create_exam(
     quiz.to_xml(filename)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Error: {:?}", e)))?;
     Ok(())
+}
+
+// Function to encase each flag with a specified separator
+fn encase_each_flag(flags: &[Flag], separator: &str) -> String {
+    flags.iter().map(|f| f.encase_flag()).join(separator)
+}
+
+// Function to join flags without encasing them
+fn join_flags(flags: &[Flag], separator: &str) -> String {
+    flags.iter().map(|f| f.flag_string()).join(separator)
+}
+
+// Function to process multiple flags and create answers
+fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
+    let total_flags = flags.len();
+    let mut answers = Vec::new();
+
+    for r in 1..=total_flags {
+        for combination in flags.iter().combinations(r) {
+            for perm in combination.iter().permutations(r) {
+                let perm_flags: Vec<Flag> = perm.iter().cloned().map(|&flag| flag.clone()).collect();
+                let encased_combined_answer = encase_each_flag(&perm_flags, separator); // Pass as a slice
+                let combined_answer = join_flags(&perm_flags, separator); // Pass as a slice
+
+                // Calculate points based on the number of flags
+                let points = ((r as f64 / total_flags as f64) * 100.0).round() as u8;
+
+                answers.push(Answer::new(points, encased_combined_answer.clone(), "Correct!".to_string().into()));
+                answers.push(Answer::new(points, combined_answer.clone(), "Correct!".to_string().into()));
+            }
+        }
+    }
+    
+    answers
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+    use crate::flag_generator::Algorithm;
+    
+    #[test]
+    fn test_multiple_flags() {
+        let mut flags = Vec::new();
+
+        let id = Uuid::now_v7();
+        let secret = "Work".to_string();
+        let secret2 = "dslpl".to_string();
+        let secret3 = "dslpl".to_string();
+        let taskid = "task1".to_string();
+        let taskid2 = "Wording mording".to_string();
+        let taskid3 = "kdosogkdo".to_string();
+        let prefix = "task_prefix".to_string();
+
+        let flag1 = Flag::new_random_flag(taskid2,32);
+        let flag2 = Flag::new_user_flag(taskid, &Algorithm::HMAC_SHA3_256, &secret, &secret3, &id);
+        let flag3 = Flag::new_user_flag(prefix, &Algorithm::HMAC_SHA3_256, &secret2, &taskid3, &id);
+
+        flags.push(flag1);
+        flags.push(flag2);
+        flags.push(flag3);
+
+        let answers = process_multiple_flags(flags, ";");
+        for answer in answers {
+            println!("{:?}", answer);
+        }
+    }
 }

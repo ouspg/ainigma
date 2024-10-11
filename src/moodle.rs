@@ -1,13 +1,13 @@
 use crate::build_process::TaskBuildProcessOutput;
 use crate::config::{OutputKind, Task};
+use crate::flag_generator::Flag;
+use itertools::Itertools;
 use moodle_xml::{
     answer::Answer,
     question::{Question, QuestionType, ShortAnswerQuestion},
     quiz::Quiz,
 };
 use std::io::{self, BufRead, BufReader};
-use itertools::Itertools;
-use crate::flag_generator::Flag;
 
 /// Create an exam from a list of task build process outputs, which includes the question as well
 pub fn create_exam(
@@ -115,17 +115,16 @@ fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
                 answers.push(Answer::new(
                     points,
                     encased_combined_answer.clone(),
-                    "Correct!".to_string().into()
+                    "Correct!".to_string().into(),
                 ));
                 answers.push(Answer::new(
                     points,
                     combined_answer.clone(),
-                    "Correct!".to_string().into()
+                    "Correct!".to_string().into(),
                 ));
             }
         }
     }
-    
     answers
 }
 

@@ -63,7 +63,7 @@ pub fn create_exam(
                             item.flags[0].flag_string(),
                             "Correct!".to_string().into(),
                         ),
-                    ] 
+                    ]
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
                     process_multiple_flags(item.flags.clone(), ";")
@@ -104,7 +104,7 @@ fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
     for r in 1..=total_flags {
         for combination in flags.iter().combinations(r) {
             for perm in combination.iter().permutations(r) {
-                let perm_flags: Vec<Flag> = 
+                let perm_flags: Vec<Flag> =
                     perm.iter().cloned().map(|&flag| flag.clone()).collect();
                 let encased_combined_answer = encase_each_flag(&perm_flags, separator); // Pass as a slice
                 let combined_answer = join_flags(&perm_flags, separator); // Pass as a slice

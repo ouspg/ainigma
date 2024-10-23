@@ -158,8 +158,10 @@ mod tests {
         let flag2 = Flag::new_random_flag(taskid2, 32);
         let flag3 = Flag::new_random_flag(taskid3, 32);
         let flag4 = Flag::new_user_flag(prefix4, &Algorithm::HMAC_SHA3_256, &secret, &taskid4, &id);
-        let flag5 = Flag::new_user_flag(prefix5, &Algorithm::HMAC_SHA3_256, &secret2, &taskid5, &id);
-        let flag6 = Flag::new_user_flag(prefix6, &Algorithm::HMAC_SHA3_256, &secret3, &taskid6, &id);
+        let flag5 =
+            Flag::new_user_flag(prefix5, &Algorithm::HMAC_SHA3_256, &secret2, &taskid5, &id);
+        let flag6 =
+            Flag::new_user_flag(prefix6, &Algorithm::HMAC_SHA3_256, &secret3, &taskid6, &id);
 
         flags2.push(flag1);
 

@@ -175,17 +175,30 @@ mod tests {
         let answers3 = process_multiple_flags(flags3, " ");
 
         for answer in answers {
-            match answer.fraction{
+            match answer.fraction {
                 33 => {
-                    assert!(answer.text.contains("task4_prefix:") || answer.text.contains("task5_prefix:") || answer.text.contains("task6_prefix:"));
+                    assert!(
+                        answer.text.contains("task4_prefix:")
+                            || answer.text.contains("task5_prefix:")
+                            || answer.text.contains("task6_prefix:")
+                    );
                 }
                 67 => {
-                    assert!((answer.text.contains("task4_prefix:") && answer.text.contains("task5_prefix:"))
-                    || (answer.text.contains("task6_prefix:") && answer.text.contains("task5_prefix:"))
-                    || (answer.text.contains("task6_prefix:") && answer.text.contains("task4_prefix:")));
+                    assert!(
+                        (answer.text.contains("task4_prefix:")
+                            && answer.text.contains("task5_prefix:"))
+                            || (answer.text.contains("task6_prefix:")
+                                && answer.text.contains("task5_prefix:"))
+                            || (answer.text.contains("task6_prefix:")
+                                && answer.text.contains("task4_prefix:"))
+                    );
                 }
                 100 => {
-                    assert!((answer.text.contains("task4_prefix:") && answer.text.contains("task5_prefix:") && answer.text.contains("task6_prefix:")));
+                    assert!(
+                        (answer.text.contains("task4_prefix:")
+                            && answer.text.contains("task5_prefix:")
+                            && answer.text.contains("task6_prefix:"))
+                    );
                 }
                 _ => {
                     unreachable!("Unexpected fraction value encountered in test")
@@ -197,7 +210,7 @@ mod tests {
             assert!(answer.text.contains("task1:"));
         }
         for answer in answers3 {
-            match answer.fraction{
+            match answer.fraction {
                 50 => {
                     assert!(answer.text.contains("task2:") || answer.text.contains("task3:"));
                 }

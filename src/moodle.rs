@@ -66,7 +66,7 @@ pub fn create_exam(
                     ]
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
-                    process_multiple_flags(item.flags.clone(), ";")
+                    process_multiple_flags(item.flags.clone(), " ")
                 };
                 question
                     .add_answers(answers)
@@ -137,27 +137,77 @@ mod tests {
     #[test]
     fn test_multiple_flags() {
         let mut flags = Vec::new();
+        let mut flags2 = Vec::new();
+        let mut flags3 = Vec::new();
 
         let id = Uuid::now_v7();
         let secret = "Work".to_string();
         let secret2 = "dslpl".to_string();
         let secret3 = "dslpl".to_string();
         let taskid = "task1".to_string();
-        let taskid2 = "Wording mording".to_string();
-        let taskid3 = "kdosogkdo".to_string();
-        let prefix = "task_prefix".to_string();
+        let taskid2 = "task2".to_string();
+        let taskid3 = "task3".to_string();
+        let taskid4 = "task4".to_string();
+        let taskid5 = "task5".to_string();
+        let taskid6 = "task6".to_string();
+        let prefix4 = "task4_prefix".to_string();
+        let prefix5 = "task5_prefix".to_string();
+        let prefix6 = "task6_prefix".to_string();
 
-        let flag1 = Flag::new_random_flag(taskid2, 32);
-        let flag2 = Flag::new_user_flag(taskid, &Algorithm::HMAC_SHA3_256, &secret, &secret3, &id);
-        let flag3 = Flag::new_user_flag(prefix, &Algorithm::HMAC_SHA3_256, &secret2, &taskid3, &id);
+        let flag1 = Flag::new_random_flag(taskid, 32);
+        let flag2 = Flag::new_random_flag(taskid2, 32);
+        let flag3 = Flag::new_random_flag(taskid3, 32);
+        let flag4 = Flag::new_user_flag(prefix4, &Algorithm::HMAC_SHA3_256, &secret, &taskid4, &id);
+        let flag5 = Flag::new_user_flag(prefix5, &Algorithm::HMAC_SHA3_256, &secret2, &taskid5, &id);
+        let flag6 = Flag::new_user_flag(prefix6, &Algorithm::HMAC_SHA3_256, &secret3, &taskid6, &id);
 
-        flags.push(flag1);
-        flags.push(flag2);
-        flags.push(flag3);
+        flags2.push(flag1);
 
-        let answers = process_multiple_flags(flags, ";");
+        flags3.push(flag2);
+        flags3.push(flag3);
+
+        flags.push(flag4);
+        flags.push(flag5);
+        flags.push(flag6);
+
+        let answers = process_multiple_flags(flags, " ");
+        let answers2 = process_multiple_flags(flags2, " ");
+        let answers3 = process_multiple_flags(flags3, " ");
+
         for answer in answers {
-            println!("{:?}", answer);
+            match answer.fraction{
+                33 => {
+                    assert!(answer.text.contains("task4_prefix:") || answer.text.contains("task5_prefix:") || answer.text.contains("task6_prefix:"));
+                }
+                67 => {
+                    assert!((answer.text.contains("task4_prefix:") && answer.text.contains("task5_prefix:"))
+                    || (answer.text.contains("task6_prefix:") && answer.text.contains("task5_prefix:"))
+                    || (answer.text.contains("task6_prefix:") && answer.text.contains("task4_prefix:")));
+                }
+                100 => {
+                    assert!((answer.text.contains("task4_prefix:") && answer.text.contains("task5_prefix:") && answer.text.contains("task6_prefix:")));
+                }
+                _ => {
+                    unreachable!("Unexpected fraction value encountered in test")
+                }
+            }
+        }
+        for answer in answers2 {
+            assert!(answer.fraction == 100);
+            assert!(answer.text.contains("task1:"));
+        }
+        for answer in answers3 {
+            match answer.fraction{
+                50 => {
+                    assert!(answer.text.contains("task2:") || answer.text.contains("task3:"));
+                }
+                100 => {
+                    assert!(answer.text.contains("task2:") && answer.text.contains("task3:"));
+                }
+                _ => {
+                    unreachable!("Unexpected fraction value encountered in test")
+                }
+            }
         }
     }
 }

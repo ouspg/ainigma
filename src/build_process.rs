@@ -3,7 +3,9 @@ use std::fs;
 use std::path::Path;
 use uuid::Uuid;
 
-use crate::config::{BuildConfig, Builder, ModuleConfiguration, OutputKind, Task};
+use crate::config::{
+    BuildConfig, Builder, ModuleConfiguration, OutputKind, Task, DEFAULT_FLAGS_FILENAME,
+};
 use crate::flag_generator::Flag;
 
 fn create_flag_id_pairs_by_task<'a>(
@@ -155,7 +157,8 @@ pub fn build_task(
     uuid: Uuid,
     output_directory: &Path,
 ) -> Result<TaskBuildProcessOutput, Box<dyn std::error::Error>> {
-    let (flags, mut build_envs) = create_flag_id_pairs_by_task(task_config, module_config, uuid);
+    let (mut flags, mut build_envs) =
+        create_flag_id_pairs_by_task(task_config, module_config, uuid);
 
     match task_config.build.builder {
         Builder::Shell(ref entrypoint) => {
@@ -207,9 +210,26 @@ pub fn build_task(
             let mut outputs = Vec::with_capacity(task_config.build.output.len());
             if output.status.success() {
                 for output in &task_config.build.output {
-                    let path = builder_output_dir
+                    let path = match builder_output_dir
                         .join(output.kind.get_filename())
-                        .canonicalize()?;
+                        .canonicalize()
+                    {
+                        Ok(p) => {
+                            tracing::debug!(
+                                "Constructed path when checking build output files: {}",
+                                p.display()
+                            );
+                            p
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to canonicalize build output path for file {}: {}",
+                                &output.kind.get_filename().to_string_lossy(),
+                                e
+                            );
+                            return Err(Box::new(e));
+                        }
+                    };
                     match fs::metadata(&path) {
                         Ok(_) => {
                             tracing::debug!("File exists: {}", path.display());
@@ -225,6 +245,52 @@ pub fn build_task(
                             std::process::exit(1);
                         }
                     }
+                }
+                // If the task has a seed-based flag, we must capture the resulting flag from the process output
+                // Stored into the file seeded_flags.json, using same key as the passed environment variable
+                for flag in flags.iter_mut() {
+                    let flag_key = flag.get_flag_type_value_pair().0;
+                    if let Flag::UserSeedFlag(ref mut user_seed_flag) = flag {
+                        let path = task_config
+                            .build
+                            .output
+                            .iter()
+                            .find_map(|output| {
+                                if let OutputKind::Flags(ref pathbuf) = output.kind {
+                                    Some(builder_output_dir.join(pathbuf))
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_else(|| builder_output_dir.join(DEFAULT_FLAGS_FILENAME));
+                        let file = match fs::File::open(&path) {
+                            Ok(file) => file,
+                            Err(e) => {
+                                tracing::error!(
+                                    "Failed to open flags.json for task {}: {}",
+                                    task_config.id,
+                                    e
+                                );
+                                std::process::exit(1);
+                            }
+                        };
+                        let reader = std::io::BufReader::new(file);
+                        let seeded_flags: HashMap<String, String> =
+                            serde_json::from_reader(reader)?;
+                        // Same key than passed for the build process
+                        if let Some(seed) = seeded_flags.get(&flag_key) {
+                            user_seed_flag.update_suffix(seed.to_owned());
+                        } else {
+                            tracing::error!(
+                                "Seed flag for task {} not found in the output file",
+                                task_config.id
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                for flag in &flags {
+                    tracing::debug!("Flag: {:?}", flag);
                 }
                 Ok(TaskBuildProcessOutput::new(
                     uuid,

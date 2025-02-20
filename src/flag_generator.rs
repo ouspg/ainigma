@@ -122,6 +122,9 @@ impl FlagUnit {
             suffix: flag_suffix_result,
         }
     }
+    pub fn value(&self) -> &str {
+        self.suffix.as_str()
+    }
     pub fn update_suffix(&mut self, new_suffix: String) {
         self.suffix = new_suffix;
     }

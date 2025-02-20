@@ -52,18 +52,27 @@ pub fn create_exam(
                 let mut question =
                     ShortAnswerQuestion::new(task_config.name.clone(), instructions_string, None);
                 let answers = if item.flags.len() == 1 {
-                    vec![
-                        Answer::new(
+                    // Unknown flag, task build process has created this one
+                    if let Flag::UserSeedFlag(flag) = &item.flags[0] {
+                        vec![Answer::new(
                             100,
-                            item.flags[0].encase_flag(),
+                            flag.value().to_string(),
                             "Correct!".to_string().into(),
-                        ),
-                        Answer::new(
-                            100,
-                            item.flags[0].flag_string(),
-                            "Correct!".to_string().into(),
-                        ),
-                    ]
+                        )]
+                    } else {
+                        vec![
+                            Answer::new(
+                                100,
+                                item.flags[0].encase_flag(),
+                                "Correct!".to_string().into(),
+                            ),
+                            Answer::new(
+                                100,
+                                item.flags[0].flag_string(),
+                                "Correct!".to_string().into(),
+                            ),
+                        ]
+                    }
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
                     process_multiple_flags(item.flags.clone(), " ")
@@ -88,7 +97,16 @@ pub fn create_exam(
 
 // Function to encase each flag with a specified separator
 fn encase_each_flag(flags: &[Flag], separator: &str) -> String {
-    flags.iter().map(|f| f.encase_flag()).join(separator)
+    flags
+        .iter()
+        .map(|f| {
+            if let Flag::UserSeedFlag(flag) = f {
+                flag.value().to_string()
+            } else {
+                f.encase_flag()
+            }
+        })
+        .join(separator)
 }
 
 // Function to join flags without encasing them

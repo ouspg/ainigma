@@ -43,11 +43,14 @@ impl S3Storage {
             "The Provider",
         );
         let region = Region::new(config.aws_region);
+        let conf_req: aws_sdk_s3::config::RequestChecksumCalculation =
+            aws_sdk_s3::config::RequestChecksumCalculation::WhenRequired;
         let client_config = aws_sdk_s3::config::Builder::new()
             .endpoint_url(&config.aws_s3_endpoint)
             .region(region)
             .credentials_provider(credentials)
             .behavior_version_latest()
+            .request_checksum_calculation(conf_req)
             .build();
         let link_expiration_days = config.link_expiration;
         let client = Client::from_conf(client_config);
@@ -138,7 +141,6 @@ impl CloudStorage for S3Storage {
             let file_key = format!("{}/{}", files.dst_location.trim_end_matches("/"), file.0);
             // Use structured concurrency whenever possible
             // Avoid using tokio::spawn, as we lose the control
-            // debug filename and path
             tracing::debug!(
                 "Uploading with remote file key: {} from local path : {}",
                 file_key,
@@ -211,9 +213,8 @@ impl CloudStorage for S3Storage {
                             Err(e) => {
                                 tracing::error!(
                                     "Failed to upload the file: {:?}",
-                                    e.raw_response()
+                                    e.as_service_error()
                                 );
-                                tracing::error!("Failed to upload the file: {}", e);
                                 return Err(CloudStorageError::AWSSdkError(e.to_string()));
                             }
                         }

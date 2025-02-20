@@ -267,7 +267,7 @@ pub fn build_task(
                             Ok(file) => file,
                             Err(e) => {
                                 tracing::error!(
-                                    "Failed to open seeded_flags.json for task {}: {}",
+                                    "Failed to open flags.json for task {}: {}",
                                     task_config.id,
                                     e
                                 );

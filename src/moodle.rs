@@ -110,7 +110,7 @@ fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
                 let combined_answer = join_flags(&perm_flags, separator); // Pass as a slice
 
                 // Calculate points based on the number of flags
-                let points = ((r as f64 / total_flags as f64) * 100.0).round() as u8;
+                let points = ((r as f64 / total_flags as f64) * 100.0).round() as i8;
 
                 answers.push(Answer::new(
                     points,

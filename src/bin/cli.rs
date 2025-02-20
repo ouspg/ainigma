@@ -192,10 +192,10 @@ impl OutputDirectory {
 
 fn main() -> std::process::ExitCode {
     // Global stdout subscriber for event tracing, defaults to info level
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    // let subscriber = tracing_subscriber::FmtSubscriber::builder()
-    //     .with_max_level(tracing::Level::DEBUG) // Set log level to DEBUG
-    //     .finish();
+    // let subscriber = tracing_subscriber::FmtSubscriber::new();
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::DEBUG) // Set log level to DEBUG
+        .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let cli = OptsRoot::parse();
@@ -207,7 +207,7 @@ fn main() -> std::process::ExitCode {
                 .to_str()
                 .unwrap_or("The configuration file does not have valid path name. Broken Unicode or something else.")
         );
-        std::process::exit(1);
+        ExitCode::FAILURE
     } else {
         match &cli.command {
             Commands::Generate {

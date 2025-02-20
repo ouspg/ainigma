@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
 const DEFAULT_SH_FILENAME: &str = "entrypoint.sh";
+pub(crate) const DEFAULT_FLAGS_FILENAME: &str = "flags.json";
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -237,6 +238,7 @@ pub enum OutputKind {
     Resource(PathBuf),
     Readme(PathBuf),
     Meta(PathBuf),
+    Flags(PathBuf),
 }
 
 impl OutputKind {
@@ -246,6 +248,7 @@ impl OutputKind {
             OutputKind::Resource(_) => OutputKind::Resource(new_content),
             OutputKind::Readme(_) => OutputKind::Readme(new_content),
             OutputKind::Meta(_) => OutputKind::Meta(new_content),
+            OutputKind::Flags(_) => OutputKind::Flags(new_content),
         }
     }
     pub fn get_filename(&self) -> &Path {
@@ -254,6 +257,7 @@ impl OutputKind {
             OutputKind::Resource(name) => name,
             OutputKind::Readme(name) => name,
             OutputKind::Meta(name) => name,
+            OutputKind::Flags(_) => Path::new(DEFAULT_FLAGS_FILENAME),
         }
     }
     pub const fn kind(&self) -> &str {
@@ -262,6 +266,7 @@ impl OutputKind {
             OutputKind::Resource(_) => "resource",
             OutputKind::Readme(_) => "readme",
             OutputKind::Meta(_) => "meta",
+            OutputKind::Flags(_) => "flags",
         }
     }
 }

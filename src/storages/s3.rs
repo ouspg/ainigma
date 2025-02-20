@@ -138,6 +138,12 @@ impl CloudStorage for S3Storage {
             let file_key = format!("{}/{}", files.dst_location.trim_end_matches("/"), file.0);
             // Use structured concurrency whenever possible
             // Avoid using tokio::spawn, as we lose the control
+            // debug filename and path
+            tracing::debug!(
+                "Uploading with remote file key: {} from local path : {}",
+                file_key,
+                file.1.kind.get_filename().to_string_lossy()
+            );
             let body = ByteStream::from_path(file.1.kind.get_filename()).await;
             let task = async {
                 match body {
@@ -203,6 +209,10 @@ impl CloudStorage for S3Storage {
                                 }
                             }
                             Err(e) => {
+                                tracing::error!(
+                                    "Failed to upload the file: {:?}",
+                                    e.raw_response()
+                                );
                                 tracing::error!("Failed to upload the file: {}", e);
                                 return Err(CloudStorageError::AWSSdkError(e.to_string()));
                             }

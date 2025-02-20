@@ -122,6 +122,9 @@ impl FlagUnit {
             suffix: flag_suffix_result,
         }
     }
+    pub fn update_suffix(&mut self, new_suffix: String) {
+        self.suffix = new_suffix;
+    }
 
     fn user_flag(
         identifier: String,
@@ -149,11 +152,11 @@ impl FlagUnit {
 
 /// Generates a completely random flag
 fn pure_random_flag(lenght: u8) -> String {
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::from_os_rng();
     let size = lenght.into();
     let mut vec: Vec<u8> = vec![0; size];
     for i in &mut vec {
-        *i = rng.gen();
+        *i = rng.random();
     }
     vec.iter().fold(String::new(), |mut output, b| {
         let _ = write!(output, "{b:02x}");

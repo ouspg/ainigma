@@ -10,6 +10,10 @@ pub enum BuildError {
     OutputVerificationFailed(String),
     #[error("Serde derserialization failed from output file {0}.")]
     SerdeDerserializationFailed(String),
+    #[error("Build in thread failed {0}")]
+    ThreadError(String),
+    #[error("Internal subprocess shell command failed {0}")]
+    ShellSubprocessError(String),
 }
 
 impl From<serde_json::Error> for BuildError {

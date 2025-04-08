@@ -1,7 +1,7 @@
 use ainigma::{
     build_process::{build_task, TaskBuildProcessOutput},
-    config::{read_check_toml, ModuleConfiguration},
-    errors::{BuildError, CloudStorageError, ConfigError},
+    config::{read_check_toml, ModuleConfiguration, Task},
+    errors::{BuildError, CloudStorageError},
     moodle::create_exam,
     storages::{CloudStorage, FileObjects, S3Storage},
 };
@@ -10,7 +10,10 @@ use once_cell::sync::Lazy;
 use std::{
     path::{Path, PathBuf},
     process::ExitCode,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread,
 };
 
@@ -57,6 +60,12 @@ enum Commands {
         #[arg(short, long)]
         check_bucket: bool,
     },
+    /// Check if the configuration has correct syntax and pretty print it
+    Validate {
+        /// Check if the bucket exists
+        #[arg(long, action = clap::ArgAction::SetTrue)]
+        check_bucket: bool,
+    },
     /// Designed to deploy the flags for a single challenge
     /// Generates flags in possible batch mode and runs build just once
     Deploy {
@@ -78,9 +87,6 @@ struct BuildSelection {
     /// Specify the category which will be built completely at once
     #[arg(short, long, value_name = "NUMBER")]
     category: Option<usize>,
-    /// Check if the configuration has correct syntax and pretty print it
-    #[arg(long, action = clap::ArgAction::SetTrue)]
-    dry_run: Option<bool>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -235,10 +241,21 @@ fn output_dir_selection(output_dir: Option<&PathBuf>) -> Result<OutputDirectory,
 }
 
 fn main() -> std::process::ExitCode {
-    // Global stdout subscriber for event tracing, defaults to info level
-    // let subscriber = tracing_subscriber::FmtSubscriber::new();
+    let log_level = std::env::var("RUST_LOG")
+        .ok()
+        .and_then(|level| match level.to_lowercase().as_str() {
+            "trace" => Some(tracing::Level::TRACE),
+            "debug" => Some(tracing::Level::DEBUG),
+            "info" => Some(tracing::Level::INFO),
+            "warn" | "warning" => Some(tracing::Level::WARN),
+            "error" => Some(tracing::Level::ERROR),
+            _ => None,
+        })
+        .unwrap_or(tracing::Level::INFO); // Default to INFO if not specified or invalid
+
+    // Global stdout subscriber for event tracing, configure based on env var
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(tracing::Level::DEBUG) // Set log level to DEBUG
+        .with_max_level(log_level)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -253,6 +270,14 @@ fn main() -> std::process::ExitCode {
         );
         ExitCode::FAILURE
     } else {
+        let config = read_check_toml(cli.config.as_os_str());
+        let config = match config {
+            Ok(config) => config,
+            Err(error) => {
+                tracing::error!("Error when reading the configuration file: {}", error);
+                return ExitCode::FAILURE;
+            }
+        };
         match &cli.command {
             Commands::Generate {
                 output_dir,
@@ -260,21 +285,6 @@ fn main() -> std::process::ExitCode {
                 number,
                 moodle,
             } => {
-                let config = read_check_toml(cli.config.as_os_str());
-                let config = match config {
-                    Ok(config) => {
-                        if selection.dry_run.unwrap_or(false) {
-                            println!("{:#?}", config);
-                            return ExitCode::SUCCESS;
-                        } else {
-                            config
-                        }
-                    }
-                    Err(error) => {
-                        tracing::error!("Error when reading the configuration file: {}", error);
-                        return ExitCode::FAILURE;
-                    }
-                };
                 let output_dir = match output_dir_selection(output_dir.as_ref()) {
                     Ok(dir) => dir,
                     Err(error) => {
@@ -285,7 +295,21 @@ fn main() -> std::process::ExitCode {
 
                 let outputs = match selection.task {
                     Some(ref task) => {
-                        match parallel_task_build(&config, task, *number, output_dir.path()) {
+                        tracing::info!(
+                            "Building the task '{}' with the variation count {}",
+                            &task,
+                            number
+                        );
+                        // Fail fast so check if the task exists already here
+                        let task_config = match config.get_task_by_id(task) {
+                            Some(task_config) => task_config,
+                            None => {
+                                tracing::error!("Task ID not found: {task}");
+                                return ExitCode::FAILURE;
+                            }
+                        };
+                        match parallel_task_build(&config, &task_config, *number, output_dir.path())
+                        {
                             Ok(out) => out,
                             Err(error) => {
                                 tracing::error!("Error when building the task: {}", error);
@@ -334,7 +358,7 @@ fn main() -> std::process::ExitCode {
                             OutputDirectory::Temprarory(output_dir) => {
                                 let path = output_dir.into_path();
                                 tracing::info!(
-                                    "Build has been finished and the files are located in the temporal output directory: {}",
+                                    "The build has been finished and the files are located in the temporal output directory: {}",
                                     path.display()
                                 );
                             }
@@ -381,72 +405,115 @@ fn main() -> std::process::ExitCode {
             Commands::Deploy { .. } => {
                 todo!()
             }
+            Commands::Validate { .. } => {
+                println!("{:#?}", config);
+                ExitCode::SUCCESS
+            }
         }
     }
 }
 
 fn parallel_task_build(
     config: &ModuleConfiguration,
-    task: &str,
+    task_config: &Task,
     number: usize,
     output_dir: &Path,
-) -> Result<Vec<TaskBuildProcessOutput>, ConfigError> {
-    tracing::info!(
-        "Building the task '{}' with the variation count {}",
-        &task,
-        number
-    );
-    // Fail fast so check if the task exists alrady here
-    let task_config = config
-        .get_task_by_id(task)
-        .ok_or_else(|| ConfigError::TaskIDNotFound(task.to_string()))?;
+) -> Result<Vec<TaskBuildProcessOutput>, BuildError> {
     let all_outputs = Arc::new(Mutex::new(Vec::with_capacity(number)));
+
     if number > 1 {
+        let failure_occurred = Arc::new(AtomicBool::new(false));
         let mut handles = Vec::with_capacity(number);
         let course_config = Arc::new(config.clone());
-        let task_config = Arc::new(task_config);
+        let task_config = Arc::new(task_config.clone());
         let output_dir = Arc::new(output_dir.to_path_buf());
+
         for i in 1..=number {
             let courseconf = Arc::clone(&course_config);
             let taskconf = Arc::clone(&task_config);
             let outputs = Arc::clone(&all_outputs);
             let outdir = Arc::clone(&output_dir);
+            let failure_flag = Arc::clone(&failure_occurred);
+
             let handle = thread::spawn(move || {
+                // Check if any thread has already failed
+                if failure_flag.load(Ordering::SeqCst) {
+                    tracing::info!("Skipping variant {} due to failure in another variant", i);
+                    return Err(BuildError::ThreadError(format!(
+                        "Stopping variant {} due to failure in another thread",
+                        i
+                    )));
+                }
+
                 tracing::info!("Starting building the variant {}", i);
                 let uuid = Uuid::now_v7();
-                let output = build_task(&courseconf, &taskconf, uuid, &outdir, i);
-                match output {
+
+                match build_task(&courseconf, &taskconf, uuid, &outdir, i) {
                     Ok(output) => {
                         outputs
-                                .lock()
-                                .expect(
-                                    "Another thread panicked while owning the mutex when building the task.",
-                                )
-                                .push(output);
+                            .lock()
+                            .expect("Another thread panicked while owning the mutex when building the task.")
+                            .push(output);
+                        tracing::info!("Variant {} building finished.", i);
+                        Ok(())
                     }
                     Err(error) => {
-                        tracing::error!("Error when building the task: {}", error);
+                        // Signal that a failure occurred
+                        failure_flag.store(true, Ordering::SeqCst);
+                        tracing::error!("Variant {} failed: {:?}", i, error);
+                        Err(error)
                     }
                 }
-                tracing::info!("Variant {} building finished.", i);
             });
-            handles.push(handle)
+
+            handles.push(handle);
         }
-        // join multithreads together
+
+        // Join threads and collect results
+        let mut first_error = None;
+
         for handle in handles {
-            handle.join().unwrap_or_else(|error| {
-                tracing::error!(
-                    "Error when joining the thread. Some files might not be built: {:?}",
-                    error
-                );
-            })
+            match handle.join() {
+                Ok(thread_result) => {
+                    if let Err(e) = thread_result {
+                        // Save the first error we encounter
+                        if first_error.is_none() {
+                            first_error = Some(e);
+                        }
+                    }
+                }
+                Err(panic_error) => {
+                    let error_msg = format!("Thread panicked: {:?}", panic_error);
+                    tracing::error!("{}", error_msg);
+
+                    if first_error.is_none() {
+                        first_error = Some(BuildError::ThreadError(format!(
+                            "Error when joining thread: {}",
+                            error_msg
+                        )));
+                    }
+                }
+            }
+        }
+
+        // If any thread had an error, return it
+        if let Some(error) = first_error {
+            return Err(error);
         }
     } else {
+        // Single variant case, no threading needed
         let uuid = Uuid::now_v7();
-        let outputs = build_task(config, &task_config, uuid, output_dir, 1).unwrap();
-        all_outputs.lock().unwrap().push(outputs);
-        tracing::info!("Task '{}' build succesfully", &task);
+        match build_task(config, task_config, uuid, output_dir, 1) {
+            Ok(outputs) => {
+                all_outputs.lock().unwrap().push(outputs);
+                tracing::info!("Task '{}' build successfully", task_config.id);
+            }
+            Err(error) => {
+                return Err(error);
+            }
+        }
     }
+
     let vec = Arc::try_unwrap(all_outputs)
         .expect("There are still other Arc references when there should not")
         .into_inner()

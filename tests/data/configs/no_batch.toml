@@ -1,11 +1,11 @@
 identifier = "01920a0e-8c4e-7bbb-80a3-fcae235253ae"
 name = "Test module 1"
-description = "Some tasks"
+description = "Do you like standards?"
 version = "0.0.1"
 
 [[categories]]
 number = 4
-name = "Container security"
+name = "Standards everywhere"
 
 [[categories.tasks]]
 id = "task002"
@@ -14,7 +14,7 @@ name = "How does this standard work?"
 points = 1.0
 # Just one flag for the task
 stages = [
-    { id = "task0021", name = "problem", weight = 1, flag = { kind = "pure_random" } },
+    { id = "task0021", name = "problem", weight = 1, flag = { kind = "user_derived" } },
 ]
 
 [categories.tasks.build]

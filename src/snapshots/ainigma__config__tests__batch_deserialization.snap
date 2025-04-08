@@ -12,7 +12,7 @@ ModuleConfiguration {
             tasks: [
                 Task {
                     id: "task002",
-                    name: "How does this standard work?",
+                    name: "How do containers work?",
                     description: "",
                     points: 1.0,
                     stages: [
@@ -21,7 +21,7 @@ ModuleConfiguration {
                                 "task0021",
                             ),
                             name: Some(
-                                "problem",
+                                "Find the flag :)",
                             ),
                             description: None,
                             weight: Some(
@@ -53,7 +53,7 @@ ModuleConfiguration {
                         ],
                         enabled_modes: NonEmptyBuildModes(
                             [
-                                Sequential,
+                                Batch,
                             ],
                         ),
                     },

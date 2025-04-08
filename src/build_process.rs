@@ -160,6 +160,11 @@ fn verify_build_files(
     let mut outputs = Vec::with_capacity(task_config.build.output.len());
 
     for output in &task_config.build.output {
+        tracing::debug!(
+            "Verifying build output file '{}' and joining it with '{}'",
+            output.kind.get_filename().to_string_lossy(),
+            builder_output_dir.display()
+        );
         let path = match builder_output_dir
             .join(output.kind.get_filename())
             .canonicalize()
@@ -170,7 +175,7 @@ fn verify_build_files(
             }
             Err(e) => {
                 tracing::error!(
-                    "Failed to canonicalize build output path for file {}: {}",
+                    "Failed to canonicalize build output path for file {}: {}. Is builder using given output directory correctly or configuration has unintentional output files defined?",
                     &output.kind.get_filename().to_string_lossy(),
                     e
                 );
@@ -183,13 +188,13 @@ fn verify_build_files(
                 outputs.push(OutputItem::new(output.kind.with_new_path(path)));
             }
 
-            Err(_) => {
+            Err(e) => {
                 tracing::error!("File does not exist: {}", path.display());
                 tracing::error!(
                     "The file was configured output with '{}' use case",
                     output.kind.kind()
                 );
-                std::process::exit(1);
+                return Err(BuildError::OutputVerificationFailed(e.to_string()));
             }
         }
     }
@@ -212,12 +217,6 @@ pub fn build_task(
             let builder_output_dir = output_directory
                 .join(uuid.to_string())
                 .join(&task_config.id);
-            tracing::debug!(
-                "Running shell command: {} with flags: {:?} in directory: {}",
-                entrypoint.entrypoint,
-                build_envs,
-                &builder_output_dir.display()
-            );
             // Create all required directories in the path
             match fs::create_dir_all(&builder_output_dir) {
                 Ok(_) => (),
@@ -239,6 +238,13 @@ pub fn build_task(
                 ),
                 ("BUILD_NUMBER".to_string(), build_number.to_string()),
             ]);
+            tracing::debug!(
+                "Running shell command: {} with flags: {:?} in directory: {}",
+                entrypoint.entrypoint,
+                build_envs,
+                &task_config.build.directory.display()
+            );
+
             let output = std::process::Command::new("sh")
                 .arg(&entrypoint.entrypoint)
                 .env_clear()
@@ -249,12 +255,10 @@ pub fn build_task(
             let output = match output {
                 Ok(output) => output,
                 Err(e) => {
-                    tracing::error!(
+                    return Err(BuildError::ShellSubprocessError(format!(
                         "The build process of task {} failed prematurely: {}",
-                        task_config.id,
-                        e
-                    );
-                    std::process::exit(1);
+                        task_config.id, e
+                    )));
                 }
             };
             if output.status.success() {

@@ -4,7 +4,6 @@ use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
-use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
@@ -555,21 +554,6 @@ impl Default for Shell {
     }
 }
 
-pub fn read_toml_content_from_file(filepath: &OsStr) -> Result<String, Box<dyn Error>> {
-    let mut file = File::open(filepath)?;
-    let mut file_content = String::new();
-    file.read_to_string(&mut file_content)?;
-    Ok(file_content)
-}
-
-//TODO: Add warnings for unspecified fields
-pub fn toml_content(file_content: String) -> Result<ModuleConfiguration, ConfigError> {
-    let module_config = toml::from_str(&file_content);
-    module_config.map_err(|err| ConfigError::TomlParseError {
-        message: err.to_string(),
-    })
-}
-
 pub fn check_toml(module: ModuleConfiguration) -> Result<ModuleConfiguration, ConfigError> {
     let module_name = &module.name;
     if module_name.is_empty() {
@@ -678,10 +662,21 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
 
     Ok(true)
 }
-
+//TODO: Add warnings for unspecified fields
 pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigError> {
-    let tomlstring = read_toml_content_from_file(filepath).expect("No reading errors");
-    let module_config = toml_content(tomlstring)?;
+    let mut file = File::open(filepath).map_err(|err| ConfigError::TomlParseError {
+        message: format!("Failed to open file: {}", err),
+    })?;
+
+    let mut file_content = String::new();
+    file.read_to_string(&mut file_content)
+        .map_err(|err| ConfigError::TomlParseError {
+            message: format!("Failed to read file content: {}", err),
+        })?;
+    let module_config =
+        toml::from_str(&file_content).map_err(|err| ConfigError::TomlParseError {
+            message: err.to_string(),
+        })?;
     check_toml(module_config)
 }
 #[cfg(test)]

@@ -1,0 +1,29 @@
+identifier = "01908498-ac98-708d-b886-b6f2747ef785"
+name = "Cybersecurity"
+description = "A comprehensive course covering various aspects of cybersecurity"
+version = "0.0.1"                                                                # mandatory
+[[categories]]
+number = 1
+name = "Network Security Fundamentals"
+
+[[categories.tasks]]
+id = "task001"
+name = "Challenge 5"
+description = "Previous exploit was trivial. Try harder."
+points = 2.0
+# For deterministic tests
+stages = [{ flag = { kind = "user_derived" } }]
+
+[categories.tasks.build]
+directory = "tests/tasks/simple_shell"
+builder = { shell = { entrypoint = "build.sh" } }
+enabled_modes = ["sequential"]
+
+[[categories.tasks.build.output]]
+kind = { readme = "readme.txt" }
+[[categories.tasks.build.output]]
+kind = { resource = "secret.sh" }
+
+[flag_config]
+user_derived = { secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" }
+rng_seed = { secret = "You must know me to predict the seed of the other users" }

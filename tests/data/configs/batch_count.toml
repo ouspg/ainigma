@@ -8,17 +8,17 @@ name = "Container security"
 
 [[categories.tasks]]
 id = "task002"
-name = "How does this standard work?"
+name = "How do containers work?"
 points = 1.0
 # Just one flag for the task
 stages = [
-    { id = "task0021", name = "problem", weight = 1, flag = { kind = "pure_random" }, batch = { count = 6 } },
+    { id = "task0021", name = "Find the flag :)", weight = 1, flag = { kind = "pure_random" }, batch = { count = 6 } },
 ]
 
 [categories.tasks.build]
 directory = "ansible"
 builder = { shell = {} }
-enabled_modes = ["sequential"]
+enabled_modes = ["batch"]
 
 
 [[categories.tasks.build.output]]

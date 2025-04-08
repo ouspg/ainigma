@@ -1,74 +1,57 @@
+use crate::errors::ConfigError;
 use crate::flag_generator;
-use serde::Deserialize;
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use thiserror::Error;
+use std::str::FromStr;
 use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
 const DEFAULT_SH_FILENAME: &str = "entrypoint.sh";
+const DEFAULT_FILE_EXPIRATION: u32 = 31;
+const DEFAULT_LINK_EXPIRATION: u32 = 7;
+const DEFAULT_RANDOM_FLAG_LENGTH: u8 = 32;
+
 pub(crate) const DEFAULT_FLAGS_FILENAME: &str = "flags.json";
 
-#[derive(Debug, Error)]
-pub enum ConfigError {
-    #[error("Error in Toml file: Course Uuid must be valid")]
-    UuidError,
-    #[error("{message}")]
-    TomlParseError { message: String },
-    #[error("Error in Toml file: Course name must not be empty")]
-    CourseNameError,
-    #[error("Error in Toml file: Course version must not be empty")]
-    CourseVersionError,
-    #[error("Error in Toml file: Each category must have a unique number")]
-    CategoryNumberError,
-    #[error("Error in Toml file: Task Id cannot be empty")]
-    TasksIDsNotUniqueError,
-    #[error("The following task identifier was not found: {0}")]
-    TaskIDNotFound(String),
-    #[error("Error in Toml file: Each task must have a unique id")]
-    TaskCountError,
-    #[error("Error in Toml file: Task name cannot be empty")]
-    TaskNameError,
-    #[error("Error in Toml file: Task point amount must be non-negative")]
-    TaskPointError,
-    #[error("Error in Toml file: Flag type must be one of the three \"user_derived\", \"pure_random\", \"rng_seed\"")]
-    FlagTypeError,
-    #[error("Error in Toml file: Task flags must have a unique id")]
-    FlagCountError,
-    #[error("Error in Toml file: Each task subtask must have a unique ID")]
-    SubTaskCountError,
-    #[error("Error in Toml file: Each subtask ID must include the current task ID as prefix")]
-    SubTaskIdMatchError,
-    #[error("Error in Toml file: Each task points must match subtask point total")]
-    SubTaskPointError,
-    #[error("Error in Toml file: Each task subtask name must not be empty")]
-    SubTaskNameError,
+fn random_hex_secret() -> String {
+    let mut random_bytes = vec![0u8; 32];
+    let mut rng = StdRng::from_os_rng();
+    rng.fill_bytes(random_bytes.as_mut_slice());
+    random_bytes
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>()
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModuleConfiguration {
-    //TODO:Change to UUID
-    pub identifier: String,
+    pub identifier: Uuid,
     pub name: String,
+    #[serde(default)]
     pub description: String,
     pub version: String,
     pub categories: Vec<Category>,
-    pub flag_types: FlagsTypes,
+    #[serde(default)]
+    pub flag_config: FlagConfig,
+    #[serde(default)]
     pub deployment: Deployment,
 }
 
 impl ModuleConfiguration {
     pub fn new(
-        identifier: String,
+        identifier: Uuid,
         name: String,
         description: String,
         version: String,
         categories: Vec<Category>,
-        flag_types: FlagsTypes,
+        flag_config: FlagConfig,
         deployment: Deployment,
     ) -> ModuleConfiguration {
         ModuleConfiguration {
@@ -77,7 +60,7 @@ impl ModuleConfiguration {
             description,
             version,
             categories,
-            flag_types,
+            flag_config,
             deployment,
         }
     }
@@ -103,7 +86,7 @@ impl ModuleConfiguration {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Category {
     pub tasks: Vec<Task>,
     pub number: u8,
@@ -120,10 +103,11 @@ impl Category {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
     pub id: String,
     pub name: String,
+    #[serde(default)]
     pub description: String,
     pub points: f32,
     pub stages: Vec<TaskElement>,
@@ -167,20 +151,86 @@ impl Task {
         }
     }
 }
-
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]
-pub struct FlagConfig {
-    pub kind: String,
+pub struct BatchConfig {
+    pub count: usize,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct FlagVariant {
+    pub kind: FlagVariantKind,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FlagVariantKind {
+    UserDerived,
+    PureRandom,
+    RngSeed,
+}
+
+impl FlagVariant {
+    pub fn as_str(&self) -> &'static str {
+        match self.kind {
+            FlagVariantKind::UserDerived => "user_derived",
+            FlagVariantKind::PureRandom => "pure_random",
+            FlagVariantKind::RngSeed => "rng_seed",
+        }
+    }
+}
+
+impl std::fmt::Display for FlagVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for FlagVariant {
+    type Err = ConfigError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "user_derived" => Ok(FlagVariant {
+                kind: FlagVariantKind::UserDerived,
+            }),
+            "pure_random" => Ok(FlagVariant {
+                kind: FlagVariantKind::PureRandom,
+            }),
+            "rng_seed" => Ok(FlagVariant {
+                kind: FlagVariantKind::RngSeed,
+            }),
+            _ => Err(ConfigError::FlagTypeError),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FlagVariant {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Helper {
+            kind: String,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        Self::from_str(&helper.kind).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TaskElement {
     pub id: Option<String>,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub description: Option<String>,
     pub weight: Option<u8>,
-    pub flag: FlagConfig,
+    pub flag: FlagVariant,
+    pub batch: Option<BatchConfig>,
 }
 
 impl TaskElement {
@@ -189,7 +239,8 @@ impl TaskElement {
         name: Option<String>,
         description: Option<String>,
         weight: Option<u8>,
-        flag: FlagConfig,
+        flag: FlagVariant,
+        batch: Option<BatchConfig>,
     ) -> TaskElement {
         TaskElement {
             id,
@@ -197,14 +248,67 @@ impl TaskElement {
             description,
             weight,
             flag,
+            batch,
         }
     }
 }
-#[derive(Debug, Deserialize, Clone)]
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum BuildMode {
+    Sequential,
+    Batch,
+}
+impl BuildMode {
+    pub fn all() -> &'static [BuildMode] {
+        &[BuildMode::Sequential, BuildMode::Batch]
+    }
+}
+impl core::fmt::Display for BuildMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuildMode::Sequential => write!(f, "sequential"),
+            BuildMode::Batch => write!(f, "batch"),
+        }
+    }
+}
+
+impl std::str::FromStr for BuildMode {
+    type Err = ConfigError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "sequential" => Ok(BuildMode::Sequential),
+            "batch" => Ok(BuildMode::Batch),
+            _ => Err(ConfigError::BuildModeError(
+                s.to_owned(),
+                BuildMode::all()
+                    .iter()
+                    .map(|f| format!("{f}"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for BuildMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BuildConfig {
     pub directory: std::path::PathBuf,
     pub builder: Builder,
     pub output: Vec<BuildOutputFile>,
+    #[serde(default)]
+    pub disabled_modes: Vec<BuildMode>,
 }
 impl AsRef<BuildConfig> for BuildConfig {
     fn as_ref(&self) -> &BuildConfig {
@@ -217,21 +321,26 @@ impl BuildConfig {
         directory: std::path::PathBuf,
         builder: Builder,
         output: Vec<BuildOutputFile>,
+        disabled_modes: Vec<BuildMode>,
     ) -> BuildConfig {
         BuildConfig {
             directory,
             builder,
             output,
+            disabled_modes,
         }
+    }
+    pub fn is_feature_enabled(&self, feature: BuildMode) -> bool {
+        !self.disabled_modes.contains(&feature)
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BuildOutputFile {
     pub kind: OutputKind,
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputKind {
     Internal(PathBuf),
@@ -271,33 +380,69 @@ impl OutputKind {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct FlagsTypes {
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct FlagConfig {
+    #[serde(default = "PureRandom::default")]
     pub pure_random: PureRandom,
     pub user_derived: UserDerived,
     pub rng_seed: RngSeed,
 }
-#[derive(Debug, Deserialize, Clone)]
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PureRandom {
     pub length: u8,
 }
-#[derive(Debug, Deserialize, Clone)]
+impl Default for PureRandom {
+    fn default() -> Self {
+        PureRandom {
+            length: DEFAULT_RANDOM_FLAG_LENGTH,
+        }
+    }
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserDerived {
+    #[serde(default = "flag_generator::Algorithm::default")]
     pub algorithm: flag_generator::Algorithm,
     pub secret: String,
 }
-#[derive(Debug, Deserialize, Clone)]
+impl Default for UserDerived {
+    fn default() -> Self {
+        UserDerived {
+            algorithm: flag_generator::Algorithm::default(),
+            secret: { random_hex_secret() },
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RngSeed {
     pub secret: String,
 }
+impl Default for RngSeed {
+    fn default() -> Self {
+        RngSeed {
+            secret: { random_hex_secret() },
+        }
+    }
+}
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Deployment {
     pub build_timeout: u32,
+    #[serde(default)]
     pub upload: Upload,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+impl Default for Deployment {
+    fn default() -> Self {
+        Deployment {
+            build_timeout: 300,
+            upload: Upload::default(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct Upload {
     pub aws_s3_endpoint: String,
@@ -307,8 +452,20 @@ pub struct Upload {
     pub link_expiration: u32,
     pub file_expiration: u32,
 }
+impl Default for Upload {
+    fn default() -> Self {
+        Upload {
+            aws_s3_endpoint: "".to_string(),
+            aws_region: "".to_string(),
+            bucket_name: "".to_string(),
+            use_pre_signed: false,
+            link_expiration: DEFAULT_LINK_EXPIRATION,
+            file_expiration: DEFAULT_FILE_EXPIRATION,
+        }
+    }
+}
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]
 #[serde(rename_all = "lowercase")]
 pub enum Builder {
@@ -324,7 +481,7 @@ impl Builder {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Nix {
     #[serde(default = "Nix::default_entrypoint")]
     pub entrypoint: String,
@@ -343,7 +500,7 @@ impl Default for Nix {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Shell {
     #[serde(default = "Shell::default_entrypoint")]
     pub entrypoint: String,
@@ -378,11 +535,6 @@ pub fn toml_content(file_content: String) -> Result<ModuleConfiguration, ConfigE
 }
 
 pub fn check_toml(module: ModuleConfiguration) -> Result<ModuleConfiguration, ConfigError> {
-    let id = module.identifier.as_str();
-    match Uuid::parse_str(id) {
-        Ok(ok) => ok,
-        Err(_err) => return Err(ConfigError::UuidError),
-    };
     let module_name = &module.name;
     if module_name.is_empty() {
         return Err(ConfigError::CourseNameError);
@@ -450,13 +602,6 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
             // Single element in parts, id must be none
             return Err(ConfigError::SubTaskCountError);
         }
-        // possible flag enum later
-        if !(part.flag.kind == "user_derived"
-            || part.flag.kind == "pure_random"
-            || part.flag.kind == "rng_seed")
-        {
-            return Err(ConfigError::FlagTypeError);
-        }
     }
 
     //checks subtasks have unique id
@@ -505,9 +650,10 @@ pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigEr
 }
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
     use std::ffi::OsStr;
 
-    use super::{check_toml, toml_content};
+    use super::{check_toml, toml_content, ModuleConfiguration};
     use crate::config::read_toml_content_from_file;
 
     #[test]
@@ -516,5 +662,25 @@ mod tests {
         let result1 = toml_content(result.unwrap());
         let courseconfig = result1.unwrap();
         let _coursefconfig = check_toml(courseconfig).unwrap();
+    }
+
+    #[test]
+    fn test_batch_deserialization() {
+        let batch_config_with_count = include_str!("../tests/data/configs/batch_count.toml");
+        let result: ModuleConfiguration = toml::from_str(batch_config_with_count).unwrap();
+        assert_debug_snapshot!(result);
+        let no_batch = include_str!("../tests/data/configs/no_batch.toml");
+        let result: ModuleConfiguration = toml::from_str(no_batch).unwrap();
+        assert_debug_snapshot!(result);
+    }
+    #[test]
+    fn test_disabled_build_modes() {
+        let config = include_str!("../tests/data/configs/no_sequential.toml");
+        let result: ModuleConfiguration = toml::from_str(config).unwrap();
+        assert_debug_snapshot!(result);
+        // Invalid mode
+        let modified_config = config.replace("sequential", "sequentiall");
+        let result: Result<ModuleConfiguration, _> = toml::from_str(&modified_config);
+        assert!(result.is_err())
     }
 }

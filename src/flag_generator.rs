@@ -1,7 +1,7 @@
 use core::panic;
 use hmac::{digest::InvalidLength, Hmac, Mac};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use std::fmt::Write;
 use uuid::Uuid;
@@ -13,9 +13,11 @@ type Hmac256 = Hmac<Sha3_256>;
 ///
 /// #### Algorithms
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
-#[derive(Debug, PartialEq, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 #[allow(non_camel_case_types)]
+#[non_exhaustive]
 pub enum Algorithm {
+    #[default]
     HMAC_SHA3_256,
 }
 
@@ -33,7 +35,7 @@ pub enum Algorithm {
 /// - `user_seed_flag()` - `UserSeedFlag` generator
 /// - `user_flag()` - `UserDerivedFlag` generator
 /// - `flag_string()` - returns Flag as a one string
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Flag {
     RngFlag(FlagUnit),
     UserSeedFlag(FlagUnit),
@@ -106,7 +108,7 @@ impl Flag {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FlagUnit {
     /// Identifier is typically the same as task id
     identifier: String,

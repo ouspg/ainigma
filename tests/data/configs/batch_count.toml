@@ -1,8 +1,5 @@
-# Module Configuration
-
 identifier = "01920a0e-8c4e-7bbb-80a3-fcae235253ae"
-name = "Test module 1"
-description = "Some tasks"
+name = "Something about the cloud security"
 version = "0.0.1"
 
 [[categories]]
@@ -12,7 +9,6 @@ name = "Container security"
 [[categories.tasks]]
 id = "task002"
 name = "How does this standard work?"
-description = "Find the flag."
 points = 1.0
 # Just one flag for the task
 stages = [
@@ -22,23 +18,13 @@ stages = [
 [categories.tasks.build]
 directory = "ansible"
 builder = { shell = {} }
+enabled_modes = ["sequential"]
+
 
 [[categories.tasks.build.output]]
 kind = { readme = "readme.txt" }
 
+# For deterministic tests, one needs to define secrets
 [flag_config]
-pure_random = { length = 32 }
-user_derived = { algorithm = "HMAC_SHA3_256", secret = "6b2c0c4535ea5b7c7f4fc613a7388404ce80e0c8e2632f139f1aa9d27f540f15" }
+user_derived = { secret = "Try to guess the super secret secret!" }
 rng_seed = { secret = "HaHa you don't know it" }
-
-
-[deployment]
-build_timeout = 300 # seconds
-
-[deployment.upload]
-AWS_S3_ENDPOINT = "https://a3s.fi"
-AWS_REGION = "us-west-2"           # Something to make AWS SDK happy
-BUCKET_NAME = ""
-USE_PRE_SIGNED = false
-LINK_EXPIRATION = 7                # 7 days is currently the maximum policy for AWS S3, if you need more, set public
-FILE_EXPIRATION = 21               # In days - TODO currently just manual usea

@@ -19,7 +19,8 @@ stages = [
 directory = "ansible"
 # Default entrypoint for shell is "entrypoint.sh"
 builder = { shell = {} }
-disabled_modes = ["sequential"]
+# At least one must be enabled
+enabled_modes = ["sequential"]
 
 [[categories.tasks.build.output]]
 kind = { readme = "readme.txt" }

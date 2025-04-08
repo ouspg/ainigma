@@ -47,9 +47,11 @@ ModuleConfiguration {
                                 ),
                             },
                         ],
-                        disabled_modes: [
-                            Sequential,
-                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
                     },
                 },
             ],

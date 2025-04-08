@@ -1,0 +1,15 @@
+---
+source: src/config.rs
+expression: result
+---
+Deployment {
+    build_timeout: 400,
+    upload: Upload {
+        aws_s3_endpoint: "https://s3.example.com",
+        aws_region: "example-west-south",
+        bucket_name: "example.bucket",
+        use_pre_signed: false,
+        link_expiration: 7,
+        file_expiration: 21,
+    },
+}

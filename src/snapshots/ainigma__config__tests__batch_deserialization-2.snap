@@ -47,7 +47,11 @@ ModuleConfiguration {
                                 ),
                             },
                         ],
-                        disabled_modes: [],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
                     },
                 },
             ],
@@ -70,12 +74,12 @@ ModuleConfiguration {
     deployment: Deployment {
         build_timeout: 300,
         upload: Upload {
-            aws_s3_endpoint: "https://a3s.fi",
-            aws_region: "us-west-2",
+            aws_s3_endpoint: "",
+            aws_region: "",
             bucket_name: "",
             use_pre_signed: false,
             link_expiration: 7,
-            file_expiration: 21,
+            file_expiration: 31,
         },
     },
 }

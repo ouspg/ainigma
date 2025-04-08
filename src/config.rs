@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
 const DEFAULT_SH_FILENAME: &str = "entrypoint.sh";
+const DEFAULT_BUILD_TIMEOUT: u32 = 300;
 const DEFAULT_FILE_EXPIRATION: u32 = 31;
 const DEFAULT_LINK_EXPIRATION: u32 = 7;
 const DEFAULT_RANDOM_FLAG_LENGTH: u8 = 32;
@@ -305,14 +306,39 @@ impl<'de> Deserialize<'de> for BuildMode {
         Self::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NonEmptyBuildModes(Vec<BuildMode>);
+impl NonEmptyBuildModes {
+    pub fn new(modes: Vec<BuildMode>) -> Result<Self, String> {
+        if modes.is_empty() {
+            Err("At least one BuildMode must be specified".to_string())
+        } else {
+            Ok(NonEmptyBuildModes(modes))
+        }
+    }
+    pub fn contains(&self, mode: &BuildMode) -> bool {
+        self.0.contains(mode)
+    }
+}
+fn deserialize_non_empty_build_modes<'de, D>(
+    deserializer: D,
+) -> Result<NonEmptyBuildModes, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let modes = Vec::<BuildMode>::deserialize(deserializer)?;
+    NonEmptyBuildModes::new(modes)
+        .map_err(|err| serde::de::Error::custom(format!("Error in 'enabled_modes' field: {}", err)))
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BuildConfig {
     pub directory: std::path::PathBuf,
     pub builder: Builder,
     pub output: Vec<BuildOutputFile>,
-    #[serde(default)]
-    pub disabled_modes: Vec<BuildMode>,
+    // Note: all modes are disabled by default - task must explicitly enable one!
+    #[serde(deserialize_with = "deserialize_non_empty_build_modes")]
+    pub enabled_modes: NonEmptyBuildModes,
 }
 impl AsRef<BuildConfig> for BuildConfig {
     fn as_ref(&self) -> &BuildConfig {
@@ -325,17 +351,17 @@ impl BuildConfig {
         directory: std::path::PathBuf,
         builder: Builder,
         output: Vec<BuildOutputFile>,
-        disabled_modes: Vec<BuildMode>,
+        enabled_modes: NonEmptyBuildModes,
     ) -> BuildConfig {
         BuildConfig {
             directory,
             builder,
             output,
-            disabled_modes,
+            enabled_modes,
         }
     }
     pub fn is_feature_enabled(&self, feature: BuildMode) -> bool {
-        !self.disabled_modes.contains(&feature)
+        self.enabled_modes.contains(&feature)
     }
 }
 
@@ -432,6 +458,7 @@ impl Default for RngSeed {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Deployment {
+    #[serde(default = "Deployment::default_build_timeout")]
     pub build_timeout: u32,
     #[serde(default)]
     pub upload: Upload,
@@ -440,9 +467,14 @@ pub struct Deployment {
 impl Default for Deployment {
     fn default() -> Self {
         Deployment {
-            build_timeout: 300,
+            build_timeout: DEFAULT_BUILD_TIMEOUT,
             upload: Upload::default(),
         }
+    }
+}
+impl Deployment {
+    pub fn default_build_timeout() -> u32 {
+        DEFAULT_BUILD_TIMEOUT
     }
 }
 
@@ -655,17 +687,14 @@ pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigEr
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use std::ffi::OsStr;
 
-    use super::{check_toml, toml_content, ModuleConfiguration};
-    use crate::config::read_toml_content_from_file;
+    use super::{Deployment, ModuleConfiguration};
 
     #[test]
     fn test_toml() {
-        let result = read_toml_content_from_file(OsStr::new("course.toml"));
-        let result1 = toml_content(result.unwrap());
-        let courseconfig = result1.unwrap();
-        let _coursefconfig = check_toml(courseconfig).unwrap();
+        let default = include_str!("../tests/data/configs/default.toml");
+        let result: ModuleConfiguration = toml::from_str(default).unwrap();
+        assert_debug_snapshot!(result);
     }
 
     #[test]
@@ -686,5 +715,11 @@ mod tests {
         let modified_config = config.replace("sequential", "sequentiall");
         let result: Result<ModuleConfiguration, _> = toml::from_str(&modified_config);
         assert!(result.is_err())
+    }
+    #[test]
+    fn test_deployment_upload_config() {
+        let config = include_str!("../tests/data/configs/deployment_upload.toml");
+        let result: Deployment = toml::from_str(config).unwrap();
+        assert_debug_snapshot!(result);
     }
 }

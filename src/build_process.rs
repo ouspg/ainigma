@@ -4,8 +4,10 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::config::{
-    BuildConfig, Builder, ModuleConfiguration, OutputKind, Task, DEFAULT_FLAGS_FILENAME,
+    BuildConfig, Builder, FlagVariantKind, ModuleConfiguration, OutputKind, Task,
+    DEFAULT_FLAGS_FILENAME,
 };
+use crate::errors::BuildError;
 use crate::flag_generator::Flag;
 
 fn create_flag_id_pairs_by_task<'a>(
@@ -23,12 +25,12 @@ fn create_flag_id_pairs_by_task<'a>(
         } else {
             id = &task_config.id
         }
-        match stage.flag.kind.as_str() {
-            "user_derived" => {
+        match stage.flag.kind {
+            FlagVariantKind::UserDerived => {
                 let flag = Flag::new_user_flag(
                     id.into(),
-                    &module_config.flag_types.user_derived.algorithm,
-                    &module_config.flag_types.user_derived.secret,
+                    &module_config.flag_config.user_derived.algorithm,
+                    &module_config.flag_config.user_derived.secret,
                     id,
                     &uuid,
                 );
@@ -36,18 +38,18 @@ fn create_flag_id_pairs_by_task<'a>(
                 flags_pairs.insert(flag_key, flag_value);
                 flags.push(flag);
             }
-            "pure_random" => {
+            FlagVariantKind::PureRandom => {
                 let flag =
-                    Flag::new_random_flag(id.into(), module_config.flag_types.pure_random.length);
+                    Flag::new_random_flag(id.into(), module_config.flag_config.pure_random.length);
                 let (flag_key, flag_value) = flag.get_flag_type_value_pair();
                 flags_pairs.insert(flag_key, flag_value);
                 flags.push(flag);
             }
-            "rng_seed" => {
+            FlagVariantKind::RngSeed => {
                 let flag = Flag::new_user_seed_flag(
                     id.into(),
-                    &module_config.flag_types.user_derived.algorithm,
-                    &module_config.flag_types.user_derived.secret,
+                    &module_config.flag_config.user_derived.algorithm,
+                    &module_config.flag_config.user_derived.secret,
                     id,
                     &uuid,
                 );
@@ -55,7 +57,6 @@ fn create_flag_id_pairs_by_task<'a>(
                 flags_pairs.insert(flag_key, flag_value);
                 flags.push(flag);
             }
-            _ => panic!("Invalid flag type"),
         };
     }
     (flags, flags_pairs)
@@ -134,6 +135,7 @@ impl TaskBuildProcessOutput {
             })
             .collect()
     }
+    /// Get readme.txt from the output files
     pub fn get_readme(&self) -> Option<&OutputItem> {
         self.files
             .iter()
@@ -150,13 +152,58 @@ impl TaskBuildProcessOutput {
         }
     }
 }
+/// Verify the build output files and generates absolute paths
+fn verify_build_files(
+    task_config: &Task,
+    builder_output_dir: &Path,
+) -> Result<Vec<OutputItem>, BuildError> {
+    let mut outputs = Vec::with_capacity(task_config.build.output.len());
+
+    for output in &task_config.build.output {
+        let path = match builder_output_dir
+            .join(output.kind.get_filename())
+            .canonicalize()
+        {
+            Ok(p) => {
+                tracing::debug!("Output filepath valid: {}", p.display());
+                p
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to canonicalize build output path for file {}: {}",
+                    &output.kind.get_filename().to_string_lossy(),
+                    e
+                );
+                return Err(BuildError::OutputVerificationFailed(e.to_string()));
+            }
+        };
+        match fs::metadata(&path) {
+            Ok(_) => {
+                tracing::debug!("File exists: {}", path.display());
+                outputs.push(OutputItem::new(output.kind.with_new_path(path)));
+            }
+
+            Err(_) => {
+                tracing::error!("File does not exist: {}", path.display());
+                tracing::error!(
+                    "The file was configured output with '{}' use case",
+                    output.kind.kind()
+                );
+                std::process::exit(1);
+            }
+        }
+    }
+    Ok(outputs)
+}
 
 pub fn build_task(
     module_config: &ModuleConfiguration,
     task_config: &Task,
     uuid: Uuid,
     output_directory: &Path,
-) -> Result<TaskBuildProcessOutput, Box<dyn std::error::Error>> {
+    // If the build is repeated, tells the number, starting from 1
+    build_number: usize,
+) -> Result<TaskBuildProcessOutput, BuildError> {
     let (mut flags, mut build_envs) =
         create_flag_id_pairs_by_task(task_config, module_config, uuid);
 
@@ -185,10 +232,13 @@ pub fn build_task(
             }
             // The process's current working directory is set to be the build directory
             // This means that output directory should relatively referenced based on the CWD of this program
-            build_envs.insert(
-                "OUTPUT_DIR".to_string(),
-                builder_output_dir.to_str().unwrap_or_default().to_string(),
-            );
+            build_envs.extend([
+                (
+                    "OUTPUT_DIR".to_string(),
+                    builder_output_dir.to_str().unwrap_or_default().to_string(),
+                ),
+                ("BUILD_NUMBER".to_string(), build_number.to_string()),
+            ]);
             let output = std::process::Command::new("sh")
                 .arg(&entrypoint.entrypoint)
                 .env_clear()
@@ -207,45 +257,8 @@ pub fn build_task(
                     std::process::exit(1);
                 }
             };
-            let mut outputs = Vec::with_capacity(task_config.build.output.len());
             if output.status.success() {
-                for output in &task_config.build.output {
-                    let path = match builder_output_dir
-                        .join(output.kind.get_filename())
-                        .canonicalize()
-                    {
-                        Ok(p) => {
-                            tracing::debug!(
-                                "Constructed path when checking build output files: {}",
-                                p.display()
-                            );
-                            p
-                        }
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to canonicalize build output path for file {}: {}",
-                                &output.kind.get_filename().to_string_lossy(),
-                                e
-                            );
-                            return Err(Box::new(e));
-                        }
-                    };
-                    match fs::metadata(&path) {
-                        Ok(_) => {
-                            tracing::debug!("File exists: {}", path.display());
-                            outputs.push(OutputItem::new(output.kind.with_new_path(path)));
-                        }
-
-                        Err(_) => {
-                            tracing::error!("File does not exist: {}", path.display());
-                            tracing::error!(
-                                "The file was configured output with '{}' use case",
-                                output.kind.kind()
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-                }
+                let outputs = verify_build_files(task_config, &builder_output_dir)?;
                 // If the task has a seed-based flag, we must capture the resulting flag from the process output
                 // Stored into the file seeded_flags.json, using same key as the passed environment variable
                 for flag in flags.iter_mut() {

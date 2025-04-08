@@ -1,7 +1,7 @@
 use ainigma::{
     build_process::{build_task, TaskBuildProcessOutput},
-    config::{read_check_toml, ConfigError, ModuleConfiguration},
-    errors::CloudStorageError,
+    config::{read_check_toml, ModuleConfiguration},
+    errors::{BuildError, CloudStorageError, ConfigError},
     moodle::create_exam,
     storages::{CloudStorage, FileObjects, S3Storage},
 };
@@ -56,6 +56,16 @@ enum Commands {
         /// Check if the bucket exists
         #[arg(short, long)]
         check_bucket: bool,
+    },
+    /// Designed to deploy the flags for a single challenge
+    /// Generates flags in possible batch mode and runs build just once
+    Deploy {
+        /// The output directory where the build files will be stored. If not set, using temporary directory.
+        /// Must exist and be writable if provided.
+        #[arg(short, long, value_name = "DIRECTORY")]
+        output_dir: Option<PathBuf>,
+        #[command(flatten)]
+        selection: BuildSelection,
     },
 }
 
@@ -190,6 +200,40 @@ impl OutputDirectory {
     }
 }
 
+fn output_dir_selection(output_dir: Option<&PathBuf>) -> Result<OutputDirectory, BuildError> {
+    match output_dir {
+        Some(output_dir) => {
+            if !output_dir.exists() {
+                Err(BuildError::InvalidOutputDirectory(format!(
+                    "The provided output directory does not exist: {}",
+                    output_dir.display()
+                )))?
+            } else if !output_dir.is_dir() {
+                Err(BuildError::InvalidOutputDirectory(format!(
+                    "The provided output directory is not a directory: {}",
+                    output_dir.display()
+                )))?
+            } else {
+                Ok(OutputDirectory::Provided(output_dir.to_path_buf()))
+            }
+        }
+        None => {
+            let temp_dir = match TempDir::new() {
+                Ok(dir) => dir,
+                Err(error) => Err(BuildError::TemporaryDirectoryFail(format!(
+                    "Error when creating a temporal directory {}",
+                    error
+                )))?,
+            };
+            tracing::info!(
+                "No output directory provided, using a temporal directory in path '{}'",
+                temp_dir.path().display()
+            );
+            Ok(OutputDirectory::Temprarory(temp_dir))
+        }
+    }
+}
+
 fn main() -> std::process::ExitCode {
     // Global stdout subscriber for event tracing, defaults to info level
     // let subscriber = tracing_subscriber::FmtSubscriber::new();
@@ -231,40 +275,11 @@ fn main() -> std::process::ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
-                let output_dir: OutputDirectory = match output_dir {
-                    Some(output_dir) => {
-                        if !output_dir.exists() {
-                            tracing::error!(
-                                "The provided output directory did not exist: {}",
-                                output_dir.display()
-                            );
-                            return ExitCode::FAILURE;
-                        } else if !output_dir.is_dir() {
-                            tracing::error!(
-                                "The provided output directory is not a directory: {}",
-                                output_dir.display()
-                            );
-                            return ExitCode::FAILURE;
-                        } else {
-                            OutputDirectory::Provided(output_dir.to_path_buf())
-                        }
-                    }
-                    None => {
-                        let temp_dir = match TempDir::new() {
-                            Ok(dir) => dir,
-                            Err(error) => {
-                                tracing::error!(
-                                    "Error when creating a temporal directory: {}",
-                                    error
-                                );
-                                return ExitCode::FAILURE;
-                            }
-                        };
-                        tracing::info!(
-                            "No output directory provided, using a temporal directory in path '{}'",
-                            temp_dir.path().display()
-                        );
-                        OutputDirectory::Temprarory(temp_dir)
+                let output_dir = match output_dir_selection(output_dir.as_ref()) {
+                    Ok(dir) => dir,
+                    Err(error) => {
+                        tracing::error!("Cannot create output directory: {}", error.to_string());
+                        return ExitCode::FAILURE;
                     }
                 };
 
@@ -363,6 +378,9 @@ fn main() -> std::process::ExitCode {
                 }
                 ExitCode::SUCCESS
             }
+            Commands::Deploy { .. } => {
+                todo!()
+            }
         }
     }
 }
@@ -388,15 +406,15 @@ fn parallel_task_build(
         let course_config = Arc::new(config.clone());
         let task_config = Arc::new(task_config);
         let output_dir = Arc::new(output_dir.to_path_buf());
-        for i in 0..number {
+        for i in 1..=number {
             let courseconf = Arc::clone(&course_config);
             let taskconf = Arc::clone(&task_config);
             let outputs = Arc::clone(&all_outputs);
             let outdir = Arc::clone(&output_dir);
             let handle = thread::spawn(move || {
-                tracing::info!("Starting building the variant {}", i + 1);
+                tracing::info!("Starting building the variant {}", i);
                 let uuid = Uuid::now_v7();
-                let output = build_task(&courseconf, &taskconf, uuid, &outdir);
+                let output = build_task(&courseconf, &taskconf, uuid, &outdir, i);
                 match output {
                     Ok(output) => {
                         outputs
@@ -425,7 +443,7 @@ fn parallel_task_build(
         }
     } else {
         let uuid = Uuid::now_v7();
-        let outputs = build_task(config, &task_config, uuid, output_dir).unwrap();
+        let outputs = build_task(config, &task_config, uuid, output_dir, 1).unwrap();
         all_outputs.lock().unwrap().push(outputs);
         tracing::info!("Task '{}' build succesfully", &task);
     }

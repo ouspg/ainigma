@@ -1,0 +1,29 @@
+identifier = "01920a0e-8c4e-7bbb-80a3-fcae235253ae"
+name = "Cloud and Network security"
+version = "0.0.1"
+
+[[categories]]
+number = 4
+name = "Container security"
+
+[[categories.tasks]]
+id = "task002"
+name = "How does OCI standard work?"
+points = 1.0
+# Just one flag for the tsk
+stages = [
+    { id = "task0021", name = "Jupyter problem", weight = 1, flag = { kind = "pure_random" } },
+]
+
+[categories.tasks.build]
+directory = "ansible"
+# Default entrypoint for shell is "entrypoint.sh"
+builder = { shell = {} }
+disabled_modes = ["sequential"]
+
+[[categories.tasks.build.output]]
+kind = { readme = "readme.txt" }
+
+[flag_config]
+user_derived = { secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" }
+rng_seed = { secret = "You must know me to predict the seed of the other users" }

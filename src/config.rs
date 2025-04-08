@@ -24,10 +24,14 @@ fn random_hex_secret() -> String {
     let mut random_bytes = vec![0u8; 32];
     let mut rng = StdRng::from_os_rng();
     rng.fill_bytes(random_bytes.as_mut_slice());
-    random_bytes
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>()
+    random_bytes.iter().fold(
+        String::with_capacity(random_bytes.len() * 2),
+        |mut acc, b| {
+            use std::fmt::Write;
+            let _ = write!(acc, "{:02x}", b);
+            acc
+        },
+    )
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

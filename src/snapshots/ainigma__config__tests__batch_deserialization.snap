@@ -24,11 +24,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: PureRandom,
                             },
-                            batch: Some(
-                                BatchConfig {
-                                    count: 6,
-                                },
-                            ),
                         },
                     ],
                     build: BuildConfig {
@@ -44,6 +39,16 @@ ModuleConfiguration {
                                     "readme.txt",
                                 ),
                             },
+                            BuildOutputFile {
+                                kind: Resource(
+                                    "reversable.bin",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Resource(
+                                    "encrypted_output.txt",
+                                ),
+                            },
                         ],
                         enabled_modes: NonEmptyBuildModes(
                             [
@@ -51,6 +56,11 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: Some(
+                        BatchConfig {
+                            count: 6,
+                        },
+                    ),
                 },
             ],
             number: 4,

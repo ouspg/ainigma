@@ -30,7 +30,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: UserDerived,
                             },
-                            batch: None,
                         },
                     ],
                     build: BuildConfig {
@@ -53,6 +52,7 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: None,
                 },
             ],
             number: 4,

@@ -32,7 +32,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: UserDerived,
                             },
-                            batch: None,
                         },
                         TaskElement {
                             id: Some(
@@ -50,7 +49,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: PureRandom,
                             },
-                            batch: None,
                         },
                         TaskElement {
                             id: Some(
@@ -68,7 +66,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: RngSeed,
                             },
-                            batch: None,
                         },
                     ],
                     build: BuildConfig {
@@ -106,6 +103,7 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: None,
                 },
                 Task {
                     id: "task002",
@@ -121,7 +119,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: PureRandom,
                             },
-                            batch: None,
                         },
                     ],
                     build: BuildConfig {
@@ -154,6 +151,7 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: None,
                 },
             ],
             number: 1,
@@ -175,7 +173,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: PureRandom,
                             },
-                            batch: None,
                         },
                     ],
                     build: BuildConfig {
@@ -203,6 +200,7 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: None,
                 },
                 Task {
                     id: "task004",
@@ -218,7 +216,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: RngSeed,
                             },
-                            batch: None,
                         },
                     ],
                     build: BuildConfig {
@@ -246,6 +243,7 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: None,
                 },
                 Task {
                     id: "task005",
@@ -261,7 +259,6 @@ ModuleConfiguration {
                             flag: FlagVariant {
                                 kind: PureRandom,
                             },
-                            batch: None,
                         },
                     ],
                     build: BuildConfig {
@@ -284,6 +281,7 @@ ModuleConfiguration {
                             ],
                         ),
                     },
+                    batch: None,
                 },
             ],
             number: 2,

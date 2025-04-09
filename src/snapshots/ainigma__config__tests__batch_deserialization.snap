@@ -17,16 +17,10 @@ ModuleConfiguration {
                     points: 1.0,
                     stages: [
                         TaskElement {
-                            id: Some(
-                                "task0021",
-                            ),
-                            name: Some(
-                                "Find the flag :)",
-                            ),
+                            id: None,
+                            name: None,
                             description: None,
-                            weight: Some(
-                                1,
-                            ),
+                            weight: None,
                             flag: FlagVariant {
                                 kind: PureRandom,
                             },
@@ -38,10 +32,10 @@ ModuleConfiguration {
                         },
                     ],
                     build: BuildConfig {
-                        directory: "ansible",
+                        directory: "tests/tasks/reverse1",
                         builder: Shell(
                             Shell {
-                                entrypoint: "entrypoint.sh",
+                                entrypoint: "custom_entry.sh",
                             },
                         ),
                         output: [

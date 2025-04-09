@@ -1,7 +1,7 @@
 use assert_cmd::Command;
 
 #[test]
-fn cli_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
+fn cli_simple_sequentical_validate() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?;
     Command::cargo_bin("cli")?
         .args([
@@ -15,9 +15,10 @@ fn cli_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
             "-n",
             "5",
         ])
-        .env("RUST_LOG", "debug")
+        .env("RUST_LOG", "error")
         .assert()
         .success();
+
     // Check that tempdir has 5 dirs and validate content of the first dir
     let entries: Vec<_> = std::fs::read_dir(temp_dir.path())?.collect::<Result<_, _>>()?;
     assert_eq!(entries.len(), 5, "Should have 5 directories");

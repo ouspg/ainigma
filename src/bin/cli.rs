@@ -1,5 +1,5 @@
 use ainigma::{
-    build_process::{build_task, TaskBuildProcessOutput},
+    build_process::{build_batch, build_sequential, TaskBuildContainer},
     config::{read_check_toml, ModuleConfiguration, Task},
     errors::{BuildError, CloudStorageError},
     moodle::create_exam,
@@ -102,8 +102,8 @@ enum Moodle {
 
 fn s3_upload(
     config: ModuleConfiguration,
-    files: Vec<TaskBuildProcessOutput>,
-) -> Result<Vec<TaskBuildProcessOutput>, Box<dyn std::error::Error>> {
+    mut container: TaskBuildContainer,
+) -> Result<TaskBuildContainer, Box<dyn std::error::Error>> {
     // Check if the bucket exists
     let storage = S3Storage::from_config(config.deployment.upload.clone());
     let storage = match storage {
@@ -115,7 +115,7 @@ fn s3_upload(
         }
     };
 
-    let mut tasks = Vec::with_capacity(files.len());
+    let mut tasks = Vec::with_capacity(container.outputs.len());
 
     let health = RUNTIME.block_on(async {
         match storage.health_check().await {
@@ -138,17 +138,21 @@ fn s3_upload(
         config.deployment.upload.bucket_name.as_str()
     );
 
-    for mut file in files {
+    for mut file in container.outputs {
+        // TODO batch not supported yet
         let module_nro = config
-            .get_category_number_by_task_id(&file.task_id)
+            .get_category_number_by_task_id(&container.task.id)
             .unwrap_or_else(|| {
-                panic!("Cannot find module number based on task '{}'", file.task_id)
+                panic!(
+                    "Cannot find module number based on task '{}'",
+                    container.task.id
+                )
             });
         let dst_location = format!(
             "category{}/{}/{}",
             module_nro,
-            file.task_id.trim_end_matches("/"),
-            file.uiid
+            container.task.id.trim_end_matches("/"),
+            file.uuid
         );
         let future = async {
             match FileObjects::new(dst_location, file.get_resource_files())
@@ -182,7 +186,8 @@ fn s3_upload(
                 }
             }
             tracing::info!("All {} files uploaded successfully.", files.len());
-            Ok(files)
+            container.outputs = files;
+            Ok(container)
         }
         Err(error) => {
             tracing::error!("Overall file upload process resulted with error: {}", error);
@@ -293,6 +298,29 @@ fn main() -> std::process::ExitCode {
                     }
                 };
 
+                // Fail fast by checking if the task exists first
+                let task_config = match &selection.task {
+                    Some(ref task) => match config.get_task_by_id(task) {
+                        Some(task_config) => task_config,
+                        None => {
+                            tracing::error!("Task ID not found: {task}");
+                            return ExitCode::FAILURE;
+                        }
+                    },
+                    None => {
+                        // For category selections, we don't need task_config yet
+                        // This branch will be handled separately in the outputs match below
+                        // if let Some(_) = selection.category {
+                        return ExitCode::SUCCESS;
+                        // No task_config needed for category build
+                        // }
+                        // // We'll return early if neither task nor category is provided
+                        // else {
+                        //     todo!("Implement category build");
+                        // }
+                    }
+                };
+
                 let outputs = match selection.task {
                     Some(ref task) => {
                         tracing::info!(
@@ -300,14 +328,7 @@ fn main() -> std::process::ExitCode {
                             &task,
                             number
                         );
-                        // Fail fast so check if the task exists already here
-                        let task_config = match config.get_task_by_id(task) {
-                            Some(task_config) => task_config,
-                            None => {
-                                tracing::error!("Task ID not found: {task}");
-                                return ExitCode::FAILURE;
-                            }
-                        };
+                        // We already have task_config from above
                         match parallel_task_build(&config, &task_config, *number, output_dir.path())
                         {
                             Ok(out) => out,
@@ -332,10 +353,9 @@ fn main() -> std::process::ExitCode {
                             Some(ref task) => {
                                 let task_config = config.get_task_by_id(task);
                                 match task_config {
-                                    Some(task_config) => {
-                                        let results = s3_upload(config, outputs).unwrap();
-                                        let _examp =
-                                            create_exam(&task_config, results, category, output);
+                                    Some(_) => {
+                                        let results = s3_upload(config.clone(), outputs).unwrap();
+                                        let _examp = create_exam(results, category, output);
                                     }
                                     None => {
                                         tracing::error!(
@@ -402,23 +422,66 @@ fn main() -> std::process::ExitCode {
                 }
                 ExitCode::SUCCESS
             }
-            Commands::Deploy { .. } => {
-                todo!()
+            Commands::Deploy {
+                output_dir,
+                selection,
+            } => {
+                let output_dir = match output_dir_selection(output_dir.as_ref()) {
+                    Ok(dir) => dir,
+                    Err(error) => {
+                        tracing::error!("Cannot create output directory: {}", error.to_string());
+                        return ExitCode::FAILURE;
+                    }
+                };
+
+                // Fail fast by checking if the task exists first
+                let task_config = match &selection.task {
+                    Some(ref task) => match config.get_task_by_id(task) {
+                        Some(task_config) => task_config,
+                        None => {
+                            tracing::error!("Task ID not found: {task}");
+                            return ExitCode::FAILURE;
+                        }
+                    },
+                    None => {
+                        // For category selections, we don't need task_config yet
+                        // This branch will be handled separately in the outputs match below
+                        // if let Some(_) = selection.category {
+                        return ExitCode::FAILURE;
+                        // No task_config needed for category build
+                        // }
+                        // // We'll return early if neither task nor category is provided
+                        // else {
+                        //     todo!("Implement category build");
+                        // }
+                    }
+                };
+
+                let outputs = match build_batch(&config, &task_config, output_dir.path()) {
+                    Ok(out) => vec![out],
+                    Err(error) => {
+                        tracing::error!("Error when building the task: {}", error);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                dbg!(outputs);
+                ExitCode::SUCCESS
             }
             Commands::Validate { .. } => {
                 println!("{:#?}", config);
+
                 ExitCode::SUCCESS
             }
         }
     }
 }
 
-fn parallel_task_build(
-    config: &ModuleConfiguration,
-    task_config: &Task,
+fn parallel_task_build<'a>(
+    config: &'a ModuleConfiguration,
+    task_config: &'a Task,
     number: usize,
-    output_dir: &Path,
-) -> Result<Vec<TaskBuildProcessOutput>, BuildError> {
+    output_dir: &'a Path,
+) -> Result<TaskBuildContainer<'a>, BuildError> {
     let all_outputs = Arc::new(Mutex::new(Vec::with_capacity(number)));
 
     if number > 1 {
@@ -448,7 +511,7 @@ fn parallel_task_build(
                 tracing::info!("Starting building the variant {}", i);
                 let uuid = Uuid::now_v7();
 
-                match build_task(&courseconf, &taskconf, uuid, &outdir, i) {
+                match build_sequential(&courseconf, &taskconf, uuid, &outdir, i) {
                     Ok(output) => {
                         outputs
                             .lock()
@@ -503,7 +566,7 @@ fn parallel_task_build(
     } else {
         // Single variant case, no threading needed
         let uuid = Uuid::now_v7();
-        match build_task(config, task_config, uuid, output_dir, 1) {
+        match build_sequential(config, task_config, uuid, output_dir, 1) {
             Ok(outputs) => {
                 all_outputs.lock().unwrap().push(outputs);
                 tracing::info!("Task '{}' build successfully", task_config.id);
@@ -519,8 +582,12 @@ fn parallel_task_build(
         .into_inner()
         .expect("Mutex cannot be locked");
 
-    Ok(vec)
+    Ok(TaskBuildContainer::new(
+        output_dir.to_path_buf(),
+        task_config,
+        vec,
+        false,
+    ))
 }
-
 #[cfg(test)]
 mod tests {}

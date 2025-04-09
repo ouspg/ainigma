@@ -1,5 +1,5 @@
-use crate::build_process::TaskBuildProcessOutput;
-use crate::config::{OutputKind, Task};
+use crate::build_process::TaskBuildContainer;
+use crate::config::OutputKind;
 use crate::flag_generator::Flag;
 use itertools::Itertools;
 use moodle_xml::{
@@ -11,14 +11,14 @@ use std::io::{self, BufRead, BufReader};
 
 /// Create an exam from a list of task build process outputs, which includes the question as well
 pub fn create_exam(
-    task_config: &Task,
-    items: Vec<TaskBuildProcessOutput>,
+    items: TaskBuildContainer,
     category: &str,
     filename: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut questions: Vec<QuestionType> = Vec::with_capacity(items.len());
+    let mut questions: Vec<QuestionType> = Vec::with_capacity(items.outputs.len());
 
-    for item in items {
+    for item in items.outputs {
+        // TODO batch not supported yet
         let instructions = item.get_readme();
         match instructions {
             Some(instructions) => {
@@ -33,8 +33,10 @@ pub fn create_exam(
                     "<div style=\"display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;\">"
                         .to_string(),
                 );
-                for link in item.files {
-                    if let (OutputKind::Resource(resource), Some(link)) = (link.kind, link.link) {
+                for link in &item.outputs {
+                    if let (OutputKind::Resource(ref resource), Some(ref link)) =
+                        (&link.kind, &link.link)
+                    {
                         lines.push(format!(
                             "<a href=\"{}\" target=\"_blank\" class=\"btn btn-primary\">{}</a>",
                             link,
@@ -50,10 +52,10 @@ pub fn create_exam(
 
                 let instructions_string = lines.join("\n");
                 let mut question =
-                    ShortAnswerQuestion::new(task_config.name.clone(), instructions_string, None);
-                let answers = if item.flags.len() == 1 {
+                    ShortAnswerQuestion::new(items.task.name.clone(), instructions_string, None);
+                let answers = if item.stage_flags.len() == 1 {
                     // Unknown flag, task build process has created this one
-                    if let Flag::UserSeedFlag(flag) = &item.flags[0] {
+                    if let Flag::RngSeed(flag) = &item.stage_flags[0] {
                         vec![Answer::new(
                             100,
                             flag.value().to_string(),
@@ -63,19 +65,19 @@ pub fn create_exam(
                         vec![
                             Answer::new(
                                 100,
-                                item.flags[0].encase_flag(),
+                                item.stage_flags[0].encase_flag(),
                                 "Correct!".to_string().into(),
                             ),
                             Answer::new(
                                 100,
-                                item.flags[0].flag_string(),
+                                item.stage_flags[0].flag_string(),
                                 "Correct!".to_string().into(),
                             ),
                         ]
                     }
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
-                    process_multiple_flags(item.flags.clone(), " ")
+                    process_multiple_flags(item.stage_flags.clone(), " ")
                 };
                 question
                     .add_answers(answers)
@@ -100,7 +102,7 @@ fn encase_each_flag(flags: &[Flag], separator: &str) -> String {
     flags
         .iter()
         .map(|f| {
-            if let Flag::UserSeedFlag(flag) = f {
+            if let Flag::RngSeed(flag) = f {
                 flag.value().to_string()
             } else {
                 f.encase_flag()

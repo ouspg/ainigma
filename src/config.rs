@@ -13,12 +13,14 @@ use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
 const DEFAULT_SH_FILENAME: &str = "entrypoint.sh";
+
 const DEFAULT_BUILD_TIMEOUT: u32 = 300;
 const DEFAULT_FILE_EXPIRATION: u32 = 31;
 const DEFAULT_LINK_EXPIRATION: u32 = 7;
 const DEFAULT_RANDOM_FLAG_LENGTH: u8 = 32;
 
 pub(crate) const DEFAULT_FLAGS_FILENAME: &str = "flags.json";
+pub(crate) const DEFAULT_BUILD_MANIFEST: &str = "build-manifest.json";
 
 fn random_hex_secret() -> String {
     let mut random_bytes = vec![0u8; 32];
@@ -88,6 +90,16 @@ impl ModuleConfiguration {
         }
         None
     }
+    pub fn get_category_by_task_id(&self, id: &str) -> Option<&Category> {
+        for category in &self.categories {
+            for task in &category.tasks {
+                if task.id == id {
+                    return Some(category);
+                }
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -116,6 +128,7 @@ pub struct Task {
     pub points: f32,
     pub stages: Vec<TaskElement>,
     pub build: BuildConfig,
+    pub batch: Option<BatchConfig>,
 }
 
 impl Task {
@@ -126,6 +139,7 @@ impl Task {
         points: f32,
         stages: Vec<TaskElement>,
         build: BuildConfig,
+        batch: Option<BatchConfig>,
     ) -> Task {
         Task {
             id,
@@ -134,6 +148,7 @@ impl Task {
             points,
             stages,
             build,
+            batch,
         }
     }
     /// Gets all task IDs for a task, including possible subtasks in `stages`
@@ -234,7 +249,6 @@ pub struct TaskElement {
     pub description: Option<String>,
     pub weight: Option<u8>,
     pub flag: FlagVariant,
-    pub batch: Option<BatchConfig>,
 }
 
 impl TaskElement {
@@ -244,7 +258,6 @@ impl TaskElement {
         description: Option<String>,
         weight: Option<u8>,
         flag: FlagVariant,
-        batch: Option<BatchConfig>,
     ) -> TaskElement {
         TaskElement {
             id,
@@ -252,7 +265,6 @@ impl TaskElement {
             description,
             weight,
             flag,
-            batch,
         }
     }
 }
@@ -605,22 +617,28 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
         return Err(ConfigError::TaskPointError);
     }
     if task.stages.is_empty() {
-        return Err(ConfigError::SubTaskCountError);
+        return Err(ConfigError::StageError("Empty stage"));
     }
 
     for part in &task.stages {
         if task.stages.len() > 1 {
             if part.id.is_none() {
-                return Err(ConfigError::SubTaskCountError);
+                return Err(ConfigError::StageError(
+                    "ID cannot be empty if you have more than one stages.",
+                ));
             }
             if let Some(id) = &part.id {
                 if !id.to_lowercase().starts_with(&task.id.to_lowercase()) {
-                    return Err(ConfigError::SubTaskIdMatchError);
+                    return Err(ConfigError::StageError(
+                        "Stage ID must be prefixed with task ID",
+                    ));
                 }
             }
         } else if part.id.is_some() {
             // Single element in parts, id must be none
-            return Err(ConfigError::SubTaskCountError);
+            return Err(ConfigError::StageError(
+                "You cannot have ID for stage when you have just one stage.",
+            ));
         }
     }
 
@@ -632,7 +650,7 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
             .iter()
             .all(|item| set.insert(item.id.as_ref().unwrap()))
         {
-            return Err(ConfigError::SubTaskCountError);
+            return Err(ConfigError::StageError("Stages must have unique id!"));
         }
 
         let all_names_are_non_empty = &task
@@ -640,23 +658,19 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
             .iter()
             .all(|s| !s.name.as_ref().unwrap_or(&"".to_string()).is_empty());
         if !all_names_are_non_empty {
-            return Err(ConfigError::SubTaskNameError);
+            return Err(ConfigError::StageError("Each stage must have name!"));
         }
     } else {
-        // id, name, description, weight must be none if just one element in parts
-        if task.stages[0].id.is_some() {
-            return Err(ConfigError::SubTaskCountError);
-        }
-        if task.stages[0].name.is_some() {
-            return Err(ConfigError::SubTaskNameError);
-        }
-        if task.stages[0].description.is_some() {
-            // TODO change error message
-            return Err(ConfigError::SubTaskNameError);
-        }
-        if task.stages[0].weight.is_some() {
-            // TODO change error message
-            return Err(ConfigError::SubTaskNameError);
+        // Check that metadata fields are not present for single-stage tasks
+        let stage = &task.stages[0];
+        if stage.id.is_some()
+            || stage.name.is_some()
+            || stage.description.is_some()
+            || stage.weight.is_some()
+        {
+            return Err(ConfigError::StageError(
+                "Single-stage tasks should not have ID, name, description, or weight specified",
+            ));
         }
     }
 

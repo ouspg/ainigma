@@ -10,19 +10,24 @@ name = "Container security"
 id = "task002"
 name = "How do containers work?"
 points = 1.0
+# repetition abstraction where the innermost taskbuilder is supposed to be run only once
+# But we still need `count` amount of variants for the task
+batch = { count = 6 }
 # Just one flag for the task
-stages = [
-    { id = "task0021", name = "Find the flag :)", weight = 1, flag = { kind = "pure_random" }, batch = { count = 6 } },
-]
+stages = [{ flag = { kind = "pure_random" } }]
 
 [categories.tasks.build]
-directory = "ansible"
-builder = { shell = {} }
+directory = "tests/tasks/reverse1"
+builder = { shell = { entrypoint = "custom_entry.sh" } }
 enabled_modes = ["batch"]
 
 
 [[categories.tasks.build.output]]
 kind = { readme = "readme.txt" }
+[[categories.tasks.build.output]]
+kind = { resource = "reversable.bin" }
+[[categories.tasks.build.output]]
+kind = { resource = "encrypted_output.txt" }
 
 # For deterministic tests, one needs to define secrets
 [flag_config]

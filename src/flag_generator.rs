@@ -36,11 +36,13 @@ pub enum Algorithm {
 /// - `user_flag()` - `UserDerivedFlag` generator
 /// - `flag_string()` - returns Flag as a one string
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum Flag {
     RngFlag(FlagUnit),
-    UserSeedFlag(FlagUnit),
+    RngSeed(FlagUnit),
     UserDerivedFlag(FlagUnit),
 }
+
 impl Flag {
     /// Generates a random hexstring flag with given prefix and lenght
     pub fn new_random_flag(prefix: String, length: u8) -> Self {
@@ -58,15 +60,15 @@ impl Flag {
             identifier, algorithm, secret, taskid, uuid,
         ))
     }
-    /// Generates a random hexstring flag with given prefix and user id (UUID)
-    pub fn new_user_seed_flag(
+    /// Generates a random hexstring flag with given prefix and user id (UUID), given as RNG seed for the builders
+    pub fn new_rng_seed(
         identifier: String,
         algorithm: &Algorithm,
         secret: &str,
         taskid: &str,
         uuid: &Uuid,
     ) -> Self {
-        Flag::UserSeedFlag(FlagUnit::user_flag(
+        Flag::RngSeed(FlagUnit::user_flag(
             identifier, algorithm, secret, taskid, uuid,
         ))
     }
@@ -74,7 +76,7 @@ impl Flag {
     pub fn flag_string(&self) -> String {
         match self {
             Flag::RngFlag(rngflag) => rngflag.return_flag().trim().to_string(),
-            Flag::UserSeedFlag(userseedflag) => userseedflag.return_flag().trim().to_string(),
+            Flag::RngSeed(userseedflag) => userseedflag.return_flag().trim().to_string(),
             Flag::UserDerivedFlag(userflag) => userflag.return_flag().trim().to_string(),
         }
     }
@@ -85,7 +87,7 @@ impl Flag {
     pub fn get_identifier(&self) -> &str {
         match self {
             Flag::RngFlag(rngflag) => rngflag.identifier.as_str(),
-            Flag::UserSeedFlag(userseedflag) => userseedflag.identifier.as_str(),
+            Flag::RngSeed(userseedflag) => userseedflag.identifier.as_str(),
             Flag::UserDerivedFlag(userflag) => userflag.identifier.as_str(),
         }
     }
@@ -96,8 +98,8 @@ impl Flag {
                 let flag_key = format!("FLAG_PURE_RANDOM_{}", rngflag.identifier.to_uppercase());
                 (flag_key, self.flag_string())
             }
-            Flag::UserSeedFlag(userseedflag) => {
-                let flag_key = format!("FLAG_USER_SEED_{}", userseedflag.identifier.to_uppercase());
+            Flag::RngSeed(userseedflag) => {
+                let flag_key = format!("FLAG_RNG_SEED_{}", userseedflag.identifier.to_uppercase());
                 (flag_key, self.flag_string())
             }
             Flag::UserDerivedFlag(userflag) => {
@@ -267,7 +269,7 @@ mod tests {
         let prefix3 = "task1".to_string();
         let flag = Flag::new_random_flag(prefix, 32);
         let flag2 = Flag::new_user_flag(prefix2, &Algorithm::HMAC_SHA3_256, "This works", "A", &id);
-        let flag3 = Flag::new_user_seed_flag(
+        let flag3 = Flag::new_rng_seed(
             prefix3,
             &Algorithm::HMAC_SHA3_256,
             "this also works",

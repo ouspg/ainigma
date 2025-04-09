@@ -1,9 +1,15 @@
 #!/bin/sh
 
 # Exit on fail
-set -e
-
+set -euo pipefail
 echo "Building very simple bash script..."
+# Use jq to extract each flag from JSON (assumes JSON field 'flags' is an array)
+# Safe index when no batching
+# Builder always provides the BUILD_MANIFEST
+FLAG=$(jq -r '.flags[0].stage_flags[0].user_derived.suffix' "$BUILD_MANIFEST")
+OUTPUT_DIR="$(jq -r '.out_dir' "$BUILD_MANIFEST")"
+
+echo $OUTPUT_DIR > nice.txt
 
 # Create the script
 # OUTPUT_DIR is provided by the builder and we must use it
@@ -12,9 +18,9 @@ cat << EOF > $OUTPUT_DIR/secret.sh
 #!/bin/bash
 
 # The flag is now hardcoded in the script
-FLAG="$FLAG_PURE_RANDOM_task005"
+FLAG="$FLAG"
 
-echo "The flag is: \$FLAG"
+echo "The flag is: \flag{$FLAG}"
 EOF
 
 # Make the inner script executable

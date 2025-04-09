@@ -26,14 +26,8 @@ pub enum ConfigError {
     FlagTypeError,
     #[error("Duplicate flag ID detected - each flag must have a unique identifier")]
     FlagCountError,
-    #[error("Duplicate subtask ID detected - each subtask must have a unique identifier")]
-    SubTaskCountError,
-    #[error("Subtask ID must begin with its parent task ID as a prefix")]
-    SubTaskIdMatchError,
-    #[error("Task point total must match the sum of its subtask points")]
-    SubTaskPointError,
-    #[error("Subtask name is required and cannot be empty")]
-    SubTaskNameError,
+    #[error("Stage incorrectly configured: {0}")]
+    StageError(&'static str),
     #[error("Invalid build mode '{0}'. Available modes: [{1}]")]
     BuildModeError(String, String),
 }

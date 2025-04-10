@@ -2,7 +2,7 @@
 # Script that uses batch build
 #
 #
-set -euo pipefail
+set -e
 
 # Use jq to extract each flag item from JSON (assumes JSON field 'flags' is an array of objects)
 # Builder always provides the BUILD_MANIFEST

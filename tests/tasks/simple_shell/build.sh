@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Exit on fail
-set -euo pipefail
+set -e
 echo "Building very simple bash script..."
 # Use jq to extract each flag from JSON (assumes JSON field 'flags' is an array)
 # Safe index when no batching

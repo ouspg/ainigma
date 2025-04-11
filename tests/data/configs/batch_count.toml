@@ -1,18 +1,18 @@
 identifier = "01920a0e-8c4e-7bbb-80a3-fcae235253ae"
-name = "Something about the cloud security"
+name = "Softaware security"
 version = "0.0.1"
 
 [[categories]]
 number = 4
-name = "Container security"
+name = "Reverse engineering"
 
 [[categories.tasks]]
 id = "task002"
-name = "How do containers work?"
+name = "Basics of reverse engineering"
 points = 1.0
 # repetition abstraction where the innermost taskbuilder is supposed to be run only once
 # But we still need `count` amount of variants for the task
-batch = { count = 5 }
+batch = { count = 3 }
 # Just one flag for the task
 stages = [{ flag = { kind = "pure_random" } }]
 

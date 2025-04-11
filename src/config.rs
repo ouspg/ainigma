@@ -70,11 +70,11 @@ impl ModuleConfiguration {
             deployment,
         }
     }
-    pub fn get_task_by_id(&self, id: &str) -> Option<Task> {
+    pub fn get_task_by_id(&self, id: &str) -> Option<&Task> {
         for category in &self.categories {
             for task in &category.tasks {
                 if task.id == id {
-                    return Some(task.clone());
+                    return Some(task);
                 }
             }
         }

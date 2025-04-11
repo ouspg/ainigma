@@ -61,6 +61,12 @@ impl TaskBuildContainer<'_> {
         }
         Ok(())
     }
+    /// Check if the task has any files to distribute other than the readme.txt. Defined by the existence of `OutputKind::Resource`.
+    pub fn has_files_to_distribute(&self) -> bool {
+        self.outputs
+            .iter()
+            .any(|intermediate| !intermediate.get_resource_files().is_empty())
+    }
 }
 
 // All flags in a single task's stages

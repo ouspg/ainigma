@@ -35,7 +35,7 @@ fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Entries: {:?}", entries);
 
-    assert_eq!(entries.len(), 5, "Should have 5 directories");
+    assert_eq!(entries.len(), 3, "Should have 5 directories");
 
     // test just one randomly
     let uid_dir = &entries[0];

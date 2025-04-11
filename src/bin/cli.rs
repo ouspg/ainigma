@@ -1,9 +1,9 @@
 use ainigma::{
     build_process::{build_batch, build_sequential, TaskBuildContainer},
     config::{read_check_toml, ModuleConfiguration, Task},
-    errors::{BuildError, CloudStorageError},
+    errors::BuildError,
     moodle::create_exam,
-    storages::{CloudStorage, FileObjects, S3Storage},
+    storages::s3_upload,
 };
 use clap::{crate_description, Args, Parser, Subcommand};
 use once_cell::sync::Lazy;
@@ -92,109 +92,15 @@ struct BuildSelection {
 #[derive(Debug, Subcommand)]
 enum Moodle {
     Moodle {
+        /// Disable automatic upload to the cloud storage
+        #[arg(short, long, default_value_t = false)]
+        disable_upload: bool,
         #[arg(short, long)]
         category: String,
         /// Output file name
         #[arg(short, long, default_value = "quiz.xml")]
         output: String,
     },
-}
-
-fn s3_upload(
-    config: ModuleConfiguration,
-    mut container: TaskBuildContainer,
-) -> Result<TaskBuildContainer, Box<dyn std::error::Error>> {
-    // Check if the bucket exists
-    let storage = S3Storage::from_config(config.deployment.upload.clone());
-    let storage = match storage {
-        Ok(storage) => storage,
-        Err(error) => {
-            tracing::error!("Error when creating the S3 storage: {}", error);
-            tracing::error!("Cannot continue with the file upload.");
-            return Err(error);
-        }
-    };
-
-    let mut tasks = Vec::with_capacity(container.outputs.len());
-
-    let health = RUNTIME.block_on(async {
-        match storage.health_check().await {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                tracing::error!("Error when checking the health of the storage: {}", error);
-                Err(error)
-            }
-        }
-    });
-    match health {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::error!("Cannot continue with the file upload.");
-            return Err(e.into());
-        }
-    }
-    tracing::info!(
-        "Strating the file upload into the bucket: {}",
-        config.deployment.upload.bucket_name.as_str()
-    );
-
-    for mut file in container.outputs {
-        // TODO batch not supported yet
-        let module_nro = config
-            .get_category_number_by_task_id(&container.task.id)
-            .unwrap_or_else(|| {
-                panic!(
-                    "Cannot find module number based on task '{}'",
-                    container.task.id
-                )
-            });
-        let dst_location = format!(
-            "category{}/{}/{}",
-            module_nro,
-            container.task.id.trim_end_matches("/"),
-            file.uuid
-        );
-        let future = async {
-            match FileObjects::new(dst_location, file.get_resource_files())
-                .map_err(CloudStorageError::FileObjectError)
-            {
-                Ok(files) => {
-                    let items = storage
-                        .upload(files, config.deployment.upload.use_pre_signed)
-                        .await?;
-                    file.update_files(items);
-                    Ok(file)
-                }
-                Err(error) => {
-                    tracing::error!("Error when creating the file objects: {}", error);
-                    Err(error)
-                }
-            }
-        };
-        tasks.push(future);
-    }
-    let result = RUNTIME.block_on(async { futures::future::try_join_all(tasks).await });
-    match result {
-        Ok(files) => {
-            if !config.deployment.upload.use_pre_signed {
-                let result = RUNTIME.block_on(async { storage.set_public_access().await });
-                match result {
-                    Ok(_) => {}
-                    Err(error) => {
-                        tracing::error!("Error when setting the public access: {}", error);
-                    }
-                }
-            }
-            tracing::info!("All {} files uploaded successfully.", files.len());
-            container.outputs = files;
-            Ok(container)
-        }
-        Err(error) => {
-            tracing::error!("Overall file upload process resulted with error: {}", error);
-            tracing::error!("There is a chance that you are rate limited by the cloud storage. Please try again later.");
-            Err(error.into())
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -241,6 +147,33 @@ fn output_dir_selection(output_dir: Option<&PathBuf>) -> Result<OutputDirectory,
                 temp_dir.path().display()
             );
             Ok(OutputDirectory::Temprarory(temp_dir))
+        }
+    }
+}
+
+struct ValidatedBuildInfo<'a> {
+    task_config: &'a Task,
+    task_id: Option<String>,
+}
+
+fn validate_build_selection<'a>(
+    config: &'a ModuleConfiguration,
+    selection: &'a BuildSelection,
+) -> Result<ValidatedBuildInfo<'a>, ExitCode> {
+    match &selection.task {
+        Some(task) => match config.get_task_by_id(task) {
+            Some(task_config) => Ok(ValidatedBuildInfo {
+                task_config,
+                task_id: Some(task.clone()),
+            }),
+            None => {
+                tracing::error!("Task ID not found: {task}");
+                Err(ExitCode::FAILURE)
+            }
+        },
+        None => {
+            tracing::error!("Categories are not supported yet.");
+            Err(ExitCode::FAILURE)
         }
     }
 }
@@ -298,91 +231,61 @@ fn main() -> std::process::ExitCode {
                     }
                 };
 
-                // Fail fast by checking if the task exists first
-                let task_config = match &selection.task {
-                    Some(ref task) => match config.get_task_by_id(task) {
-                        Some(task_config) => task_config,
-                        None => {
-                            tracing::error!("Task ID not found: {task}");
+                // Single validation point for task/category selection
+                let validated = match validate_build_selection(&config, selection) {
+                    Ok(info) => info,
+                    Err(code) => return code,
+                };
+
+                let outputs = if validated.task_config.batch.is_some() {
+                    tracing::info!(
+                        "Batch mode is enabled for the task '{}', ignoring possible passed variance counts",
+                        validated.task_id.as_ref().unwrap()
+                    );
+                    match build_batch(&config, validated.task_config, output_dir.path()) {
+                        Ok(out) => out,
+                        Err(error) => {
+                            tracing::error!(
+                                "Error when building the task in batch mode: {}",
+                                error
+                            );
                             return ExitCode::FAILURE;
                         }
-                    },
-                    None => {
-                        tracing::error!("Categories are not supported yet.");
-                        return ExitCode::FAILURE;
-                        //
+                    }
+                } else {
+                    tracing::info!(
+                        "Building the task '{}' with the variation count {}",
+                        validated.task_id.as_ref().unwrap(),
+                        number
+                    );
+                    match parallel_task_build(
+                        &config,
+                        validated.task_config,
+                        *number,
+                        output_dir.path(),
+                    ) {
+                        Ok(out) => out,
+                        Err(error) => {
+                            tracing::error!("Error when building the task: {}", error);
+                            return ExitCode::FAILURE;
+                        }
                     }
                 };
 
-                let outputs = match selection.task {
-                    Some(ref task) => {
-                        if task_config.batch.is_some() {
-                            tracing::info!("Batch mode is enabled for the task '{}', ignoring possible passed variance counts", task);
-                            match build_batch(&config, &task_config, output_dir.path()) {
-                                Ok(out) => out,
-                                Err(error) => {
-                                    tracing::error!(
-                                        "Error when building the task in batch mode: {}",
-                                        error
-                                    );
-                                    return ExitCode::FAILURE;
-                                }
-                            }
-                        } else {
-                            tracing::info!(
-                                "Building the task '{}' with the variation count {}",
-                                &task,
-                                number
-                            );
-                            // We already have task_config from above
-                            match parallel_task_build(
-                                &config,
-                                &task_config,
-                                *number,
-                                output_dir.path(),
-                            ) {
-                                Ok(out) => out,
-                                Err(error) => {
-                                    tracing::error!("Error when building the task: {}", error);
-                                    return ExitCode::FAILURE;
-                                }
-                            }
-                        }
-                    }
-                    None => match selection.category {
-                        Some(_category) => {
-                            todo!("Implement category build");
-                        }
-                        None => {
-                            todo!("Implement category build");
-                        }
-                    },
-                };
                 match moodle {
                     Some(cmd_moodle) => match cmd_moodle {
-                        Moodle::Moodle { category, output } => match selection.task {
-                            Some(ref task) => {
-                                let task_config = config.get_task_by_id(task);
-                                match task_config {
-                                    Some(_) => {
-                                        let results = s3_upload(config.clone(), outputs).unwrap();
-                                        let _examp = create_exam(results, category, output);
-                                    }
-                                    None => {
-                                        tracing::error!(
-                                            "Task identifier {} not found from the module configuration when generating the Moodle exam.", task
-                                        );
-                                        return ExitCode::FAILURE;
-                                    }
-                                }
-                            }
-                            None => {
-                                tracing::error!(
-                                    "Task must be specified when generating the Moodle exam."
-                                );
-                                return ExitCode::FAILURE;
-                            }
-                        },
+                        Moodle::Moodle {
+                            category,
+                            output,
+                            disable_upload,
+                        } => {
+                            let results = if outputs.has_files_to_distribute() & !disable_upload {
+                                s3_upload(&config, outputs, &RUNTIME).unwrap()
+                            } else {
+                                outputs
+                            };
+                            let _exam = create_exam(results, category, output);
+                        }
                     },
                     None => {
                         match output_dir {
@@ -404,7 +307,7 @@ fn main() -> std::process::ExitCode {
                     }
                 }
                 // Ensure that possible temporal directory is removed at this point, not earlier
-                drop(output_dir);
+                // drop(output_dir);
                 ExitCode::SUCCESS
             }
             Commands::Upload { check_bucket } => {

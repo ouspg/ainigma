@@ -4,7 +4,7 @@ expression: result
 ---
 ModuleConfiguration {
     identifier: 01920a0e-8c4e-7bbb-80a3-fcae235253ae,
-    name: "Something about the cloud security",
+    name: "Softaware security",
     description: "",
     version: "0.0.1",
     categories: [
@@ -12,7 +12,7 @@ ModuleConfiguration {
             tasks: [
                 Task {
                     id: "task002",
-                    name: "How do containers work?",
+                    name: "Basics of reverse engineering",
                     description: "",
                     points: 1.0,
                     stages: [
@@ -58,13 +58,13 @@ ModuleConfiguration {
                     },
                     batch: Some(
                         BatchConfig {
-                            count: 5,
+                            count: 3,
                         },
                     ),
                 },
             ],
             number: 4,
-            name: "Container security",
+            name: "Reverse engineering",
         },
     ],
     flag_config: FlagConfig {

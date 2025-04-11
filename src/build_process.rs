@@ -14,7 +14,7 @@ use crate::flag_generator::Flag;
 /// Represents the build process of a task, including the initial configuration and produced output files and flags.
 #[derive(serde::Serialize, Debug)]
 pub struct TaskBuildContainer<'a> {
-    pub out_dir_base: PathBuf,
+    pub basedir: PathBuf,
     pub task: &'a Task,
     /// For batch mode, this is > 1, for a sequential build, this is 1
     pub outputs: Vec<IntermediateOutput>,
@@ -28,7 +28,7 @@ impl<'a> TaskBuildContainer<'a> {
         batched: bool,
     ) -> Self {
         Self {
-            out_dir_base: out_dir,
+            basedir: out_dir,
             task,
             outputs,
             batched,
@@ -242,14 +242,16 @@ fn verify_output_dir(
 }
 
 fn run_subprocess(
-    entrypoint: &str,
+    program: &str,
+    args: Vec<&str>,
     build_manifest: &mut TaskBuildContainer,
     build_envs: HashMap<String, String>,
 ) -> Result<(), BuildError> {
-    let output = std::process::Command::new("sh")
-        .arg(entrypoint)
-        .env_clear()
-        .envs(build_envs)
+    tracing::debug!("Running subprocess: {} with args: {:?}", program, args);
+
+    let output = std::process::Command::new(program)
+        .args(args)
+        .envs(build_envs) // Use merged environment instead of env_clear()
         .current_dir(&build_manifest.task.build.directory)
         .output();
 
@@ -269,7 +271,7 @@ fn run_subprocess(
         // Stored into the file flags.json by default, using same key as the passed environment variable
         map_rng_seed_to_flag(
             &mut build_manifest.outputs,
-            &build_manifest.out_dir_base,
+            &build_manifest.basedir,
             build_manifest.task,
         )?;
 
@@ -339,7 +341,7 @@ pub fn build_batch<'a>(
     }
     // PANICS: We are creating the file in the output directory, which is guaranteed to exist (unless someone removed it between check and this point)
     let mut build_manifest = TaskBuildContainer {
-        out_dir_base: builder_output_dir,
+        basedir: builder_output_dir,
         task: task_config,
         outputs: entries,
         batched: true,
@@ -352,17 +354,38 @@ pub fn build_batch<'a>(
         return Ok(build_manifest);
     }
 
-    let build_envs = HashMap::from([(
+    let mut build_envs = HashMap::from([(
         "BUILD_MANIFEST".to_string(),
         json_path.to_str().unwrap_or_default().to_string(),
     )]);
+    let (program, program_args) = match task_config.build.builder {
+        Builder::Shell(ref entrypoint) => ("sh", vec![entrypoint.entrypoint.as_str()]),
+        Builder::Nix(ref entrypoint) => {
+            // For nix to work, we need to set the environment variables
+            let mut preserved_env = HashMap::new();
+            let env_vars_to_preserve = [
+                "PATH",
+                "NIX_PATH",
+                "NIX_PROFILES",
+                "NIX_SSL_CERT_FILE",
+                "NIX_STORE",
+                "NIX_REMOTE",
+                "NIX_USER_PROFILE_DIR",
+            ];
 
-    match task_config.build.builder {
-        Builder::Shell(ref entrypoint) => {
-            run_subprocess(&entrypoint.entrypoint, &mut build_manifest, build_envs)?
+            for var in &env_vars_to_preserve {
+                if let Ok(value) = std::env::var(var) {
+                    preserved_env.insert(var.to_string(), value);
+                }
+            }
+            let final_env = preserved_env;
+            build_envs.extend(final_env);
+
+            ("nix", vec!["run", ".", &entrypoint.entrypoint])
         }
-        Builder::Nix(_) => todo!("Nix builder not implemented"),
-    }
+    };
+
+    run_subprocess(program, program_args, &mut build_manifest, build_envs)?;
 
     Ok(build_manifest)
 }
@@ -456,7 +479,7 @@ pub fn build_sequential<'a>(
         intermediate.task_instance_dir.join(DEFAULT_BUILD_MANIFEST)
     };
     let mut build_manifest = TaskBuildContainer {
-        out_dir_base: output_directory.to_path_buf(),
+        basedir: output_directory.to_path_buf(),
         task: task_config,
         outputs: vec![intermediate],
         batched: false,
@@ -482,7 +505,12 @@ pub fn build_sequential<'a>(
                 &task_config.build.directory.display()
             );
 
-            run_subprocess(&entrypoint.entrypoint, &mut build_manifest, build_envs)?
+            run_subprocess(
+                "sh",
+                vec![&entrypoint.entrypoint],
+                &mut build_manifest,
+                build_envs,
+            )?
         }
         Builder::Nix(_) => todo!("Nix builder not implemented"),
     }

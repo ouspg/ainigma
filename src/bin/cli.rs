@@ -1,18 +1,18 @@
 use ainigma::{
-    build_process::{build_batch, build_sequential, TaskBuildContainer},
-    config::{read_check_toml, ModuleConfiguration, Task, DEFAULT_BUILD_MANIFEST},
+    build_process::{TaskBuildContainer, build_batch, build_sequential},
+    config::{DEFAULT_BUILD_MANIFEST, ModuleConfiguration, Task, read_check_toml},
     errors::BuildError,
     moodle::create_exam,
     storages::s3_upload,
 };
-use clap::{crate_description, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, crate_description};
 use once_cell::sync::Lazy;
 use std::{
     path::{Path, PathBuf},
     process::ExitCode,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     thread,
 };
@@ -29,7 +29,8 @@ static RUNTIME: Lazy<Runtime> =
 #[derive(Parser, Debug)]
 #[command(name = "aínigma", version , about = "CLI for aínigma", long_about = crate_description!(), arg_required_else_help = true)]
 pub struct OptsRoot {
-    #[arg(short, long, value_name = "FILE")]
+    /// Path to the configuration file
+    #[arg(short, long, value_name = "FILE", default_value = "ainigma.toml")]
     config: PathBuf,
     #[command(subcommand)]
     command: Commands,
@@ -62,11 +63,9 @@ enum Commands {
     },
     /// Check if the configuration has correct syntax and pretty print it
     Validate {
-        // Check if the bucket exists
-        // #[arg(long, action = clap::ArgAction::SetTrue)]
-        // check_bucket: bool,
-        #[command(flatten)]
-        selection: BuildSelection,
+        /// Validation supports validating only one task at a time
+        #[arg(short, long, value_name = "IDENTIFIER")]
+        task: String,
     },
     /// Designed to deploy the flags for a single challenge
     /// Generates flags in possible batch mode and runs build just once
@@ -342,7 +341,7 @@ fn main() -> std::process::ExitCode {
                 tracing::error!("Deploy command is not implemented yet.");
                 ExitCode::FAILURE
             }
-            Commands::Validate { selection } => {
+            Commands::Validate { task } => {
                 tracing::info!("Validating the configuration file...");
                 println!("{:#?}", config);
                 tracing::info!(
@@ -351,9 +350,13 @@ fn main() -> std::process::ExitCode {
                 );
                 let cwd_dir = std::env::current_dir().unwrap();
                 let tempdir = tempfile::tempdir().expect("Failed to create a temporary file");
+                let selection = BuildSelection {
+                    task: Some(task.clone()),
+                    category: None,
+                };
 
                 // Single validation point for task/category selection
-                let validated = match validate_build_selection(&config, selection) {
+                let validated = match validate_build_selection(&config, &selection) {
                     Ok(info) => info,
                     Err(code) => return code,
                 };
@@ -406,9 +409,9 @@ fn main() -> std::process::ExitCode {
                     .expect("Failed to copy the manifest file to the current directory");
 
                 tracing::info!(
-                    "To see the contents of generated '{}', run `jq . {}",
+                    "To see the contents of the generated '{}', run 'jq . {}'",
                     DEFAULT_BUILD_MANIFEST,
-                    manifest_path.display()
+                    cwd_dir.join(DEFAULT_BUILD_MANIFEST).display()
                 );
                 drop(tempdir);
 

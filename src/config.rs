@@ -344,6 +344,8 @@ where
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BuildConfig {
+    /// Directory where the build will be executed and source files are located
+    #[serde(default = "BuildConfig::default_directory")]
     pub directory: std::path::PathBuf,
     pub builder: Builder,
     pub output: Vec<BuildOutputFile>,
@@ -373,6 +375,9 @@ impl BuildConfig {
     }
     pub fn is_feature_enabled(&self, feature: BuildMode) -> bool {
         self.enabled_modes.contains(&feature)
+    }
+    fn default_directory() -> std::path::PathBuf {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
     }
 }
 

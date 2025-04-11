@@ -44,7 +44,6 @@ impl TaskBuildContainer<'_> {
                 let pre_cano = &intermediate
                     .task_instance_dir
                     .join(item.kind.get_filename());
-                println!("Pre-canonicalized path: {}", pre_cano.display());
                 let path = match pre_cano.canonicalize() {
                     Ok(p) => p,
                     Err(e) => {

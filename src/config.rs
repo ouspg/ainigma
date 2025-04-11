@@ -19,8 +19,8 @@ const DEFAULT_FILE_EXPIRATION: u32 = 31;
 const DEFAULT_LINK_EXPIRATION: u32 = 7;
 const DEFAULT_RANDOM_FLAG_LENGTH: u8 = 32;
 
-pub(crate) const DEFAULT_FLAGS_FILENAME: &str = "flags.json";
-pub(crate) const DEFAULT_BUILD_MANIFEST: &str = "build-manifest.json";
+pub const DEFAULT_FLAGS_FILENAME: &str = "flags.json";
+pub const DEFAULT_BUILD_MANIFEST: &str = "build-manifest.json";
 
 fn random_hex_secret() -> String {
     let mut random_bytes = vec![0u8; 32];

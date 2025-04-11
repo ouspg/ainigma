@@ -1,3 +1,4 @@
+use ainigma::config::DEFAULT_BUILD_MANIFEST;
 use assert_cmd::Command;
 use predicates::prelude::*;
 // uses data/configs/simple_shell.toml
@@ -37,6 +38,12 @@ fn cli_simple_sequentical_validate() -> Result<(), Box<dyn std::error::Error>> {
     // Check if required files exist
     let readme_path = task_dir_path.join("readme.txt");
     let secret_path = task_dir_path.join("secret.sh");
+    let manifest = task_dir_path.join(DEFAULT_BUILD_MANIFEST);
+
+    assert!(
+        manifest.exists(),
+        "Build manifest should exist in the directory"
+    );
 
     assert!(
         readme_path.exists(),

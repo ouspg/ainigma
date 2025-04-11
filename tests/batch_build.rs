@@ -1,4 +1,5 @@
 // uses data/configs/batch_count.toml
+use ainigma::config::DEFAULT_BUILD_MANIFEST;
 use assert_cmd::Command;
 
 #[test]
@@ -33,8 +34,6 @@ fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
-    println!("Entries: {:?}", entries);
-
     assert_eq!(entries.len(), 3, "Should have 5 directories");
 
     // test just one randomly
@@ -46,6 +45,12 @@ fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
     let readme_path = task_dir_path.join("readme.txt");
     let encrypted = task_dir_path.join("encrypted_output.txt");
     let reversable = task_dir_path.join("reversable.bin");
+    let manifest = temp_dir.path().join(DEFAULT_BUILD_MANIFEST);
+
+    assert!(
+        manifest.exists(),
+        "Build manifest should exist in the directory"
+    );
 
     assert!(
         readme_path.exists(),

@@ -265,6 +265,10 @@ fn run_subprocess(
         }
     };
     if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            tracing::info!("{}", line);
+        }
         build_manifest.validate_output()?;
 
         // If the task has a seed-based flag, we must capture the resulting flag from the process output

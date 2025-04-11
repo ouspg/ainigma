@@ -14,6 +14,7 @@ pub fn create_exam(
     items: TaskBuildContainer,
     category: &str,
     filename: &str,
+    disable_upload: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut questions: Vec<QuestionType> = Vec::with_capacity(items.outputs.len());
 
@@ -24,31 +25,35 @@ pub fn create_exam(
             Some(instructions) => {
                 let file = std::fs::File::open(instructions.kind.get_filename()).unwrap();
                 let reader = BufReader::new(file);
-                let mut lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
-                lines.push("".to_string());
+                let mut instructions: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
+                instructions.push("".to_string());
 
-                lines.push("<br><br><b>Please, see the download links below. Exam questions are randomised and the links are different if you retry the exam.</b>".to_string());
-                lines.push("<br>".to_string());
-                lines.push(
+                if !disable_upload {
+                    instructions.push("<br><br><b>Please, see the download links below. Exam questions are randomised and the links are different if you retry the exam.</b>".to_string());
+                    instructions.push("<br>".to_string());
+                    instructions.push(
                     "<div style=\"display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;\">"
                         .to_string(),
                 );
-                for link in &item.outputs {
-                    if let (OutputKind::Resource(resource), Some(link)) = (&link.kind, &link.link) {
-                        lines.push(format!(
-                            "<a href=\"{}\" target=\"_blank\" class=\"btn btn-primary\">{}</a>",
-                            link,
-                            resource
-                                .file_name()
-                                .unwrap_or_default()
-                                .to_ascii_lowercase()
-                                .to_string_lossy(),
-                        ));
+                    for link in &item.outputs {
+                        if let (OutputKind::Resource(resource), Some(link)) =
+                            (&link.kind, &link.link)
+                        {
+                            instructions.push(format!(
+                                "<a href=\"{}\" target=\"_blank\" class=\"btn btn-primary\">{}</a>",
+                                link,
+                                resource
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_ascii_lowercase()
+                                    .to_string_lossy(),
+                            ));
+                        }
                     }
+                    instructions.push("</div>".to_string());
                 }
-                lines.push("</div>".to_string());
 
-                let instructions_string = lines.join("\n");
+                let instructions_string = instructions.join("\n");
                 let mut question =
                     ShortAnswerQuestion::new(items.task.name.clone(), instructions_string, None);
                 let answers = if item.stage_flags.len() == 1 {

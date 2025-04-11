@@ -277,7 +277,7 @@ fn main() -> std::process::ExitCode {
                     Some(cmd_moodle) => match cmd_moodle {
                         Moodle::Moodle {
                             category,
-                            output,
+                            output: quiz_filename,
                             disable_upload,
                         } => {
                             let results = if outputs.has_files_to_distribute() & !disable_upload {
@@ -285,7 +285,8 @@ fn main() -> std::process::ExitCode {
                             } else {
                                 outputs
                             };
-                            let _exam = create_exam(results, category, output);
+                            let _exam =
+                                create_exam(results, category, quiz_filename, *disable_upload);
                         }
                     },
                     None => {
@@ -293,13 +294,13 @@ fn main() -> std::process::ExitCode {
                             OutputDirectory::Temprarory(output_dir) => {
                                 let path = output_dir.into_path();
                                 tracing::info!(
-                                    "The build has been finished and the files are located in the temporal output directory: {}",
+                                    "The build has been finished and the files are located in the temporal output directory: '{}'",
                                     path.display()
                                 );
                             }
                             OutputDirectory::Provided(path) => {
                                 tracing::info!(
-                                    "Build finished and the files are located in the provided output directory: {}",
+                                    "The build has finished and the files are located in the provided output directory: '{}'",
                                     path.display()
                                 );
                             }

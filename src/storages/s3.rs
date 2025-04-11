@@ -6,7 +6,7 @@ use futures::future::try_join_all;
 
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::{config::Region, Client};
+use aws_sdk_s3::{Client, config::Region};
 use serde_json::json;
 
 use std::env;
@@ -116,7 +116,11 @@ impl CloudStorage for S3Storage {
                 Ok(())
             }
             Err(e) => {
-                tracing::warn!("The bucket likely {} did not exist or upstream connection issues, we expect currently that you have created it manually: {}", self.bucket, e);
+                tracing::warn!(
+                    "The bucket likely {} did not exist or upstream connection issues, we expect currently that you have created it manually: {}",
+                    self.bucket,
+                    e
+                );
                 Err(CloudStorageError::BucketNotFound(self.bucket.to_owned()))
             }
         }

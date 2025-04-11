@@ -22,11 +22,7 @@ fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
         .filter_map(|entry| {
             entry.ok().and_then(|e| {
                 if let Ok(file_type) = e.file_type() {
-                    if file_type.is_dir() {
-                        Some(e)
-                    } else {
-                        None
-                    }
+                    if file_type.is_dir() { Some(e) } else { None }
                 } else {
                     None
                 }

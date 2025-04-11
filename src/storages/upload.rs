@@ -97,7 +97,9 @@ pub fn s3_upload<'a>(
         }
         Err(error) => {
             tracing::error!("Overall file upload process resulted with error: {}", error);
-            tracing::error!("There is a chance that you are rate limited by the cloud storage. Please try again later.");
+            tracing::error!(
+                "There is a chance that you are rate limited by the cloud storage. Please try again later."
+            );
             Err(error.into())
         }
     }

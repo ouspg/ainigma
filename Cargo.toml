@@ -1,10 +1,11 @@
 [package]
 name = "ainigma"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [[bin]]
-name = "cli"
+name = "ainigma"
+path = "src/bin/cli.rs"
 
 [dependencies]
 # Our async runtime

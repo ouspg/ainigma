@@ -34,9 +34,7 @@ pub fn create_exam(
                         .to_string(),
                 );
                 for link in &item.outputs {
-                    if let (OutputKind::Resource(ref resource), Some(ref link)) =
-                        (&link.kind, &link.link)
-                    {
+                    if let (OutputKind::Resource(resource), Some(link)) = (&link.kind, &link.link) {
                         lines.push(format!(
                             "<a href=\"{}\" target=\"_blank\" class=\"btn btn-primary\">{}</a>",
                             link,
@@ -65,7 +63,7 @@ pub fn create_exam(
                         vec![
                             Answer::new(
                                 100,
-                                item.stage_flags[0].encase_flag(),
+                                item.stage_flags[0].encased().to_string(),
                                 "Correct!".to_string().into(),
                             ),
                             Answer::new(
@@ -85,7 +83,9 @@ pub fn create_exam(
                 questions.push(question.into());
             }
             None => {
-                panic!("No instructions provided for Moodle exam for unkown reason. Verify that you have `readme` type in output files.");
+                panic!(
+                    "No instructions provided for Moodle exam for unkown reason. Verify that you have `readme` type in output files."
+                );
             }
         }
     }
@@ -105,7 +105,7 @@ fn encase_each_flag(flags: &[Flag], separator: &str) -> String {
             if let Flag::RngSeed(flag) = f {
                 flag.value().to_string()
             } else {
-                f.encase_flag()
+                f.encased().to_string()
             }
         })
         .join(separator)

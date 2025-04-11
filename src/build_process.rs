@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::config::{
-    BuildConfig, Builder, FlagVariantKind, ModuleConfiguration, OutputKind, Task,
-    DEFAULT_BUILD_MANIFEST, DEFAULT_FLAGS_FILENAME,
+    BuildConfig, Builder, DEFAULT_BUILD_MANIFEST, DEFAULT_FLAGS_FILENAME, FlagVariantKind,
+    ModuleConfiguration, OutputKind, Task,
 };
 use crate::errors::BuildError;
 use crate::flag_generator::Flag;
@@ -14,7 +14,7 @@ use crate::flag_generator::Flag;
 /// Represents the build process of a task, including the initial configuration and produced output files and flags.
 #[derive(serde::Serialize, Debug)]
 pub struct TaskBuildContainer<'a> {
-    out_dir_base: PathBuf,
+    pub out_dir_base: PathBuf,
     pub task: &'a Task,
     /// For batch mode, this is > 1, for a sequential build, this is 1
     pub outputs: Vec<IntermediateOutput>,
@@ -49,10 +49,10 @@ impl TaskBuildContainer<'_> {
                     Err(e) => {
                         tracing::error!("Failure in file '{}", &pre_cano.display(),);
                         tracing::error!(
-                             "Failed to verify that build output path for file `{}` exist : {}. Is builder using given output directory correctly or configuration has unintentional output files defined?",
-                             &item.kind.get_filename().to_string_lossy(),
-                             e
-                         );
+                            "Failed to verify that build output path for file `{}` exist : {}. Is builder using given output directory correctly or configuration has unintentional output files defined?",
+                            &item.kind.get_filename().to_string_lossy(),
+                            e
+                        );
                         return Err(BuildError::OutputVerificationFailed(e.to_string()));
                     }
                 };
@@ -244,24 +244,8 @@ fn verify_output_dir(
 fn run_subprocess(
     entrypoint: &str,
     build_manifest: &mut TaskBuildContainer,
+    build_envs: HashMap<String, String>,
 ) -> Result<(), BuildError> {
-    // Keep manifest in root of the output directory
-    let json_path = if build_manifest.batched {
-        build_manifest.out_dir_base.join(DEFAULT_BUILD_MANIFEST)
-    } else {
-        // For sequential builds we must use the task instance directory to avoid race condition
-        build_manifest.outputs[0]
-            .task_instance_dir
-            .join(DEFAULT_BUILD_MANIFEST)
-    };
-    serde_json::to_writer_pretty(fs::File::create(&json_path).unwrap(), &build_manifest)
-        .map_err(|e| BuildError::SerdeDerserializationFailed(e.to_string()))?;
-
-    let build_envs = HashMap::from([(
-        "BUILD_MANIFEST".to_string(),
-        json_path.to_str().unwrap_or_default().to_string(),
-    )]);
-
     let output = std::process::Command::new("sh")
         .arg(entrypoint)
         .env_clear()
@@ -303,6 +287,7 @@ pub fn build_batch<'a>(
     module_config: &'a ModuleConfiguration,
     task_config: &'a Task,
     output_directory: &'a Path,
+    validate: bool,
 ) -> Result<TaskBuildContainer<'a>, BuildError> {
     if !task_config.build.directory.exists() {
         return Err(BuildError::InvalidOutputDirectory(
@@ -360,9 +345,21 @@ pub fn build_batch<'a>(
         batched: true,
     };
 
+    let json_path = output_directory.join(DEFAULT_BUILD_MANIFEST);
+    serde_json::to_writer_pretty(fs::File::create(&json_path).unwrap(), &build_manifest)
+        .map_err(|e| BuildError::SerdeDerserializationFailed(e.to_string()))?;
+    if validate {
+        return Ok(build_manifest);
+    }
+
+    let build_envs = HashMap::from([(
+        "BUILD_MANIFEST".to_string(),
+        json_path.to_str().unwrap_or_default().to_string(),
+    )]);
+
     match task_config.build.builder {
         Builder::Shell(ref entrypoint) => {
-            run_subprocess(&entrypoint.entrypoint, &mut build_manifest)?
+            run_subprocess(&entrypoint.entrypoint, &mut build_manifest, build_envs)?
         }
         Builder::Nix(_) => todo!("Nix builder not implemented"),
     }
@@ -378,7 +375,7 @@ fn map_rng_seed_to_flag(
     // TODO batch mode not supported
     for flag in flags[0].stage_flags.iter_mut() {
         let flag_key = flag.get_flag_type_value_pair().0;
-        if let Flag::RngSeed(ref mut rng_seed) = flag {
+        if let Flag::RngSeed(rng_seed) = flag {
             let path = task_config
                 .build
                 .output
@@ -426,6 +423,7 @@ pub fn build_sequential<'a>(
     output_directory: &Path,
     // If the build is repeated, tells the number, starting from 1
     _build_number: usize,
+    validate: bool,
 ) -> Result<IntermediateOutput, BuildError> {
     let flags = create_flags_by_task(task_config, module_config, uuid);
     // Create the base output directory
@@ -441,23 +439,41 @@ pub fn build_sequential<'a>(
     // Guarantee that the output directory exists with UUID/task_id structure
     let task_instance_dir =
         verify_output_dir(output_directory, &uuid.to_string(), &task_config.id)?;
+
     let expected_outputs: Vec<OutputItem> = task_config
         .build
         .output
         .iter()
         .map(|output| OutputItem::new(output.kind.clone()))
         .collect();
+    let intermediate = IntermediateOutput::new(uuid, flags, task_instance_dir, expected_outputs);
+
+    let json_path = if validate {
+        // No race condition if we are validating
+        output_directory.join(DEFAULT_BUILD_MANIFEST)
+    } else {
+        // For sequential builds we must use the task instance directory to avoid race condition
+        intermediate.task_instance_dir.join(DEFAULT_BUILD_MANIFEST)
+    };
     let mut build_manifest = TaskBuildContainer {
         out_dir_base: output_directory.to_path_buf(),
         task: task_config,
-        outputs: vec![IntermediateOutput {
-            uuid,
-            stage_flags: flags,
-            task_instance_dir,
-            outputs: expected_outputs,
-        }],
+        outputs: vec![intermediate],
         batched: false,
     };
+    serde_json::to_writer_pretty(fs::File::create(&json_path).unwrap(), &build_manifest)
+        .map_err(|e| BuildError::SerdeDerserializationFailed(e.to_string()))?;
+
+    // We are just validating configuration and build-manifest.json
+    if validate {
+        return Ok(build_manifest.outputs[0].clone());
+    }
+
+    let build_envs = HashMap::from([(
+        "BUILD_MANIFEST".to_string(),
+        json_path.to_str().unwrap_or_default().to_string(),
+    )]);
+
     match task_config.build.builder {
         Builder::Shell(ref entrypoint) => {
             tracing::debug!(
@@ -466,7 +482,7 @@ pub fn build_sequential<'a>(
                 &task_config.build.directory.display()
             );
 
-            run_subprocess(&entrypoint.entrypoint, &mut build_manifest)?
+            run_subprocess(&entrypoint.entrypoint, &mut build_manifest, build_envs)?
         }
         Builder::Nix(_) => todo!("Nix builder not implemented"),
     }

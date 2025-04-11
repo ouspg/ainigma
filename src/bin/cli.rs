@@ -1,6 +1,6 @@
 use ainigma::{
     build_process::{build_batch, build_sequential, TaskBuildContainer},
-    config::{read_check_toml, ModuleConfiguration, Task},
+    config::{read_check_toml, ModuleConfiguration, Task, DEFAULT_BUILD_MANIFEST},
     errors::BuildError,
     moodle::create_exam,
     storages::s3_upload,
@@ -62,9 +62,11 @@ enum Commands {
     },
     /// Check if the configuration has correct syntax and pretty print it
     Validate {
-        /// Check if the bucket exists
-        #[arg(long, action = clap::ArgAction::SetTrue)]
-        check_bucket: bool,
+        // Check if the bucket exists
+        // #[arg(long, action = clap::ArgAction::SetTrue)]
+        // check_bucket: bool,
+        #[command(flatten)]
+        selection: BuildSelection,
     },
     /// Designed to deploy the flags for a single challenge
     /// Generates flags in possible batch mode and runs build just once
@@ -242,7 +244,7 @@ fn main() -> std::process::ExitCode {
                         "Batch mode is enabled for the task '{}', ignoring possible passed variance counts",
                         validated.task_id.as_ref().unwrap()
                     );
-                    match build_batch(&config, validated.task_config, output_dir.path()) {
+                    match build_batch(&config, validated.task_config, output_dir.path(), false) {
                         Ok(out) => out,
                         Err(error) => {
                             tracing::error!(
@@ -340,8 +342,75 @@ fn main() -> std::process::ExitCode {
                 tracing::error!("Deploy command is not implemented yet.");
                 ExitCode::FAILURE
             }
-            Commands::Validate { .. } => {
+            Commands::Validate { selection } => {
+                tracing::info!("Validating the configuration file...");
                 println!("{:#?}", config);
+                tracing::info!(
+                    "Configuration file is valid. Creating '{}' file in the current directory.",
+                    DEFAULT_BUILD_MANIFEST
+                );
+                let cwd_dir = std::env::current_dir().unwrap();
+                let tempdir = tempfile::tempdir().expect("Failed to create a temporary file");
+
+                // Single validation point for task/category selection
+                let validated = match validate_build_selection(&config, selection) {
+                    Ok(info) => info,
+                    Err(code) => return code,
+                };
+                let uuid = Uuid::now_v7();
+
+                let _ = if validated.task_config.batch.is_some() {
+                    tracing::info!(
+                        "Batch mode is enabled for the task '{}', ignoring possible passed variance counts and defaulting to batch count 1",
+                        validated.task_id.as_ref().unwrap()
+                    );
+                    match build_batch(&config, validated.task_config, tempdir.path(), true) {
+                        Ok(out) => out,
+                        Err(error) => {
+                            tracing::error!(
+                                "Error when building the task in batch mode: {}",
+                                error
+                            );
+                            return ExitCode::FAILURE;
+                        }
+                    }
+                } else {
+                    tracing::info!(
+                        "Building the task '{}' with the variation count 1",
+                        validated.task_id.as_ref().unwrap(),
+                    );
+
+                    let output = build_sequential(
+                        &config,
+                        validated.task_config,
+                        uuid,
+                        tempdir.path(),
+                        1,
+                        true,
+                    );
+                    match output {
+                        Ok(out) => TaskBuildContainer::new(
+                            tempdir.path().to_path_buf(),
+                            validated.task_config,
+                            vec![out],
+                            false,
+                        ),
+                        Err(error) => {
+                            tracing::error!("Error when building the task: {}", error);
+                            return ExitCode::FAILURE;
+                        }
+                    }
+                };
+                let manifest_path = tempdir.path().join(DEFAULT_BUILD_MANIFEST);
+                std::fs::copy(&manifest_path, cwd_dir.join(DEFAULT_BUILD_MANIFEST))
+                    .expect("Failed to copy the manifest file to the current directory");
+
+                tracing::info!(
+                    "To see the contents of generated '{}', run `jq . {}",
+                    DEFAULT_BUILD_MANIFEST,
+                    manifest_path.display()
+                );
+                drop(tempdir);
 
                 ExitCode::SUCCESS
             }
@@ -384,7 +453,7 @@ fn parallel_task_build<'a>(
                 let uuid = Uuid::now_v7();
                 tracing::info!("Starting building the variant {} with UUID {}", i, uuid);
 
-                match build_sequential(&courseconf, &taskconf, uuid, &outdir, i) {
+                match build_sequential(&courseconf, &taskconf, uuid, &outdir, i, false) {
                     Ok(output) => {
                         let uuid_clone = output.uuid;
                         outputs
@@ -445,7 +514,7 @@ fn parallel_task_build<'a>(
     } else {
         // Single variant case, no threading needed
         let uuid = Uuid::now_v7();
-        match build_sequential(config, task_config, uuid, output_dir, 1) {
+        match build_sequential(config, task_config, uuid, output_dir, 1, false) {
             Ok(outputs) => {
                 all_outputs.lock().unwrap().push(outputs);
                 tracing::info!("Task '{}' build successfully", task_config.id);

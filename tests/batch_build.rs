@@ -46,6 +46,9 @@ fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
     let encrypted = task_dir_path.join("encrypted_output.txt");
     let reversable = task_dir_path.join("reversable.bin");
     let manifest = temp_dir.path().join(DEFAULT_BUILD_MANIFEST);
+    // print manifest file content
+    let manifest_content = std::fs::read_to_string(&manifest)?;
+    println!("Manifest content: {}", manifest_content);
 
     assert!(
         manifest.exists(),

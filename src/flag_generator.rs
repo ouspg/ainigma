@@ -1,6 +1,6 @@
 use core::panic;
-use hmac::{digest::InvalidLength, Hmac, Mac};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use hmac::{Hmac, Mac, digest::InvalidLength};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use std::fmt::Write;
@@ -80,8 +80,12 @@ impl Flag {
             Flag::UserDerivedFlag(userflag) => userflag.return_flag().trim().to_string(),
         }
     }
-    pub fn encase_flag(&self) -> String {
-        format!("flag{{{}}}", self.flag_string())
+    pub fn encased(&self) -> &str {
+        match self {
+            Flag::RngFlag(rngflag) => &rngflag.encased,
+            Flag::RngSeed(userseedflag) => &userseedflag.encased,
+            Flag::UserDerivedFlag(userflag) => &userflag.encased,
+        }
     }
     /// Gets the identifier of the flag
     pub fn get_identifier(&self) -> &str {
@@ -116,14 +120,18 @@ pub struct FlagUnit {
     identifier: String,
     /// Suffix is the varying part of the flag
     suffix: String,
+    /// Encased flag is the flag in the format of `flag{identifier:suffix}`
+    encased: String,
 }
 impl FlagUnit {
     fn rng_flag(identifier: String, lenght: u8) -> Self {
-        let flag_suffix_result = pure_random_flag(lenght);
+        let suffix = pure_random_flag(lenght);
 
+        let encased = format!("flag{{{}:{}}}", identifier, suffix);
         FlagUnit {
             identifier,
-            suffix: flag_suffix_result,
+            suffix,
+            encased,
         }
     }
     pub fn value(&self) -> &str {
@@ -140,15 +148,17 @@ impl FlagUnit {
         taskid: &str,
         uuid: &Uuid,
     ) -> Self {
-        let flag_suffix_result = user_derived_flag(algorithm, uuid, secret, taskid);
-
-        let flag_suffix = match flag_suffix_result {
+        let suffix = user_derived_flag(algorithm, uuid, secret, taskid);
+        let flag_suffix = match suffix {
             Ok(flag) => flag,
             Err(_error) => panic!("Error generating flag"),
         };
+        let encased = format!("flag{{{}:{}}}", identifier, flag_suffix);
+
         FlagUnit {
             identifier,
             suffix: flag_suffix,
+            encased,
         }
     }
 

@@ -70,7 +70,7 @@ fn cli_simple_shell_with_moodle() -> Result<(), Box<dyn std::error::Error>> {
     let path = temp_dir.path().join("moodle.xml");
     args.push(path.to_str().unwrap());
 
-    Command::cargo_bin("cli")?
+    Command::cargo_bin("ainigma")?
         .args(args)
         .env("RUST_LOG", "info")
         .assert()

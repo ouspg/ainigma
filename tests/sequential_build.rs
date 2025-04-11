@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+// uses data/configs/simple_shell.toml
 
 const SIMPLE_SHELL_ARGS: &[&str] = &[
     "--config",
@@ -67,7 +68,7 @@ fn cli_simple_shell_with_moodle() -> Result<(), Box<dyn std::error::Error>> {
         .env("RUST_LOG", "info")
         .assert()
         .success();
-    // check if quiz.xml exists in the output dir
+    // check if exam file exists in the output dir
     if !temp_dir.path().join("moodle.xml").exists() {
         panic!("moodle.xml should exist in the directory");
     }

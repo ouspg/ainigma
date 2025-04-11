@@ -336,7 +336,10 @@ fn main() -> std::process::ExitCode {
                 }
                 ExitCode::SUCCESS
             }
-            Commands::Deploy { .. } => ExitCode::SUCCESS,
+            Commands::Deploy { .. } => {
+                tracing::error!("Deploy command is not implemented yet.");
+                ExitCode::FAILURE
+            }
             Commands::Validate { .. } => {
                 println!("{:#?}", config);
 

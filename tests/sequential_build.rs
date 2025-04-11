@@ -21,7 +21,7 @@ fn cli_simple_sequentical_validate() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = SIMPLE_SHELL_ARGS.to_vec();
     args.insert(4, temp_dir.path().to_str().unwrap());
 
-    Command::cargo_bin("cli")?
+    Command::cargo_bin("ainigma")?
         .args(args)
         .env("RUST_LOG", "info")
         .assert()

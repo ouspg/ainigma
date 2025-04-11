@@ -5,7 +5,7 @@ use assert_cmd::Command;
 #[test]
 fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?;
-    Command::cargo_bin("cli")?
+    Command::cargo_bin("ainigma")?
         .args([
             "--config",
             "tests/data/configs/batch_count.toml",

@@ -308,33 +308,44 @@ fn main() -> std::process::ExitCode {
                         }
                     },
                     None => {
-                        // For category selections, we don't need task_config yet
-                        // This branch will be handled separately in the outputs match below
-                        // if let Some(_) = selection.category {
-                        return ExitCode::SUCCESS;
-                        // No task_config needed for category build
-                        // }
-                        // // We'll return early if neither task nor category is provided
-                        // else {
-                        //     todo!("Implement category build");
-                        // }
+                        tracing::error!("Categories are not supported yet.");
+                        return ExitCode::FAILURE;
+                        //
                     }
                 };
 
                 let outputs = match selection.task {
                     Some(ref task) => {
-                        tracing::info!(
-                            "Building the task '{}' with the variation count {}",
-                            &task,
-                            number
-                        );
-                        // We already have task_config from above
-                        match parallel_task_build(&config, &task_config, *number, output_dir.path())
-                        {
-                            Ok(out) => out,
-                            Err(error) => {
-                                tracing::error!("Error when building the task: {}", error);
-                                return ExitCode::FAILURE;
+                        if task_config.batch.is_some() {
+                            tracing::info!("Batch mode is enabled for the task '{}', ignoring possible passed variance counts", task);
+                            match build_batch(&config, &task_config, output_dir.path()) {
+                                Ok(out) => out,
+                                Err(error) => {
+                                    tracing::error!(
+                                        "Error when building the task in batch mode: {}",
+                                        error
+                                    );
+                                    return ExitCode::FAILURE;
+                                }
+                            }
+                        } else {
+                            tracing::info!(
+                                "Building the task '{}' with the variation count {}",
+                                &task,
+                                number
+                            );
+                            // We already have task_config from above
+                            match parallel_task_build(
+                                &config,
+                                &task_config,
+                                *number,
+                                output_dir.path(),
+                            ) {
+                                Ok(out) => out,
+                                Err(error) => {
+                                    tracing::error!("Error when building the task: {}", error);
+                                    return ExitCode::FAILURE;
+                                }
                             }
                         }
                     }
@@ -422,51 +433,7 @@ fn main() -> std::process::ExitCode {
                 }
                 ExitCode::SUCCESS
             }
-            Commands::Deploy {
-                output_dir,
-                selection,
-            } => {
-                let output_dir = match output_dir_selection(output_dir.as_ref()) {
-                    Ok(dir) => dir,
-                    Err(error) => {
-                        tracing::error!("Cannot create output directory: {}", error.to_string());
-                        return ExitCode::FAILURE;
-                    }
-                };
-
-                // Fail fast by checking if the task exists first
-                let task_config = match &selection.task {
-                    Some(ref task) => match config.get_task_by_id(task) {
-                        Some(task_config) => task_config,
-                        None => {
-                            tracing::error!("Task ID not found: {task}");
-                            return ExitCode::FAILURE;
-                        }
-                    },
-                    None => {
-                        // For category selections, we don't need task_config yet
-                        // This branch will be handled separately in the outputs match below
-                        // if let Some(_) = selection.category {
-                        return ExitCode::FAILURE;
-                        // No task_config needed for category build
-                        // }
-                        // // We'll return early if neither task nor category is provided
-                        // else {
-                        //     todo!("Implement category build");
-                        // }
-                    }
-                };
-
-                let outputs = match build_batch(&config, &task_config, output_dir.path()) {
-                    Ok(out) => vec![out],
-                    Err(error) => {
-                        tracing::error!("Error when building the task: {}", error);
-                        return ExitCode::FAILURE;
-                    }
-                };
-                dbg!(outputs);
-                ExitCode::SUCCESS
-            }
+            Commands::Deploy { .. } => ExitCode::SUCCESS,
             Commands::Validate { .. } => {
                 println!("{:#?}", config);
 
@@ -508,16 +475,22 @@ fn parallel_task_build<'a>(
                     )));
                 }
 
-                tracing::info!("Starting building the variant {}", i);
                 let uuid = Uuid::now_v7();
+                tracing::info!("Starting building the variant {} with UUID {}", i, uuid);
 
                 match build_sequential(&courseconf, &taskconf, uuid, &outdir, i) {
                     Ok(output) => {
+                        let uuid_clone = output.uuid;
                         outputs
                             .lock()
                             .expect("Another thread panicked while owning the mutex when building the task.")
                             .push(output);
-                        tracing::info!("Variant {} building finished.", i);
+                        tracing::info!(
+                            "Variant {} building finished with UUID {} when original was {}.",
+                            i,
+                            uuid_clone,
+                            uuid
+                        );
                         Ok(())
                     }
                     Err(error) => {

@@ -15,7 +15,7 @@ fn cli_simple_sequentical_validate() -> Result<(), Box<dyn std::error::Error>> {
             "-n",
             "5",
         ])
-        .env("RUST_LOG", "error")
+        .env("RUST_LOG", "info")
         .assert()
         .success();
 

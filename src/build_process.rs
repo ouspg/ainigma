@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+// use tracing::instrument;
 use uuid::Uuid;
 
 use crate::config::{
@@ -13,7 +14,7 @@ use crate::flag_generator::Flag;
 /// Represents the build process of a task, including the initial configuration and produced output files and flags.
 #[derive(serde::Serialize, Debug)]
 pub struct TaskBuildContainer<'a> {
-    out_dir: PathBuf,
+    out_dir_base: PathBuf,
     pub task: &'a Task,
     /// For batch mode, this is > 1, for a sequential build, this is 1
     pub outputs: Vec<IntermediateOutput>,
@@ -27,7 +28,7 @@ impl<'a> TaskBuildContainer<'a> {
         batched: bool,
     ) -> Self {
         Self {
-            out_dir,
+            out_dir_base: out_dir,
             task,
             outputs,
             batched,
@@ -37,42 +38,26 @@ impl<'a> TaskBuildContainer<'a> {
 
 impl TaskBuildContainer<'_> {
     pub fn validate_output(&mut self) -> Result<(), BuildError> {
-        let dir = self.out_dir.to_path_buf();
-        let batched = self.batched;
-        let task_id = self.task.id.clone();
         for intermediate in &mut self.outputs {
             for item in &mut intermediate.outputs {
-                // batched builder has many uuids and cannot keep it in `out_dir` directly
-                let path = if batched {
-                    dir.join(intermediate.uuid.to_string()).join(&task_id)
-                } else {
-                    dir.join(item.kind.get_filename())
-                };
-                let path = match path.canonicalize() {
+                // The task instance directory should be defined already
+                let pre_cano = &intermediate
+                    .task_instance_dir
+                    .join(item.kind.get_filename());
+                println!("Pre-canonicalized path: {}", pre_cano.display());
+                let path = match pre_cano.canonicalize() {
                     Ok(p) => p,
                     Err(e) => {
+                        tracing::error!("Failure in file '{}", &pre_cano.display(),);
                         tracing::error!(
-                             "Failed to canonicalize build output path for file {}: {}. Is builder using given output directory correctly or configuration has unintentional output files defined?",
+                             "Failed to verify that build output path for file `{}` exist : {}. Is builder using given output directory correctly or configuration has unintentional output files defined?",
                              &item.kind.get_filename().to_string_lossy(),
                              e
                          );
                         return Err(BuildError::OutputVerificationFailed(e.to_string()));
                     }
                 };
-                match fs::metadata(&path) {
-                    Ok(_) => {
-                        tracing::debug!("File exists: {}", path.display());
-                        item.update_path(path);
-                    }
-                    Err(e) => {
-                        tracing::error!("File does not exist: {}", path.display());
-                        tracing::error!(
-                            "The file was configured output with '{}' use case",
-                            &item.kind.kind()
-                        );
-                        return Err(BuildError::OutputVerificationFailed(e.to_string()));
-                    }
-                }
+                item.update_path(path);
             }
         }
         Ok(())
@@ -84,14 +69,21 @@ impl TaskBuildContainer<'_> {
 pub struct IntermediateOutput {
     pub uuid: Uuid,
     pub stage_flags: Vec<Flag>,
+    pub task_instance_dir: PathBuf,
     pub outputs: Vec<OutputItem>,
 }
 
 impl IntermediateOutput {
-    pub fn new(uuid: Uuid, stage_flags: Vec<Flag>, outputs: Vec<OutputItem>) -> Self {
+    pub fn new(
+        uuid: Uuid,
+        stage_flags: Vec<Flag>,
+        task_instance_dir: PathBuf,
+        outputs: Vec<OutputItem>,
+    ) -> Self {
         Self {
             uuid,
             stage_flags,
+            task_instance_dir,
             outputs,
         }
     }
@@ -248,7 +240,15 @@ fn run_subprocess(
     entrypoint: &str,
     build_manifest: &mut TaskBuildContainer,
 ) -> Result<(), BuildError> {
-    let json_path = build_manifest.out_dir.join(DEFAULT_BUILD_MANIFEST);
+    // Keep manifest in root of the output directory
+    let json_path = if build_manifest.batched {
+        build_manifest.out_dir_base.join(DEFAULT_BUILD_MANIFEST)
+    } else {
+        // For sequential builds we must use the task instance directory to avoid race condition
+        build_manifest.outputs[0]
+            .task_instance_dir
+            .join(DEFAULT_BUILD_MANIFEST)
+    };
     serde_json::to_writer_pretty(fs::File::create(&json_path).unwrap(), &build_manifest)
         .map_err(|e| BuildError::SerdeDerserializationFailed(e.to_string()))?;
 
@@ -280,7 +280,7 @@ fn run_subprocess(
         // Stored into the file flags.json by default, using same key as the passed environment variable
         map_rng_seed_to_flag(
             &mut build_manifest.outputs,
-            &build_manifest.out_dir,
+            &build_manifest.out_dir_base,
             build_manifest.task,
         )?;
 
@@ -333,9 +333,15 @@ pub fn build_batch<'a>(
             .iter()
             .map(|output| OutputItem::new(output.kind.clone()))
             .collect();
+
+        // Create UUID-specific directory for this batch
+        let task_instance_dir =
+            verify_output_dir(output_directory, &uuid_value.to_string(), &task_config.id)?;
+
         let entry = IntermediateOutput {
             uuid: uuid_value,
             stage_flags: flags,
+            task_instance_dir,
             outputs: expected_outputs,
         };
 
@@ -343,7 +349,7 @@ pub fn build_batch<'a>(
     }
     // PANICS: We are creating the file in the output directory, which is guaranteed to exist (unless someone removed it between check and this point)
     let mut build_manifest = TaskBuildContainer {
-        out_dir: builder_output_dir,
+        out_dir_base: builder_output_dir,
         task: task_config,
         outputs: entries,
         batched: true,
@@ -355,7 +361,7 @@ pub fn build_batch<'a>(
         }
         Builder::Nix(_) => todo!("Nix builder not implemented"),
     }
-    // build_manifest.
+
     Ok(build_manifest)
 }
 
@@ -417,8 +423,18 @@ pub fn build_sequential<'a>(
     _build_number: usize,
 ) -> Result<IntermediateOutput, BuildError> {
     let flags = create_flags_by_task(task_config, module_config, uuid);
-    // Guarantee that the output directory exists
-    let builder_output_dir =
+    // Create the base output directory
+    if !output_directory.exists() {
+        fs::create_dir_all(output_directory).map_err(|e| {
+            BuildError::InvalidOutputDirectory(format!(
+                "Failed to create the base output directory: {}",
+                e
+            ))
+        })?;
+    }
+
+    // Guarantee that the output directory exists with UUID/task_id structure
+    let task_instance_dir =
         verify_output_dir(output_directory, &uuid.to_string(), &task_config.id)?;
     let expected_outputs: Vec<OutputItem> = task_config
         .build
@@ -427,11 +443,12 @@ pub fn build_sequential<'a>(
         .map(|output| OutputItem::new(output.kind.clone()))
         .collect();
     let mut build_manifest = TaskBuildContainer {
-        out_dir: builder_output_dir,
+        out_dir_base: output_directory.to_path_buf(),
         task: task_config,
         outputs: vec![IntermediateOutput {
             uuid,
             stage_flags: flags,
+            task_instance_dir,
             outputs: expected_outputs,
         }],
         batched: false,

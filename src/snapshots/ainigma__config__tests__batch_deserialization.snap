@@ -58,7 +58,7 @@ ModuleConfiguration {
                     },
                     batch: Some(
                         BatchConfig {
-                            count: 6,
+                            count: 5,
                         },
                     ),
                 },

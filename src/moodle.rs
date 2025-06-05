@@ -1,5 +1,5 @@
-use crate::build_process::TaskBuildProcessOutput;
-use crate::config::{OutputKind, Task};
+use crate::build_process::TaskBuildContainer;
+use crate::config::OutputKind;
 use crate::flag_generator::Flag;
 use itertools::Itertools;
 use moodle_xml::{
@@ -11,62 +11,76 @@ use std::io::{self, BufRead, BufReader};
 
 /// Create an exam from a list of task build process outputs, which includes the question as well
 pub fn create_exam(
-    task_config: &Task,
-    items: Vec<TaskBuildProcessOutput>,
+    items: TaskBuildContainer,
     category: &str,
     filename: &str,
+    disable_upload: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut questions: Vec<QuestionType> = Vec::with_capacity(items.len());
+    let mut questions: Vec<QuestionType> = Vec::with_capacity(items.outputs.len());
 
-    for item in items {
+    for item in items.outputs {
+        // TODO batch not supported yet
         let instructions = item.get_readme();
         match instructions {
             Some(instructions) => {
                 let file = std::fs::File::open(instructions.kind.get_filename()).unwrap();
                 let reader = BufReader::new(file);
-                let mut lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
-                lines.push("".to_string());
+                let mut instructions: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
+                instructions.push("".to_string());
 
-                lines.push("<br><br><b>Please, see the download links below. Exam questions are randomised and the links are different if you retry the exam.</b>".to_string());
-                lines.push("<br>".to_string());
-                lines.push(
+                if !disable_upload {
+                    instructions.push("<br><br><b>Please, see the download links below. Exam questions are randomised and the links are different if you retry the exam.</b>".to_string());
+                    instructions.push("<br>".to_string());
+                    instructions.push(
                     "<div style=\"display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;\">"
                         .to_string(),
                 );
-                for link in item.files {
-                    if let (OutputKind::Resource(resource), Some(link)) = (link.kind, link.link) {
-                        lines.push(format!(
-                            "<a href=\"{}\" target=\"_blank\" class=\"btn btn-primary\">{}</a>",
-                            link,
-                            resource
-                                .file_name()
-                                .unwrap_or_default()
-                                .to_ascii_lowercase()
-                                .to_string_lossy(),
-                        ));
+                    for link in &item.outputs {
+                        if let (OutputKind::Resource(resource), Some(link)) =
+                            (&link.kind, &link.link)
+                        {
+                            instructions.push(format!(
+                                "<a href=\"{}\" target=\"_blank\" class=\"btn btn-primary\">{}</a>",
+                                link,
+                                resource
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_ascii_lowercase()
+                                    .to_string_lossy(),
+                            ));
+                        }
                     }
+                    instructions.push("</div>".to_string());
                 }
-                lines.push("</div>".to_string());
 
-                let instructions_string = lines.join("\n");
+                let instructions_string = instructions.join("\n");
                 let mut question =
-                    ShortAnswerQuestion::new(task_config.name.clone(), instructions_string, None);
-                let answers = if item.flags.len() == 1 {
-                    vec![
-                        Answer::new(
+                    ShortAnswerQuestion::new(items.task.name.clone(), instructions_string, None);
+                let answers = if item.stage_flags.len() == 1 {
+                    // Unknown flag, task build process has created this one
+                    if let Flag::RngSeed(flag) = &item.stage_flags[0] {
+                        vec![Answer::new(
                             100,
-                            item.flags[0].encase_flag(),
+                            flag.value().to_string(),
                             "Correct!".to_string().into(),
-                        ),
-                        Answer::new(
-                            100,
-                            item.flags[0].flag_string(),
-                            "Correct!".to_string().into(),
-                        ),
-                    ]
+                        )]
+                    } else {
+                        vec![
+                            Answer::new(
+                                100,
+                                item.stage_flags[0].encased().to_string(),
+                                "Correct!".to_string().into(),
+                            ),
+                            Answer::new(
+                                100,
+                                item.stage_flags[0].flag_string(),
+                                "Correct!".to_string().into(),
+                            ),
+                        ]
+                    }
                 } else {
                     // Adds 1-inf flags as answer with chosen separator
-                    process_multiple_flags(item.flags.clone(), " ")
+                    process_multiple_flags(item.stage_flags.clone(), " ")
                 };
                 question
                     .add_answers(answers)
@@ -74,7 +88,9 @@ pub fn create_exam(
                 questions.push(question.into());
             }
             None => {
-                panic!("No instructions provided for Moodle exam for unkown reason. Verify that you have `readme` type in output files.");
+                panic!(
+                    "No instructions provided for Moodle exam for unkown reason. Verify that you have `readme` type in output files."
+                );
             }
         }
     }
@@ -88,7 +104,16 @@ pub fn create_exam(
 
 // Function to encase each flag with a specified separator
 fn encase_each_flag(flags: &[Flag], separator: &str) -> String {
-    flags.iter().map(|f| f.encase_flag()).join(separator)
+    flags
+        .iter()
+        .map(|f| {
+            if let Flag::RngSeed(flag) = f {
+                flag.value().to_string()
+            } else {
+                f.encased().to_string()
+            }
+        })
+        .join(separator)
 }
 
 // Function to join flags without encasing them
@@ -110,7 +135,7 @@ fn process_multiple_flags(flags: Vec<Flag>, separator: &str) -> Vec<Answer> {
                 let combined_answer = join_flags(&perm_flags, separator); // Pass as a slice
 
                 // Calculate points based on the number of flags
-                let points = ((r as f64 / total_flags as f64) * 100.0).round() as u8;
+                let points = ((r as f64 / total_flags as f64) * 100.0).round() as i8;
 
                 answers.push(Answer::new(
                     points,

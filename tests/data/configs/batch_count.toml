@@ -1,0 +1,35 @@
+identifier = "01920a0e-8c4e-7bbb-80a3-fcae235253ae"
+name = "Softaware security"
+version = "0.0.1"
+
+[[categories]]
+number = 4
+name = "Reverse engineering"
+
+[[categories.tasks]]
+id = "task002"
+name = "Basics of reverse engineering"
+points = 1.0
+# repetition abstraction where the innermost taskbuilder is supposed to be run only once
+# But we still need `count` amount of variants for the task
+batch = { count = 3 }
+# Just one flag for the task
+stages = [{ flag = { kind = "pure_random" } }]
+
+[categories.tasks.build]
+directory = "tests/tasks/reverse1"
+builder = { shell = { entrypoint = "custom_entry.sh" } }
+enabled_modes = ["batch"]
+
+
+[[categories.tasks.build.output]]
+kind = { readme = "readme.txt" }
+[[categories.tasks.build.output]]
+kind = { resource = "reversable.bin" }
+[[categories.tasks.build.output]]
+kind = { resource = "encrypted_output.txt" }
+
+# For deterministic tests, one needs to define secrets
+[flag_config]
+user_derived = { secret = "Try to guess the super secret secret!" }
+rng_seed = { secret = "HaHa you don't know it" }

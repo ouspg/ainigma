@@ -1,0 +1,314 @@
+---
+source: src/config.rs
+expression: result
+---
+ModuleConfiguration {
+    identifier: 01908498-ac98-708d-b886-b6f2747ef785,
+    name: "Cybersecurity",
+    description: "A comprehensive course covering various aspects of cybersecurity",
+    version: "0.0.1",
+    categories: [
+        Category {
+            tasks: [
+                Task {
+                    id: "task001",
+                    name: "Challenge 1",
+                    description: "Exploit few buffer overflow vulnerabilities",
+                    points: 1.0,
+                    stages: [
+                        TaskElement {
+                            id: Some(
+                                "task001A",
+                            ),
+                            name: Some(
+                                "Subpart A",
+                            ),
+                            description: Some(
+                                "Task A",
+                            ),
+                            weight: Some(
+                                1,
+                            ),
+                            flag: FlagVariant {
+                                kind: UserDerived,
+                            },
+                        },
+                        TaskElement {
+                            id: Some(
+                                "task001B",
+                            ),
+                            name: Some(
+                                "Subpart B",
+                            ),
+                            description: Some(
+                                "Task B",
+                            ),
+                            weight: Some(
+                                1,
+                            ),
+                            flag: FlagVariant {
+                                kind: PureRandom,
+                            },
+                        },
+                        TaskElement {
+                            id: Some(
+                                "task001C",
+                            ),
+                            name: Some(
+                                "Subpart C",
+                            ),
+                            description: Some(
+                                "Task C",
+                            ),
+                            weight: Some(
+                                1,
+                            ),
+                            flag: FlagVariant {
+                                kind: RngSeed,
+                            },
+                        },
+                    ],
+                    build: BuildConfig {
+                        directory: "tasks/category1/buffer_overflow",
+                        builder: Shell(
+                            Shell {
+                                entrypoint: "entrypoint.sh",
+                            },
+                        ),
+                        output: [
+                            BuildOutputFile {
+                                kind: Resource(
+                                    "exloitable.bin",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Internal(
+                                    "vulnerable_server.py",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Readme(
+                                    "readme.txt",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Meta(
+                                    "meta.json",
+                                ),
+                            },
+                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
+                    },
+                    batch: None,
+                },
+                Task {
+                    id: "task002",
+                    name: "Challenge 2",
+                    description: "Previous exploit was trivial. Try harder.",
+                    points: 2.0,
+                    stages: [
+                        TaskElement {
+                            id: None,
+                            name: None,
+                            description: None,
+                            weight: None,
+                            flag: FlagVariant {
+                                kind: PureRandom,
+                            },
+                        },
+                    ],
+                    build: BuildConfig {
+                        directory: "tasks/category1/basic_crypto",
+                        builder: Nix(
+                            Nix {
+                                entrypoint: "flake.nix",
+                            },
+                        ),
+                        output: [
+                            BuildOutputFile {
+                                kind: Resource(
+                                    "exloitable.bin",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Internal(
+                                    "vulnerable_server.py",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Readme(
+                                    "readme.txt",
+                                ),
+                            },
+                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
+                    },
+                    batch: None,
+                },
+            ],
+            number: 1,
+            name: "Introduction to Cybersecurity",
+        },
+        Category {
+            tasks: [
+                Task {
+                    id: "task003",
+                    name: "SQL Injection Attack",
+                    description: "Perform a SQL injection attack on a vulnerable web application",
+                    points: 1.0,
+                    stages: [
+                        TaskElement {
+                            id: None,
+                            name: None,
+                            description: None,
+                            weight: None,
+                            flag: FlagVariant {
+                                kind: PureRandom,
+                            },
+                        },
+                    ],
+                    build: BuildConfig {
+                        directory: "tasks/category2/sql_injection",
+                        builder: Shell(
+                            Shell {
+                                entrypoint: "setup.sh",
+                            },
+                        ),
+                        output: [
+                            BuildOutputFile {
+                                kind: Internal(
+                                    "vulnerable_server.py",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Readme(
+                                    "readme.txt",
+                                ),
+                            },
+                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
+                    },
+                    batch: None,
+                },
+                Task {
+                    id: "task004",
+                    name: "Network Packet Analysis",
+                    description: "Analyze network packets to identify a security breach",
+                    points: 1.0,
+                    stages: [
+                        TaskElement {
+                            id: None,
+                            name: None,
+                            description: None,
+                            weight: None,
+                            flag: FlagVariant {
+                                kind: RngSeed,
+                            },
+                        },
+                    ],
+                    build: BuildConfig {
+                        directory: "tasks/category2/packet_analysis",
+                        builder: Shell(
+                            Shell {
+                                entrypoint: "generate_pcap.sh",
+                            },
+                        ),
+                        output: [
+                            BuildOutputFile {
+                                kind: Resource(
+                                    "my_traffic.pcap",
+                                ),
+                            },
+                            BuildOutputFile {
+                                kind: Readme(
+                                    "readme.txt",
+                                ),
+                            },
+                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
+                    },
+                    batch: None,
+                },
+                Task {
+                    id: "task005",
+                    name: "Challenge 5",
+                    description: "Previous exploit was trivial. Try harder.",
+                    points: 2.0,
+                    stages: [
+                        TaskElement {
+                            id: None,
+                            name: None,
+                            description: None,
+                            weight: None,
+                            flag: FlagVariant {
+                                kind: PureRandom,
+                            },
+                        },
+                    ],
+                    build: BuildConfig {
+                        directory: "samples/tasks/simple_shell",
+                        builder: Shell(
+                            Shell {
+                                entrypoint: "build.sh",
+                            },
+                        ),
+                        output: [
+                            BuildOutputFile {
+                                kind: Readme(
+                                    "readme.txt",
+                                ),
+                            },
+                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
+                    },
+                    batch: None,
+                },
+            ],
+            number: 2,
+            name: "Network Security Fundamentals",
+        },
+    ],
+    flag_config: FlagConfig {
+        pure_random: PureRandom {
+            length: 32,
+        },
+        user_derived: UserDerived {
+            algorithm: HMAC_SHA3_256,
+            secret: "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15",
+        },
+        rng_seed: RngSeed {
+            secret: "You must know me to predict the seed of the other users",
+        },
+    },
+    deployment: Deployment {
+        build_timeout: 300,
+        upload: Upload {
+            aws_s3_endpoint: "https://a3s.fi",
+            aws_region: "us-west-2",
+            bucket_name: "hardware-software-security",
+            use_pre_signed: false,
+            link_expiration: 7,
+            file_expiration: 21,
+        },
+    },
+}

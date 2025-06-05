@@ -1,0 +1,85 @@
+---
+source: src/config.rs
+expression: result
+---
+ModuleConfiguration {
+    identifier: 01920a0e-8c4e-7bbb-80a3-fcae235253ae,
+    name: "Test module 1",
+    description: "Do you like standards?",
+    version: "0.0.1",
+    categories: [
+        Category {
+            tasks: [
+                Task {
+                    id: "task002",
+                    name: "How does this standard work?",
+                    description: "",
+                    points: 1.0,
+                    stages: [
+                        TaskElement {
+                            id: Some(
+                                "task0021",
+                            ),
+                            name: Some(
+                                "problem",
+                            ),
+                            description: None,
+                            weight: Some(
+                                1,
+                            ),
+                            flag: FlagVariant {
+                                kind: UserDerived,
+                            },
+                        },
+                    ],
+                    build: BuildConfig {
+                        directory: "ansible",
+                        builder: Shell(
+                            Shell {
+                                entrypoint: "entrypoint.sh",
+                            },
+                        ),
+                        output: [
+                            BuildOutputFile {
+                                kind: Readme(
+                                    "readme.txt",
+                                ),
+                            },
+                        ],
+                        enabled_modes: NonEmptyBuildModes(
+                            [
+                                Sequential,
+                            ],
+                        ),
+                    },
+                    batch: None,
+                },
+            ],
+            number: 4,
+            name: "Standards everywhere",
+        },
+    ],
+    flag_config: FlagConfig {
+        pure_random: PureRandom {
+            length: 32,
+        },
+        user_derived: UserDerived {
+            algorithm: HMAC_SHA3_256,
+            secret: "6b2c0c4535ea5b7c7f4fc613a7388404ce80e0c8e2632f139f1aa9d27f540f15",
+        },
+        rng_seed: RngSeed {
+            secret: "HaHa you don't know it",
+        },
+    },
+    deployment: Deployment {
+        build_timeout: 300,
+        upload: Upload {
+            aws_s3_endpoint: "",
+            aws_region: "",
+            bucket_name: "",
+            use_pre_signed: false,
+            link_expiration: 7,
+            file_expiration: 31,
+        },
+    },
+}

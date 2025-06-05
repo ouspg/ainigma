@@ -1,0 +1,8 @@
+build_timeout = 400
+[upload]
+AWS_S3_ENDPOINT = "https://s3.example.com"
+AWS_REGION = "example-west-south"
+BUCKET_NAME = "example.bucket"
+USE_PRE_SIGNED = false
+LINK_EXPIRATION = 7
+FILE_EXPIRATION = 21

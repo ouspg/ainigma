@@ -6,7 +6,7 @@ use futures::future::try_join_all;
 
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::{config::Region, Client};
+use aws_sdk_s3::{Client, config::Region};
 use serde_json::json;
 
 use std::env;
@@ -43,11 +43,14 @@ impl S3Storage {
             "The Provider",
         );
         let region = Region::new(config.aws_region);
+        let conf_req: aws_sdk_s3::config::RequestChecksumCalculation =
+            aws_sdk_s3::config::RequestChecksumCalculation::WhenRequired;
         let client_config = aws_sdk_s3::config::Builder::new()
             .endpoint_url(&config.aws_s3_endpoint)
             .region(region)
             .credentials_provider(credentials)
             .behavior_version_latest()
+            .request_checksum_calculation(conf_req)
             .build();
         let link_expiration_days = config.link_expiration;
         let client = Client::from_conf(client_config);
@@ -113,7 +116,11 @@ impl CloudStorage for S3Storage {
                 Ok(())
             }
             Err(e) => {
-                tracing::warn!("The bucket likely {} did not exist or upstream connection issues, we expect currently that you have created it manually: {}", self.bucket, e);
+                tracing::warn!(
+                    "The bucket likely {} did not exist or upstream connection issues, we expect currently that you have created it manually: {}",
+                    self.bucket,
+                    e
+                );
                 Err(CloudStorageError::BucketNotFound(self.bucket.to_owned()))
             }
         }
@@ -138,6 +145,11 @@ impl CloudStorage for S3Storage {
             let file_key = format!("{}/{}", files.dst_location.trim_end_matches("/"), file.0);
             // Use structured concurrency whenever possible
             // Avoid using tokio::spawn, as we lose the control
+            tracing::debug!(
+                "Uploading with remote file key: {} from local path : {}",
+                file_key,
+                file.1.kind.get_filename().to_string_lossy()
+            );
             let body = ByteStream::from_path(file.1.kind.get_filename()).await;
             let task = async {
                 match body {
@@ -203,7 +215,10 @@ impl CloudStorage for S3Storage {
                                 }
                             }
                             Err(e) => {
-                                tracing::error!("Failed to upload the file: {}", e);
+                                tracing::error!(
+                                    "Failed to upload the file: {:?}",
+                                    e.as_service_error()
+                                );
                                 return Err(CloudStorageError::AWSSdkError(e.to_string()));
                             }
                         }

@@ -10,7 +10,9 @@ pub enum FileObjectError {
     },
     #[error("Filepath ending to '..', attempted path traversal with suffix? : {0}")]
     SuffixPathTraversal(String),
-    #[error("Currently, all the upload files must be in the subdirectory relative the CWD. Filepath attempted path traversal with '..' or higher absolute path : {0}")]
+    #[error(
+        "Currently, all the upload files must be in the subdirectory relative the CWD. Filepath attempted path traversal with '..' or higher absolute path : {0}"
+    )]
     GeneralPathTraversal(String),
     /// file not exist
     #[error("File {0} does not exist")]

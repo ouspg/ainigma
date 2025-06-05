@@ -1,7 +1,7 @@
 use core::panic;
-use hmac::{digest::InvalidLength, Hmac, Mac};
-use rand::{rngs::StdRng, Rng, SeedableRng};
-use serde::Deserialize;
+use hmac::{Hmac, Mac, digest::InvalidLength};
+use rand::{Rng, SeedableRng, rngs::StdRng};
+use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use std::fmt::Write;
 use uuid::Uuid;
@@ -13,9 +13,11 @@ type Hmac256 = Hmac<Sha3_256>;
 ///
 /// #### Algorithms
 /// - `HmacSha3_256` generates a HMAC using SHA3_256 hashing.
-#[derive(Debug, PartialEq, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 #[allow(non_camel_case_types)]
+#[non_exhaustive]
 pub enum Algorithm {
+    #[default]
     HMAC_SHA3_256,
 }
 
@@ -33,12 +35,14 @@ pub enum Algorithm {
 /// - `user_seed_flag()` - `UserSeedFlag` generator
 /// - `user_flag()` - `UserDerivedFlag` generator
 /// - `flag_string()` - returns Flag as a one string
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum Flag {
     RngFlag(FlagUnit),
-    UserSeedFlag(FlagUnit),
+    RngSeed(FlagUnit),
     UserDerivedFlag(FlagUnit),
 }
+
 impl Flag {
     /// Generates a random hexstring flag with given prefix and lenght
     pub fn new_random_flag(prefix: String, length: u8) -> Self {
@@ -56,15 +60,15 @@ impl Flag {
             identifier, algorithm, secret, taskid, uuid,
         ))
     }
-    /// Generates a random hexstring flag with given prefix and user id (UUID)
-    pub fn new_user_seed_flag(
+    /// Generates a random hexstring flag with given prefix and user id (UUID), given as RNG seed for the builders
+    pub fn new_rng_seed(
         identifier: String,
         algorithm: &Algorithm,
         secret: &str,
         taskid: &str,
         uuid: &Uuid,
     ) -> Self {
-        Flag::UserSeedFlag(FlagUnit::user_flag(
+        Flag::RngSeed(FlagUnit::user_flag(
             identifier, algorithm, secret, taskid, uuid,
         ))
     }
@@ -72,18 +76,22 @@ impl Flag {
     pub fn flag_string(&self) -> String {
         match self {
             Flag::RngFlag(rngflag) => rngflag.return_flag().trim().to_string(),
-            Flag::UserSeedFlag(userseedflag) => userseedflag.return_flag().trim().to_string(),
+            Flag::RngSeed(userseedflag) => userseedflag.return_flag().trim().to_string(),
             Flag::UserDerivedFlag(userflag) => userflag.return_flag().trim().to_string(),
         }
     }
-    pub fn encase_flag(&self) -> String {
-        format!("flag{{{}}}", self.flag_string())
+    pub fn encased(&self) -> &str {
+        match self {
+            Flag::RngFlag(rngflag) => &rngflag.encased,
+            Flag::RngSeed(userseedflag) => &userseedflag.encased,
+            Flag::UserDerivedFlag(userflag) => &userflag.encased,
+        }
     }
     /// Gets the identifier of the flag
     pub fn get_identifier(&self) -> &str {
         match self {
             Flag::RngFlag(rngflag) => rngflag.identifier.as_str(),
-            Flag::UserSeedFlag(userseedflag) => userseedflag.identifier.as_str(),
+            Flag::RngSeed(userseedflag) => userseedflag.identifier.as_str(),
             Flag::UserDerivedFlag(userflag) => userflag.identifier.as_str(),
         }
     }
@@ -94,8 +102,8 @@ impl Flag {
                 let flag_key = format!("FLAG_PURE_RANDOM_{}", rngflag.identifier.to_uppercase());
                 (flag_key, self.flag_string())
             }
-            Flag::UserSeedFlag(userseedflag) => {
-                let flag_key = format!("FLAG_USER_SEED_{}", userseedflag.identifier.to_uppercase());
+            Flag::RngSeed(userseedflag) => {
+                let flag_key = format!("FLAG_RNG_SEED_{}", userseedflag.identifier.to_uppercase());
                 (flag_key, self.flag_string())
             }
             Flag::UserDerivedFlag(userflag) => {
@@ -106,21 +114,31 @@ impl Flag {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FlagUnit {
     /// Identifier is typically the same as task id
     identifier: String,
     /// Suffix is the varying part of the flag
     suffix: String,
+    /// Encased flag is the flag in the format of `flag{identifier:suffix}`
+    encased: String,
 }
 impl FlagUnit {
     fn rng_flag(identifier: String, lenght: u8) -> Self {
-        let flag_suffix_result = pure_random_flag(lenght);
+        let suffix = pure_random_flag(lenght);
 
+        let encased = format!("flag{{{}:{}}}", identifier, suffix);
         FlagUnit {
             identifier,
-            suffix: flag_suffix_result,
+            suffix,
+            encased,
         }
+    }
+    pub fn value(&self) -> &str {
+        self.suffix.as_str()
+    }
+    pub fn update_suffix(&mut self, new_suffix: String) {
+        self.suffix = new_suffix;
     }
 
     fn user_flag(
@@ -130,15 +148,17 @@ impl FlagUnit {
         taskid: &str,
         uuid: &Uuid,
     ) -> Self {
-        let flag_suffix_result = user_derived_flag(algorithm, uuid, secret, taskid);
-
-        let flag_suffix = match flag_suffix_result {
+        let suffix = user_derived_flag(algorithm, uuid, secret, taskid);
+        let flag_suffix = match suffix {
             Ok(flag) => flag,
             Err(_error) => panic!("Error generating flag"),
         };
+        let encased = format!("flag{{{}:{}}}", identifier, flag_suffix);
+
         FlagUnit {
             identifier,
             suffix: flag_suffix,
+            encased,
         }
     }
 
@@ -149,11 +169,11 @@ impl FlagUnit {
 
 /// Generates a completely random flag
 fn pure_random_flag(lenght: u8) -> String {
-    let mut rng = StdRng::from_entropy();
+    let mut rng = StdRng::from_os_rng();
     let size = lenght.into();
     let mut vec: Vec<u8> = vec![0; size];
     for i in &mut vec {
-        *i = rng.gen();
+        *i = rng.random();
     }
     vec.iter().fold(String::new(), |mut output, b| {
         let _ = write!(output, "{b:02x}");
@@ -259,7 +279,7 @@ mod tests {
         let prefix3 = "task1".to_string();
         let flag = Flag::new_random_flag(prefix, 32);
         let flag2 = Flag::new_user_flag(prefix2, &Algorithm::HMAC_SHA3_256, "This works", "A", &id);
-        let flag3 = Flag::new_user_seed_flag(
+        let flag3 = Flag::new_rng_seed(
             prefix3,
             &Algorithm::HMAC_SHA3_256,
             "this also works",

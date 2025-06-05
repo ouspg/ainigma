@@ -292,7 +292,7 @@ fn main() -> std::process::ExitCode {
                     None => {
                         match output_dir {
                             OutputDirectory::Temprarory(output_dir) => {
-                                let path = output_dir.into_path();
+                                let path = output_dir.keep();
                                 tracing::info!(
                                     "The build has been finished and the files are located in the temporal output directory: '{}'",
                                     path.display()

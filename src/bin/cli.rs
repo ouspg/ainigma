@@ -1,18 +1,18 @@
 use ainigma::{
-    build_process::{build_batch, build_sequential, TaskBuildContainer},
-    config::{read_check_toml, ModuleConfiguration, Task, DEFAULT_BUILD_MANIFEST},
+    build_process::{TaskBuildContainer, build_batch, build_sequential},
+    config::{DEFAULT_BUILD_MANIFEST, ModuleConfiguration, Task, read_check_toml},
     errors::BuildError,
     moodle::create_exam,
     storages::s3_upload,
 };
-use clap::{crate_description, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, crate_description};
 use once_cell::sync::Lazy;
 use std::{
     path::{Path, PathBuf},
     process::ExitCode,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     thread,
 };

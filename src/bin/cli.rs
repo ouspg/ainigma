@@ -1,18 +1,18 @@
 use ainigma::{
-    build_process::{TaskBuildContainer, build_batch, build_sequential},
-    config::{DEFAULT_BUILD_MANIFEST, ModuleConfiguration, Task, read_check_toml},
+    build_process::{build_batch, build_sequential, TaskBuildContainer},
+    config::{read_check_toml, ModuleConfiguration, Task, DEFAULT_BUILD_MANIFEST},
     errors::BuildError,
     moodle::create_exam,
     storages::s3_upload,
 };
-use clap::{Args, Parser, Subcommand, crate_description};
+use clap::{crate_description, Args, Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{
     path::{Path, PathBuf},
     process::ExitCode,
     sync::{
-        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
     },
     thread,
 };
@@ -292,7 +292,9 @@ fn main() -> std::process::ExitCode {
                     None => {
                         match output_dir {
                             OutputDirectory::Temprarory(output_dir) => {
-                                let path = output_dir.into_path();
+                                let path = output_dir
+                                    .keep()
+                                    .expect("Failed to keep the temporal directory");
                                 tracing::info!(
                                     "The build has been finished and the files are located in the temporal output directory: '{}'",
                                     path.display()

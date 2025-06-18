@@ -7,11 +7,13 @@ service LearningPlatformService {
         UserLogin,
         ListCourses,
         GetCourseConfig,
+        GetCategory,
         GetTask,
         CompareAnswer
     ],
     errors: [Unauthorized, NotFound, InternalError]
 }
+
 operation NewUser{
     input: NewUserInput
     output: User,
@@ -50,6 +52,28 @@ structure UserLoginOutput {
     expiresAt: Timestamp,
 }
 
+operation ListCourses{
+
+}
+
+
+
+operation GetCourseConfig{
+    input: CourseConfigInput,
+    output: CourseConfigOutput
+}
+
+structure CourseConfigInput{
+    @required
+    course_id: Uuid,
+}
+
+structure CourseConfigOutput{}
+
+operation GetCategory{
+    input: Category
+}
+
 operation GetTask {
     input: TaskInput,
     output: TaskOutput,
@@ -75,22 +99,12 @@ structure WebTask {
     category: String,
     files: list<String>, // for display/download
 }
-
-operation GetCourseConfig{
-    input: CourseConfigInput,
-    output: CourseOutput
-}
-
-structure CourseConfigInput{
-    @required
-    course_id: Uuid,
-}
 operation CompareAnswer{
-    input: CheckAnwer
+    input: CheckAnswer
     output: CompareAnswerOutput
 }
 
-structure CheckAnwer{
+structure CheckAnswer{
     @required
     course_id: Uuid,
     @required
@@ -107,9 +121,3 @@ structure CompareAnswerOutput {
     feedback: String,
 }
 
-structure Category {
-    id: Uuid,
-    name: String,
-    number: i32,
-    description: String,
-}

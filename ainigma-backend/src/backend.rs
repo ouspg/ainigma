@@ -1,4 +1,5 @@
-use ainigma::config::{ModuleConfiguration, Task, read_toml};
+use ainigma::config::{ModuleConfiguration, Task, read_check_toml, read_toml};
+use ainigma::errors::ConfigError;
 use std::fs;
 use std::path::Path;
 use uuid::Uuid;
@@ -8,6 +9,22 @@ const COURSES_DIR: &str = "courses";
 
 pub async fn get_task() -> Result<bool, std::io::Error> {
     // This function is a placeholder for fetching a task information to display.
+    Ok(true)
+}
+
+pub async fn check_all_config() -> Result<bool, ConfigError> {
+    let courses_path = Path::new(DATA_PATH).join(COURSES_DIR);
+    let entries =
+        fs::read_dir(&courses_path).map_err(|e| ConfigError::FileReadError(e.to_string()))?;
+    for entry_result in entries {
+        let entry = entry_result.map_err(|e| ConfigError::FileReadError(e.to_string()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            let config_path = path.join("config.toml");
+            let os_str_path = config_path.as_os_str();
+            read_check_toml(os_str_path)?;
+        }
+    }
     Ok(true)
 }
 

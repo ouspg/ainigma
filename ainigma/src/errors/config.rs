@@ -30,4 +30,6 @@ pub enum ConfigError {
     StageError(&'static str),
     #[error("Invalid build mode '{0}'. Available modes: [{1}]")]
     BuildModeError(String, String),
+    #[error("Error reading file {0}")]
+    FileReadError(String),
 }

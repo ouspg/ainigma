@@ -18,19 +18,21 @@ Smithy - Generating code for backend
 
 ## Serverside structure
 
+```
 /srv/ainigma/data/
-/courses/  
- /<course_id>/ (or name)
-config.toml (defined name for pathing)
-/<category>/ (name)
-/<task_id>/  
- entrypoint.sh  
- code_files...  
- /output/  
- /<student_uuid_v7>/  
- task files for student
-resource_files/
-Index file (index for quick course lookup and listing)
+  /courses/
+  Index file (index for quick course lookup and listing)
+    /<course_id>/ (or name)
+    config.toml (defined name for pathing)
+      /<category>/ (name)
+        /<task_id>/
+        entrypoint.sh
+        code_files...
+          /output/
+            /<student_uuid_v7>/
+            task files for student
+            resource_files/
+```
 
 ## Database structure
 

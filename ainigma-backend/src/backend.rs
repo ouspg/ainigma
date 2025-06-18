@@ -71,10 +71,10 @@ pub async fn find_task(
 }
 
 pub async fn compareanswer(
-    course_id: Uuid,
-    task_id: String,
-    user_id: Uuid,
-    answer: String,
+    _course_id: Uuid,
+    _task_id: String,
+    _user_id: Uuid,
+    _answer: String,
 ) -> Result<bool, std::io::Error> {
     // Compares the user's answer with the correct answer from database
     Ok(false) // Placeholder for actual comparison logic

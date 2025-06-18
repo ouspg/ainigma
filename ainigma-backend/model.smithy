@@ -56,8 +56,6 @@ operation ListCourses{
 
 }
 
-
-
 operation GetCourseConfig{
     input: CourseConfigInput,
     output: CourseConfigOutput

@@ -84,7 +84,7 @@ pub fn create_exam(
                 };
                 question
                     .add_answers(answers)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Error: {:?}", e)))?;
+                    .map_err(|e| io::Error::other(format!("Error: {:?}", e)))?;
                 questions.push(question.into());
             }
             None => {
@@ -98,7 +98,7 @@ pub fn create_exam(
     let categories = vec![category.into()];
     quiz.set_categories(categories);
     quiz.to_xml(filename)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Error: {:?}", e)))?;
+        .map_err(|e| io::Error::other(format!("Error: {:?}", e)))?;
     Ok(())
 }
 

@@ -604,6 +604,6 @@ pub async fn build_task<'a>(
 
         Ok(build_container)
     } else {
-        Err(BuildError::TaskNotFound(format!("{task_id}")))
+        Err(BuildError::TaskNotFound(task_id.to_string()))
     }
 }

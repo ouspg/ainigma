@@ -32,6 +32,11 @@ config.toml (defined name for pathing)
 resource_files/
 Index file (index for quick course lookup and listing)
 
+## Database structure
+
+courses (1) ── (many) categories (1) ── (many) tasks
+users (1) ── (many) user_task_progress (many) ── (1) tasks
+
 ## workflow
 
 [Client]
@@ -63,9 +68,10 @@ Index file (index for quick course lookup and listing)
 
 ## Questions
 
-- Category identifier?
+- Category no identifier and task has String
 - Course secret storage?
-- Changes only when server down? or updates?
+- Changes only when server down? (configuration checked at start and expected to be correct during runtime)
+  or updates? (updates to config during server runtime, checked in runtime with functionality locked during update process )
 
 ## Feedback
 

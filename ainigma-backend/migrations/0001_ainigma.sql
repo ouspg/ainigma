@@ -17,8 +17,7 @@ CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     name VARCHAR NOT NULL,
-    number INTEGER,
-    created_at TIMESTAMPTZ DEFAULT now()
+    number INTEGER
 );
 
 CREATE TABLE tasks (

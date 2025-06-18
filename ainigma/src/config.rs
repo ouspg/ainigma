@@ -698,6 +698,24 @@ pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigEr
         })?;
     check_toml(module_config)
 }
+
+/// Reading configuration files for server-side where faulty configs are not accepted.
+pub fn read_toml(filepath: PathBuf) -> Result<ModuleConfiguration, ConfigError> {
+    let mut file = File::open(filepath).map_err(|err| ConfigError::TomlParseError {
+        message: format!("Failed to open file: {err}"),
+    })?;
+
+    let mut file_content = String::new();
+    file.read_to_string(&mut file_content)
+        .map_err(|err| ConfigError::TomlParseError {
+            message: format!("Failed to read file content: {err}"),
+        })?;
+    let module_config =
+        toml::from_str(&file_content).map_err(|err| ConfigError::TomlParseError {
+            message: err.to_string(),
+        })?;
+    Ok(module_config)
+}
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;

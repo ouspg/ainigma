@@ -21,6 +21,8 @@ pub enum BuildError {
     // Stage had not batch when attempting batch build
     #[error("Any stage had no batch when attempting batch build: {0}")]
     StageHadNoBatch(String),
+    #[error("Task with ID {0} not found in module configuration")]
+    TaskNotFound(String),
 }
 
 impl From<serde_json::Error> for BuildError {

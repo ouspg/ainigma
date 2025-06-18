@@ -1,0 +1,60 @@
+[package]
+name = "ainigma"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "ainigma"
+path = "src/bin/cli.rs"
+
+[dependencies]
+# Our async runtime
+tokio = { version = "1.44", default-features = false, features = [
+    "macros",
+    "rt-multi-thread",
+] }
+
+# Crypto
+sha3 = "0.10"
+hmac = "0.12"
+rand = "0.9"
+
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+toml = "0.8"
+
+# Cli
+itertools = "0.14.0"
+clap = { version = "4.5", features = ["derive", "cargo"] }
+thiserror = "2"
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3.19", features = [] }
+aws-sdk-s3 = { version = "1.82.0", default-features = false, features = [
+    "rt-tokio",
+] }
+aws-config = { version = "1.6.1", default-features = false, features = [
+    "client-hyper",
+    "rt-tokio",
+    "rustls",
+] }
+futures = "0.3.31"
+moodle-xml = "0.2.0"
+serde_json = "1"
+once_cell = { version = "1", default-features = false }
+tempfile = { version = "3", default-features = false }
+[dependencies.uuid]
+version = "1"
+features = [
+    "v7",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+    "serde",
+]
+
+[dev-dependencies]
+insta = { version = "1" }
+assert_cmd = "2"
+predicates = "3"
+
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3

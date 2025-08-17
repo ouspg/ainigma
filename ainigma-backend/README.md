@@ -15,8 +15,6 @@ Other things they need to take for backend to work
 
 Sqlx - Database
 
-Smithy - Generating code for backend
-
 ## Serverside structure
 
 ```
@@ -75,6 +73,7 @@ users (1) ── (many) user_task_progress (many) ── (1) tasks
 
 
 - Course secret storage?
+- Database and authentication?
 
 
 ## Feedback

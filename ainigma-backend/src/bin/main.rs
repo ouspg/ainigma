@@ -1,20 +1,19 @@
 use ainigma_backend::{
     backend::{
-        DataStructureStatus, categories_handler, generate_data_structure, get_task_metadata,
-        handler_404, list_courses_handler, tasks_handler, download_file_handler
+        DataStructureStatus, categories_handler, download_file_handler, generate_data_structure,
+        get_task_metadata, handler_404, list_courses_handler, tasks_handler,
     },
     errors::filesystem::FileSystemError,
 };
 use axum::{Extension, Json, Router, routing::get};
-use std::sync::Arc;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<FileSystemError>> {
     init_logging();
     tracing::info!("Server is starting...");
-
 
     tracing::info!("Generating/Checking server data structure...");
     let data_structure_result = match generate_data_structure().await {
@@ -46,7 +45,10 @@ async fn main() -> Result<(), Box<FileSystemError>> {
             "/{course_id}/{category_name}/{task_id}/{uuid}",
             get(get_task_metadata),
         )
-        .route("/{course_id}/{category_name}/{task_id}/{uuid}/download/{file_name}", get(download_file_handler));
+        .route(
+            "/{course_id}/{category_name}/{task_id}/{uuid}/download/{file_name}",
+            get(download_file_handler),
+        );
 
     let app = Router::new()
         .nest("/courses", courses_router)
@@ -57,9 +59,7 @@ async fn main() -> Result<(), Box<FileSystemError>> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     tracing::info!("Listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
-        FileSystemError::BindError(format!(
-            "Could not bind to address {addr}: {e}"
-        ))
+        FileSystemError::BindError(format!("Could not bind to address {addr}: {e}"))
     })?;
     axum::serve(listener, app)
         .await

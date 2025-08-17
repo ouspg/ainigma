@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use ainigma_backend::backend::{
-    Cache, categories_handler, download_file_handler, generate_data_structure,
-    get_task_metadata, handler_404, list_courses_handler, tasks_handler,
+    Cache, categories_handler, download_file_handler, generate_data_structure, get_task_metadata,
+    handler_404, list_courses_handler, tasks_handler,
 };
 use axum::{Extension, Json, Router, routing::get};
 use reqwest::Client;

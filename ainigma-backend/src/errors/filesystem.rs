@@ -1,4 +1,3 @@
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -30,4 +29,3 @@ pub enum FileSystemError {
     #[error("Initialization error: {0}")]
     InitializationError(String),
 }
-

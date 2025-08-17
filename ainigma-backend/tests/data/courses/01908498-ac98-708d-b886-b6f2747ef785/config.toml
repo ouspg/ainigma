@@ -1,0 +1,30 @@
+identifier = "01908498-ac98-708d-b886-b6f2747ef785"
+name = "Cybersecurity"
+description = "A test course"
+version = "0.0.1"
+
+[[categories]]
+number = 1
+name = "Network_Security_Fundamentals"
+
+[[categories.tasks]]
+id = "task001"
+name = "Challenge 5"
+description = "Try harder."
+points = 2.0
+stages = [{ flag = { kind = "user_derived" } }]
+
+[categories.tasks.build]
+directory = "/tests/data/courses/01908498-ac98-708d-b886-b6f2747ef785/Network_Security_Fundamentals/task001"
+builder = { shell = { entrypoint = "build.sh" } }
+enabled_modes = ["sequential"]
+
+[[categories.tasks.build.output]]
+kind = { readme = "readme.txt" }
+
+[[categories.tasks.build.output]]
+kind = { resource = "secret.sh" }
+
+[flag_config]
+user_derived = { secret = "testsecret" }
+rng_seed = { secret = "seed" }

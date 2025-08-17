@@ -7,15 +7,24 @@ edition = "2024"
 ainigma = { path = "../ainigma" }
 
 # and any other dependencies you need:
-hyper = "1.6.0"
 axum = "0.8.4"
-tokio = { version = "1", features = ["full"] }
-uuid = { version = "1.17.0", features = ["v7", "serde"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs"] }
+uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
 serde = { version = "1.0.211", features = ["derive"] }
 serde_json = "1"
 tower = "0.5.2"
-sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls"] }
+sqlx = { version = "0.8.6", features = ["postgres", "uuid", "runtime-tokio-rustls"] }
+thiserror = "2"
+lazy_static = "1.5.0"
+regex = "1.11.1"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"]}
+chrono = "0.4.41"
+anyhow = "1.0.98"
+mime_guess = "2.0.5"
+tokio-util = "0.7.16"
 
 [dev-dependencies]
 reqwest = { version = "0.12.19", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs"] }
+httpc-test = "0.1.1"

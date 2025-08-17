@@ -433,9 +433,6 @@ pub async fn generate_data_structure() -> Result<DataStructureResult, FileSystem
 /// # Returns
 /// `Ok(true)` on success, or `Err(FileSystemError)` if any directory creation fails.
 ///
-/// # Example
-/// ```rust
-/// generate_course_structure(config).await?;
 pub async fn generate_course_structure(
     config: ModuleConfiguration,
 ) -> Result<ModuleConfiguration, FileSystemError> {

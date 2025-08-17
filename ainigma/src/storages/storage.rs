@@ -70,8 +70,7 @@ impl FileObjects {
 
             if file_map.contains_key(&file_name) {
                 return Err(FileObjectError::FilesNotUnique(format!(
-                    "File {} already exists in the list",
-                    file_name
+                    "File {file_name} already exists in the list"
                 )));
             }
             file_map.insert(file_name, file);

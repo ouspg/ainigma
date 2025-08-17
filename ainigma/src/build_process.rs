@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tokio::process::Command as TokioCommand;
+
 // use tracing::instrument;
 use uuid::Uuid;
 
@@ -100,8 +102,7 @@ impl IntermediateOutput {
             .count();
         if readme_count != 1 {
             return Err(BuildError::OutputVerificationFailed(format!(
-                "Expected exactly one readme file, found {}",
-                readme_count
+                "Expected exactly one readme file, found {readme_count}"
             )));
         }
         Ok(())
@@ -195,8 +196,7 @@ fn get_build_info(
         }
     }
     Err(format!(
-        "Build information for task with id {} not found!",
-        task_id
+        "Build information for task with id {task_id} not found!"
     ))
 }
 /// Couple output items together, so we link points to the correct output
@@ -264,6 +264,57 @@ fn run_subprocess(
             )));
         }
     };
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            tracing::info!("{}", line);
+        }
+        build_manifest.validate_output()?;
+
+        // If the task has a seed-based flag, we must capture the resulting flag from the process output
+        // Stored into the file flags.json by default, using same key as the passed environment variable
+        map_rng_seed_to_flag(
+            &mut build_manifest.outputs,
+            &build_manifest.basedir,
+            build_manifest.task,
+        )?;
+
+        Ok(())
+    } else {
+        Err(BuildError::ShellSubprocessError(format!(
+            "The build process for task {} failed with non-zero exit code. Error: {}",
+            build_manifest.task.id,
+            std::str::from_utf8(&output.stderr).unwrap_or("Unable to read stderr")
+        )))
+    }
+}
+
+async fn run_subprocess_async(
+    program: &str,
+    args: Vec<&str>,
+    task_directory: &Path,
+    build_manifest: &mut TaskBuildContainer<'_>,
+    build_envs: HashMap<String, String>,
+) -> Result<(), BuildError> {
+    tracing::debug!(
+        "Running subprocess: {} with args: {:?} in folder {}",
+        program,
+        args,
+        &task_directory.display()
+    );
+    let output = TokioCommand::new(program)
+        .args(args)
+        .envs(build_envs) // Use merged environment
+        .current_dir(task_directory)
+        .output()
+        .await
+        .map_err(|e| {
+            BuildError::ShellSubprocessError(format!(
+                "The build process of task {} failed prematurely: {}",
+                build_manifest.task.id, e
+            ))
+        })?;
+
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         for line in stdout.lines() {
@@ -457,8 +508,7 @@ pub fn build_sequential<'a>(
     if !output_directory.exists() {
         fs::create_dir_all(output_directory).map_err(|e| {
             BuildError::InvalidOutputDirectory(format!(
-                "Failed to create the base output directory: {}",
-                e
+                "Failed to create the base output directory: {e}"
             ))
         })?;
     }
@@ -525,24 +575,26 @@ pub fn build_sequential<'a>(
     Ok(build_manifest.outputs.remove(0))
 }
 
-/// Build task function for serverside use
+/// Build task function for serverside use containing the task folder
 pub async fn build_task<'a>(
     module_config: &'a ModuleConfiguration,
+    task_directory: &Path,
     task_id: &str,
     uuid: Uuid,
 ) -> Result<TaskBuildContainer<'a>, BuildError> {
+    tracing::debug!(
+        "Building task {} with UUID {} in directory {}",
+        task_id,
+        uuid,
+        task_directory.display()
+    );
     // Task has to exist
     if let Some(task) = module_config.get_task_by_id(task_id) {
-        let path = task.build.directory.clone();
         // path must exist checked in the module configuration
-        // check if output directory exists
-        let output_dir = path.join("output");
-        // if not, create it
-        tokio::fs::create_dir_all(&output_dir)
-            .await
-            .map_err(|e| BuildError::InvalidOutputDirectory(e.to_string()))?;
+        // output directory must exists
         // There isnt a student folder inside the output directory it is checked before
-        let student_output_dir = output_dir.join(uuid.to_string());
+        let relative_student_output_dir = PathBuf::from("output").join(uuid.to_string());
+        let student_output_dir = task_directory.join(&relative_student_output_dir);
         // TODO: Add optional execution where student files are not saved
         tokio::fs::create_dir_all(&student_output_dir)
             .await
@@ -561,7 +613,7 @@ pub async fn build_task<'a>(
             IntermediateOutput::new(uuid, flags, student_output_dir.clone(), expected_outputs);
 
         let mut build_container = TaskBuildContainer::new(
-            student_output_dir.to_path_buf(),
+            task_directory.to_path_buf(),
             task,
             vec![intermediate_output],
             false,
@@ -586,15 +638,17 @@ pub async fn build_task<'a>(
                 tracing::debug!(
                     "Running shell command: {} in directory: {}",
                     entrypoint.entrypoint,
-                    student_output_dir.display()
+                    task_directory.display()
                 );
 
-                run_subprocess(
+                run_subprocess_async(
                     "sh",
                     vec![&entrypoint.entrypoint],
+                    task_directory,
                     &mut build_container,
                     build_envs,
-                )?;
+                )
+                .await?;
             }
             Builder::Nix(_) => todo!("Nix builder not implemented"),
         }

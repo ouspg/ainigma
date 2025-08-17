@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use tokio::io::AsyncReadExt;
 use uuid::Uuid;
 
 const DEFAULT_NIX_FILENAME: &str = "flake.nix";
@@ -30,7 +31,7 @@ fn random_hex_secret() -> String {
         String::with_capacity(random_bytes.len() * 2),
         |mut acc, b| {
             use std::fmt::Write;
-            let _ = write!(acc, "{:02x}", b);
+            let _ = write!(acc, "{b:02x}");
             acc
         },
     )
@@ -339,7 +340,7 @@ where
 {
     let modes = Vec::<BuildMode>::deserialize(deserializer)?;
     NonEmptyBuildModes::new(modes)
-        .map_err(|err| serde::de::Error::custom(format!("Error in 'enabled_modes' field: {}", err)))
+        .map_err(|err| serde::de::Error::custom(format!("Error in 'enabled_modes' field: {err}")))
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -684,13 +685,34 @@ pub fn check_task(task: &Task) -> Result<bool, ConfigError> {
 //TODO: Add warnings for unspecified fields
 pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigError> {
     let mut file = File::open(filepath).map_err(|err| ConfigError::TomlParseError {
-        message: format!("Failed to open file: {}", err),
+        message: format!("Failed to open file: {err}"),
     })?;
 
     let mut file_content = String::new();
     file.read_to_string(&mut file_content)
         .map_err(|err| ConfigError::TomlParseError {
-            message: format!("Failed to read file content: {}", err),
+            message: format!("Failed to read file content: {err}"),
+        })?;
+    let module_config =
+        toml::from_str(&file_content).map_err(|err| ConfigError::TomlParseError {
+            message: err.to_string(),
+        })?;
+    check_toml(module_config)
+}
+
+pub async fn server_read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigError> {
+    let mut file =
+        tokio::fs::File::open(filepath)
+            .await
+            .map_err(|err| ConfigError::TomlParseError {
+                message: format!("Failed to open file: {err}"),
+            })?;
+
+    let mut file_content = String::new();
+    file.read_to_string(&mut file_content)
+        .await
+        .map_err(|err| ConfigError::TomlParseError {
+            message: format!("Failed to read file content: {err}"),
         })?;
     let module_config =
         toml::from_str(&file_content).map_err(|err| ConfigError::TomlParseError {
@@ -700,7 +722,7 @@ pub fn read_check_toml(filepath: &OsStr) -> Result<ModuleConfiguration, ConfigEr
 }
 
 /// Reading configuration files for server-side where faulty configs are not accepted.
-pub fn read_toml(filepath: PathBuf) -> Result<ModuleConfiguration, ConfigError> {
+pub async fn read_toml(filepath: PathBuf) -> Result<ModuleConfiguration, ConfigError> {
     let mut file = File::open(filepath).map_err(|err| ConfigError::TomlParseError {
         message: format!("Failed to open file: {err}"),
     })?;

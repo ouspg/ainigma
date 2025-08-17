@@ -53,8 +53,17 @@ structure UserLoginOutput {
 }
 
 operation ListCourses{
-
+    output: ListCoursesOutput,
 }
+structure ListCoursesOutput {
+    courses: Vec<Course>
+}
+
+structure Course{
+    name: String
+    id: Uuid
+}
+
 
 operation GetCourseConfig{
     input: CourseConfigInput,

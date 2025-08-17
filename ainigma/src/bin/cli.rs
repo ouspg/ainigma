@@ -139,8 +139,7 @@ fn output_dir_selection(output_dir: Option<&PathBuf>) -> Result<OutputDirectory,
             let temp_dir = match TempDir::new() {
                 Ok(dir) => dir,
                 Err(error) => Err(BuildError::TemporaryDirectoryFail(format!(
-                    "Error when creating a temporal directory {}",
-                    error
+                    "Error when creating a temporal directory {error}"
                 )))?,
             };
             tracing::info!(
@@ -344,7 +343,7 @@ fn main() -> std::process::ExitCode {
             }
             Commands::Validate { task } => {
                 tracing::info!("Validating the configuration file...");
-                println!("{:#?}", config);
+                println!("{config:#?}");
                 tracing::info!(
                     "Configuration file is valid. Creating '{}' file in the current directory.",
                     DEFAULT_BUILD_MANIFEST
@@ -449,8 +448,7 @@ fn parallel_task_build<'a>(
                 if failure_flag.load(Ordering::SeqCst) {
                     tracing::info!("Skipping variant {} due to failure in another variant", i);
                     return Err(BuildError::ThreadError(format!(
-                        "Stopping variant {} due to failure in another thread",
-                        i
+                        "Stopping variant {i} due to failure in another thread"
                     )));
                 }
 
@@ -498,13 +496,12 @@ fn parallel_task_build<'a>(
                     }
                 }
                 Err(panic_error) => {
-                    let error_msg = format!("Thread panicked: {:?}", panic_error);
+                    let error_msg = format!("Thread panicked: {panic_error:?}");
                     tracing::error!("{}", error_msg);
 
                     if first_error.is_none() {
                         first_error = Some(BuildError::ThreadError(format!(
-                            "Error when joining thread: {}",
-                            error_msg
+                            "Error when joining thread: {error_msg}"
                         )));
                     }
                 }

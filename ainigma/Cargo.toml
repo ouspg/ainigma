@@ -12,6 +12,7 @@ path = "src/bin/cli.rs"
 tokio = { version = "1.44", default-features = false, features = [
     "macros",
     "rt-multi-thread",
+    "process"
 ] }
 
 # Crypto

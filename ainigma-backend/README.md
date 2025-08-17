@@ -14,14 +14,12 @@ Other things they need to take for backend to work
 ## Software
 
 Sqlx - Database
-Smithy - Generating code for backend
 
 ## Serverside structure
 
 ```
 /srv/ainigma/data/
   /courses/
-  Index file (index for quick course lookup and listing)
     /<course_id>/ (or name)
     config.toml (defined name for pathing)
       /<category>/ (name)
@@ -39,10 +37,12 @@ Smithy - Generating code for backend
 courses (1) ── (many) categories (1) ── (many) tasks
 users (1) ── (many) user_task_progress (many) ── (1) tasks
 
-## workflow
+## Workflow
 
+```
 [Client]
 |
+|-- Request for structures course, category (static response figured at server start) -->
 |-- Request (uuid, task_id, course_id) -->
 |
 [Server]
@@ -53,8 +53,9 @@ users (1) ── (many) user_task_progress (many) ── (1) tasks
 | |-- Generate flags
 | |-- Build task using course config
 | |-- Save built task
+| |-- Add Correct flag / answer to database
 |-- Return task data -->
-|-- Add Correct flag / answer to database
+|
 [Client receives task and starts solving]
 [Client]
 |
@@ -67,15 +68,16 @@ users (1) ── (many) user_task_progress (many) ── (1) tasks
 |-- No: send feedback
 |
 [Client] receives feedback
-
+```
 ## Questions
 
-- Category no identifier and task has String
+
 - Course secret storage?
-- Changes only when server down? (configuration checked at start and expected to be correct during runtime)
-  or updates? (updates to config during server runtime, checked in runtime with functionality locked during update process )
+- Database and authentication?
+
 
 ## Feedback
 
 - No support for v7 uuid in postgre only v4
-- New build function that takes a uuid, and just takes module and task_id
+- config catogories.tasks.build path made obsolete in backend - backend always knows what task to process 
+

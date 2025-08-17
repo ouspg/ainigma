@@ -44,7 +44,7 @@ fn batch_simple_validate() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = temp_dir.path().join(DEFAULT_BUILD_MANIFEST);
     // print manifest file content
     let manifest_content = std::fs::read_to_string(&manifest)?;
-    println!("Manifest content: {}", manifest_content);
+    println!("Manifest content: {manifest_content}");
 
     assert!(
         manifest.exists(),

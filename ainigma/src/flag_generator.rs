@@ -127,7 +127,7 @@ impl FlagUnit {
     fn rng_flag(identifier: String, lenght: u8) -> Self {
         let suffix = pure_random_flag(lenght);
 
-        let encased = format!("flag{{{}:{}}}", identifier, suffix);
+        let encased = format!("flag{{{identifier}:{suffix}}}");
         FlagUnit {
             identifier,
             suffix,
@@ -153,7 +153,7 @@ impl FlagUnit {
             Ok(flag) => flag,
             Err(_error) => panic!("Error generating flag"),
         };
-        let encased = format!("flag{{{}:{}}}", identifier, flag_suffix);
+        let encased = format!("flag{{{identifier}:{flag_suffix}}}");
 
         FlagUnit {
             identifier,
@@ -197,7 +197,7 @@ fn user_derived_flag(
 
             let result = mac.finalize();
             let bytes = result.into_bytes();
-            Ok(format!("{:x}", bytes))
+            Ok(format!("{bytes:x}"))
         }
     }
 }
@@ -216,7 +216,7 @@ fn compare_hmac(
 
     let result = mac.finalize();
     let bytes = result.into_bytes();
-    let s = format!("{:x}", bytes);
+    let s = format!("{bytes:x}");
     Ok(s == hmac)
 }
 
@@ -239,7 +239,7 @@ mod tests {
         let taskid2 = "task1".to_string();
         let hash =
             user_derived_flag(&Algorithm::HMAC_SHA3_256, &id, &secret, &taskid).expect("error");
-        print!("{}", hash);
+        print!("{hash}");
         assert!(compare_hmac(hash, id, secret2, taskid2).expect("should work"))
     }
 
@@ -259,16 +259,16 @@ mod tests {
         let answer2 =
             user_derived_flag(&Algorithm::HMAC_SHA3_256, &id, &secret, &taskid).expect("works");
 
-        println!("{}", answer1);
-        println!("{}", answer2);
+        println!("{answer1}");
+        println!("{answer2}");
 
         let flag = Flag::new_user_flag(prefix, &Algorithm::HMAC_SHA3_256, &secret2, &taskid2, &id);
         let result = flag.flag_string();
-        println!("{}", result);
+        println!("{result}");
         let flag2 =
             Flag::new_user_flag(prefix2, &Algorithm::HMAC_SHA3_256, &secret3, &taskid3, &id);
         let result2 = flag2.flag_string();
-        println!("{}", result2);
+        println!("{result2}");
     }
 
     #[test]
@@ -289,6 +289,6 @@ mod tests {
         let string = flag.flag_string();
         let string2 = flag2.flag_string();
         let string3 = flag3.flag_string();
-        println!("{} {} {}", string, string2, string3)
+        println!("{string} {string2} {string3}")
     }
 }

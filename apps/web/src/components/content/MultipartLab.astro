@@ -1,0 +1,15 @@
+---
+import MultipartLabIsland from "../islands/MultipartLabIsland";
+import { getMultipartChallenge } from "../../lib/challenges/repository";
+
+interface Props {
+  taskId: string;
+}
+
+const { taskId } = Astro.props;
+const challenge = getMultipartChallenge(taskId);
+---
+
+<section class="task-island-anchor" data-task-id={taskId}>
+  <MultipartLabIsland client:idle {taskId} {challenge} />
+</section>

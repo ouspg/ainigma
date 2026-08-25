@@ -1,0 +1,7 @@
+name: ainigma-infrastructure
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm
+main: src/index.ts
+description: Ainigma infrastructure on CSC cPouta

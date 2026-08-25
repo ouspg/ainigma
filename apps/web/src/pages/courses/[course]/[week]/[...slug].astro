@@ -1,0 +1,79 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import LearningFrame from "../../../../components/shell/LearningFrame.astro";
+import ReadingWorkspace from "../../../../components/pages/ReadingWorkspace";
+import {
+  buildOutlineSections,
+  getCourse,
+  getLearningWorkspace,
+} from "../../../../lib/learning/catalog";
+import { getLocale } from "../../../../lib/i18n";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("courses");
+  const publishedCourses = new Set(
+    entries.flatMap((entry) =>
+      entry.data.kind === "course" && !entry.data.draft ? [entry.id.split("/")[0]] : [],
+    ),
+  );
+  return entries
+    .filter(
+      (entry) =>
+        entry.data.kind === "task" && publishedCourses.has(entry.id.split("/")[0] ?? ""),
+    )
+    .map((entry) => {
+      const [course, week, ...slugParts] = entry.id.split("/");
+      return { params: { course, week, slug: slugParts.join("/") }, props: { entry } };
+    });
+}
+
+interface Props {
+  entry: CollectionEntry<"courses">;
+}
+
+const { entry } = Astro.props;
+if (entry.data.kind !== "task") throw new Error(`Expected task entry: ${entry.id}`);
+const { Content, headings, remarkPluginFrontmatter } = await render(entry);
+const entries = await getCollection("courses");
+const workspace = await getLearningWorkspace(entries);
+const [courseSlug, weekSlug] = entry.id.split("/");
+const course = await getCourse(entries, courseSlug ?? "");
+const week = course.weeks.find((candidate) => candidate.slug === weekSlug);
+if (!week) throw new Error(`Missing week manifest for task: ${entry.id}`);
+const taskIndex = week.tasks.findIndex((task) => entry.id.endsWith(`/${task.slug}`));
+const previousTask = taskIndex > 0 ? week.tasks[taskIndex - 1] : undefined;
+const nextTask = taskIndex >= 0 ? week.tasks[taskIndex + 1] : undefined;
+const outline = buildOutlineSections(headings, remarkPluginFrontmatter.activityOutline);
+const currentPath = week.tasks[taskIndex]?.href ?? week.href;
+const locale = getLocale(Astro.currentLocale);
+---
+
+<BaseLayout title={`${entry.data.title} | ${course.title}`} description={entry.data.summary} {locale}>
+  <LearningFrame
+    {currentPath}
+    courses={workspace.courses}
+    profile={workspace.profile}
+    term={workspace.term}
+    activities={workspace.activity}
+    {locale}
+  >
+    <ReadingWorkspace
+      eyebrow={`${course.code} · Week ${week.number} · Activity ${taskIndex + 1}`}
+      title={entry.data.title}
+      summary={entry.data.summary}
+      {locale}
+      meta={[`${entry.data.estimatedMinutes} minutes`, `${entry.data.points} points`]}
+      {outline}
+      previous={
+        previousTask
+          ? { href: previousTask.href, label: previousTask.title }
+          : { href: week.href, label: `Week ${week.number} overview` }
+      }
+      {...(nextTask ? { next: { href: nextTask.href, label: nextTask.title } } : {})}
+    >
+      <Content />
+    </ReadingWorkspace>
+  </LearningFrame>
+</BaseLayout>

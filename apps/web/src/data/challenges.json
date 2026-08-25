@@ -1,0 +1,36 @@
+{
+  "packet-triage": {
+    "type": "multipart",
+    "title": "Packet triage",
+    "description": "Complete both checkpoints before submitting the final flag.",
+    "steps": [
+      {
+        "id": "unusual-exchange",
+        "title": "Isolate the unusual exchange",
+        "description": "Compare packet 18 with the baseline and note the TTL difference.",
+        "actionLabel": "Mark reviewed",
+        "completedLabel": "Reviewed"
+      },
+      {
+        "id": "application-protocol",
+        "title": "Identify the application protocol",
+        "description": "Give the common protocol name, not the port number.",
+        "inputLabel": "Protocol",
+        "placeholder": "Protocol name",
+        "answer": "dns",
+        "errorMessage": "Not quite. Inspect the destination port in the sample.",
+        "successMessage": "Correct. DNS is the protocol carrying the anomaly."
+      }
+    ]
+  },
+  "investigation-flag": {
+    "type": "flag",
+    "title": "Investigation flag",
+    "description": "Submit the conclusion from the trace comparison.",
+    "placeholder": "AINIGMA{...}",
+    "expectedFormat": "AINIGMA{TTL-00}",
+    "answer": "AINIGMA{TTL-17}",
+    "successMessage": "Correct. The investigation checkpoint is complete.",
+    "errorMessage": "That flag does not match. Recheck the TTL delta and casing."
+  }
+}

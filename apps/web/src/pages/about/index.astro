@@ -1,0 +1,12 @@
+---
+import PublicInfoPage from "../../components/pages/PublicInfoPage";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getLocale, getMessages } from "../../lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const metadata = getMessages(locale).metadata;
+---
+
+<BaseLayout title={metadata.aboutTitle} description={metadata.aboutDescription} {locale}>
+  <PublicInfoPage kind="about" {locale} />
+</BaseLayout>

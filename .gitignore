@@ -3,3 +3,11 @@ target/
 .vscode/
 Cargo.lock
 .env
+.ainigma/
+.shots/
+node_modules/
+apps/web/dist/
+apps/web/.astro/
+infra/pulumi/dist/
+result
+result-*

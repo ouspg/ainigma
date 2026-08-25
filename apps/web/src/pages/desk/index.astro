@@ -1,0 +1,30 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import LearningFrame from "../../components/shell/LearningFrame.astro";
+import DashboardIsland from "../../components/islands/DashboardIsland";
+import { getLearningWorkspace } from "../../lib/learning/catalog";
+import { getLocale, getMessages } from "../../lib/i18n";
+
+const entries = await getCollection("courses");
+const workspace = await getLearningWorkspace(entries);
+const locale = getLocale(Astro.currentLocale);
+const metadata = getMessages(locale).metadata;
+---
+
+<BaseLayout
+  title={metadata.deskTitle}
+  description={metadata.deskDescription}
+  {locale}
+>
+  <LearningFrame
+    currentPath="/desk/"
+    courses={workspace.courses}
+    profile={workspace.profile}
+    term={workspace.term}
+    activities={workspace.activity}
+    {locale}
+  >
+    <DashboardIsland client:load {workspace} {locale} />
+  </LearningFrame>
+</BaseLayout>

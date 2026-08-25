@@ -1,0 +1,34 @@
+{
+  "name": "ainigma-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "infra/pulumi"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "infra:typecheck": "npm --workspace infra/pulumi run typecheck",
+    "supabase:start": "supabase start",
+    "supabase:reset": "supabase db reset"
+  },
+  "devDependencies": {
+    "supabase": "^2.115.0",
+    "vite-plus": "0.3.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "12.0.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "allowScripts": {
+    "@astryxdesign/cli@0.1.9": true,
+    "protobufjs@7.6.5": true,
+    "@astryxdesign/core@0.5.0": true
+  }
+}

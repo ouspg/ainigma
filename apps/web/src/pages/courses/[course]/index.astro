@@ -1,0 +1,45 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import LearningFrame from "../../../components/shell/LearningFrame.astro";
+import CourseOverview from "../../../components/pages/CourseOverview";
+import { getCourse, getLearningWorkspace } from "../../../lib/learning/catalog";
+import { getLocale } from "../../../lib/i18n";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("courses");
+  return entries
+    .filter((entry) => entry.data.kind === "course" && !entry.data.draft)
+    .map((entry) => ({
+      params: { course: entry.id.split("/")[0] },
+      props: { entry },
+    }));
+}
+
+interface Props {
+  entry: CollectionEntry<"courses">;
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const entries = await getCollection("courses");
+const workspace = await getLearningWorkspace(entries);
+const course = await getCourse(entries, entry.id.split("/")[0] ?? "");
+const locale = getLocale(Astro.currentLocale);
+---
+
+<BaseLayout title={`${course.title} | Ainigma`} description={course.summary} {locale}>
+  <LearningFrame
+    currentPath={course.href}
+    courses={workspace.courses}
+    profile={workspace.profile}
+    term={workspace.term}
+    activities={workspace.activity}
+    {locale}
+  >
+    <CourseOverview {course} {locale}>
+      <Content />
+    </CourseOverview>
+  </LearningFrame>
+</BaseLayout>

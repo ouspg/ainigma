@@ -1,0 +1,15 @@
+---
+import FlagChallengeIsland from "../islands/FlagChallengeIsland";
+import { getFlagChallenge } from "../../lib/challenges/repository";
+
+interface Props {
+  taskId: string;
+}
+
+const { taskId } = Astro.props;
+const challenge = getFlagChallenge(taskId);
+---
+
+<section class="task-island-anchor" data-task-id={taskId}>
+  <FlagChallengeIsland client:idle {taskId} {challenge} />
+</section>

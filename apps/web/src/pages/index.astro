@@ -1,0 +1,20 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PublicHomePage from "../components/pages/PublicHomePage";
+import { getPublicCourseCatalog } from "../lib/learning/catalog";
+import { getLocale, getMessages } from "../lib/i18n";
+
+const entries = await getCollection("courses");
+const courses = getPublicCourseCatalog(entries);
+const locale = getLocale(Astro.currentLocale);
+const metadata = getMessages(locale).metadata;
+---
+
+<BaseLayout
+  title={metadata.homeTitle}
+  description={metadata.homeDescription}
+  {locale}
+>
+  <PublicHomePage {courses} {locale} />
+</BaseLayout>

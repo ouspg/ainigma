@@ -1,0 +1,156 @@
+---
+import "../styles/global.css";
+import { ClientRouter } from "astro:transitions";
+import {
+  APPEARANCE_THEME_STORAGE_KEY,
+  ASTRYX_THEME_NAMES,
+  DEFAULT_APPEARANCE_THEME,
+} from "../lib/appearance";
+import { COLOR_MODE_STORAGE_KEY } from "../lib/color-mode";
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  title: string;
+  description: string;
+  locale?: Locale;
+}
+
+const { title, description, locale = "en" } = Astro.props;
+const isLearningRoute = /^\/(?:fi\/)?(?:desk|activity|courses)(?:\/|$)/.test(Astro.url.pathname);
+---
+
+<!doctype html>
+<html
+  lang={locale === "fi" ? "fi-FI" : "en"}
+  data-locale={locale}
+  data-appearance-theme={DEFAULT_APPEARANCE_THEME}
+  data-astryx-theme={ASTRYX_THEME_NAMES[DEFAULT_APPEARANCE_THEME]}
+  transition:animate="none"
+>
+  <head>
+    <meta charset="UTF-8" />
+    <script
+      is:inline
+      define:vars={{
+        appearanceThemeStorageKey: APPEARANCE_THEME_STORAGE_KEY,
+        astryxThemeNames: ASTRYX_THEME_NAMES,
+        colorModeStorageKey: COLOR_MODE_STORAGE_KEY,
+      }}
+    >
+      const applySavedAppearance = (root) => {
+        try {
+          const storedAppearanceTheme = localStorage.getItem(appearanceThemeStorageKey);
+          const savedAppearanceTheme =
+            storedAppearanceTheme === "hacker" ? "terminal" : storedAppearanceTheme;
+          const appearanceTheme = Object.prototype.hasOwnProperty.call(
+            astryxThemeNames,
+            savedAppearanceTheme,
+          )
+            ? savedAppearanceTheme
+            : "academic";
+          root.dataset.appearanceTheme = appearanceTheme;
+          root.dataset.astryxTheme = astryxThemeNames[appearanceTheme];
+
+          const savedColorMode = localStorage.getItem(colorModeStorageKey);
+          if (savedColorMode === "light" || savedColorMode === "dark") {
+            root.dataset.colorMode = savedColorMode;
+          } else {
+            delete root.dataset.colorMode;
+          }
+        } catch {
+          // A blocked storage API should not block the first render.
+        }
+      };
+
+      applySavedAppearance(document.documentElement);
+
+      // ClientRouter swaps the server-rendered <html> attributes as well as the
+      // page body. Apply the learner's preference to the incoming document so
+      // its default/system mode never replaces the active mode for one frame.
+      document.addEventListener("astro:before-swap", (event) => {
+        applySavedAppearance(event.newDocument.documentElement);
+      });
+    </script>
+    <script is:inline>
+      const publicAstryxThemeNames = {
+        academic: "ainigma-academic",
+        terminal: "ainigma-terminal",
+      };
+      const syncAppearanceThemeChoices = () => {
+        const activeTheme = document.documentElement.dataset.appearanceTheme;
+        document.querySelectorAll("[data-appearance-theme-choice]").forEach((choice) => {
+          choice.setAttribute(
+            "aria-pressed",
+            choice.getAttribute("data-appearance-theme-choice") === activeTheme ? "true" : "false",
+          );
+        });
+      };
+      document.addEventListener("DOMContentLoaded", syncAppearanceThemeChoices, { once: true });
+
+      const syncColorModeChoices = () => {
+        const activeMode = document.documentElement.dataset.colorMode ?? "system";
+        document.querySelectorAll("[data-color-mode-choice]").forEach((choice) => {
+          choice.setAttribute(
+            "aria-pressed",
+            choice.getAttribute("data-color-mode-choice") === activeMode ? "true" : "false",
+          );
+        });
+      };
+      document.addEventListener("DOMContentLoaded", syncColorModeChoices, { once: true });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const themeChoice = target.closest("[data-appearance-theme-choice]");
+        if (themeChoice) {
+          const theme = themeChoice.getAttribute("data-appearance-theme-choice");
+          if (theme && Object.prototype.hasOwnProperty.call(publicAstryxThemeNames, theme)) {
+            document.documentElement.dataset.appearanceTheme = theme;
+            document.documentElement.dataset.astryxTheme = publicAstryxThemeNames[theme];
+            try {
+              localStorage.setItem("ainigma.appearance-theme", theme);
+            } catch {
+              // The in-page preference still works when browser storage is blocked.
+            }
+            syncAppearanceThemeChoices();
+            themeChoice.closest("details")?.removeAttribute("open");
+          }
+          return;
+        }
+        const colorModeChoice = target.closest("[data-color-mode-choice]");
+        if (colorModeChoice) {
+          const mode = colorModeChoice.getAttribute("data-color-mode-choice");
+          if (mode === "system" || mode === "light" || mode === "dark") {
+            if (mode === "system") {
+              delete document.documentElement.dataset.colorMode;
+            } else {
+              document.documentElement.dataset.colorMode = mode;
+            }
+            try {
+              if (mode === "system") {
+                localStorage.removeItem("ainigma.color-mode");
+              } else {
+                localStorage.setItem("ainigma.color-mode", mode);
+              }
+            } catch {
+              // The in-page preference still works when browser storage is blocked.
+            }
+            syncColorModeChoices();
+            colorModeChoice.closest("details")?.removeAttribute("open");
+          }
+          return;
+        }
+      });
+    </script>
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    {isLearningRoute ? <ClientRouter fallback="swap" /> : null}
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

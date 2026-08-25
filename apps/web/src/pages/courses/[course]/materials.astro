@@ -1,0 +1,69 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import LearningFrame from "../../../components/shell/LearningFrame.astro";
+import ReadingWorkspace from "../../../components/pages/ReadingWorkspace";
+import {
+  buildOutlineSections,
+  getCourse,
+  getLearningWorkspace,
+} from "../../../lib/learning/catalog";
+import { getLocale } from "../../../lib/i18n";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("courses");
+  const publishedCourses = new Set(
+    entries.flatMap((entry) =>
+      entry.data.kind === "course" && !entry.data.draft ? [entry.id.split("/")[0]] : [],
+    ),
+  );
+  return entries
+    .filter(
+      (entry) =>
+        entry.data.kind === "course-page" &&
+        entry.data.page === "materials" &&
+        publishedCourses.has(entry.id.split("/")[0] ?? ""),
+    )
+    .map((entry) => ({
+      params: { course: entry.id.split("/")[0] },
+      props: { entry },
+    }));
+}
+
+interface Props {
+  entry: CollectionEntry<"courses">;
+}
+
+const { entry } = Astro.props;
+if (entry.data.kind !== "course-page") throw new Error(`Expected course page: ${entry.id}`);
+const { Content, headings, remarkPluginFrontmatter } = await render(entry);
+const entries = await getCollection("courses");
+const workspace = await getLearningWorkspace(entries);
+const course = await getCourse(entries, entry.id.split("/")[0] ?? "");
+const outline = buildOutlineSections(headings, remarkPluginFrontmatter.activityOutline);
+const currentPath = `/courses/${course.slug}/materials/`;
+const locale = getLocale(Astro.currentLocale);
+---
+
+<BaseLayout title={`${entry.data.title} | ${course.title}`} description={entry.data.summary} {locale}>
+  <LearningFrame
+    {currentPath}
+    courses={workspace.courses}
+    profile={workspace.profile}
+    term={workspace.term}
+    activities={workspace.activity}
+    {locale}
+  >
+    <ReadingWorkspace
+      eyebrow={`${course.code} · Course resources`}
+      title={entry.data.title}
+      summary={entry.data.summary}
+      {locale}
+      {outline}
+      previous={{ href: course.href, label: "Course overview" }}
+    >
+      <Content />
+    </ReadingWorkspace>
+  </LearningFrame>
+</BaseLayout>

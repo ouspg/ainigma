@@ -1,0 +1,12 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import LoginPage from "../components/pages/LoginPage";
+import { getLocale, getMessages } from "../lib/i18n";
+
+const locale = getLocale(Astro.currentLocale);
+const metadata = getMessages(locale).metadata;
+---
+
+<BaseLayout title={metadata.loginTitle} description={metadata.loginDescription} {locale}>
+  <LoginPage client:load {locale} />
+</BaseLayout>

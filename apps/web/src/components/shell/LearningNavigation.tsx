@@ -1,0 +1,212 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { MobileNav } from "@astryxdesign/core/MobileNav";
+import { NavIcon } from "@astryxdesign/core/NavIcon";
+import {
+  SideNav,
+  SideNavItem,
+  SideNavSection,
+  type SideNavCollapsibleConfig,
+} from "@astryxdesign/core/SideNav";
+import { Text } from "@astryxdesign/core/Text";
+import { TopNavHeading } from "@astryxdesign/core/TopNav";
+import { InternationalizationProvider, useTranslator } from "@astryxdesign/core/i18n";
+import fiFI from "@astryxdesign/core/locales/fi-FI.json";
+import { Bell, BookOpenCheck, Home, Megaphone } from "lucide-react";
+import { getAstryxLocale, getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { CourseMark } from "../../lib/learning/course-icons";
+import {
+  MOBILE_NAV_REQUEST_EVENT,
+  MOBILE_NAV_STATE_EVENT,
+  type MobileNavRequestDetail,
+  type MobileNavStateDetail,
+} from "../../lib/learning/mobile-navigation";
+import type { CourseInfo } from "../../lib/learning/types";
+
+interface Props {
+  currentPath: string;
+  courses: CourseInfo[];
+  locale: Locale;
+}
+
+function LearningNavigationContent({ currentPath, courses, locale }: Props) {
+  const translateAstryx = useTranslator();
+  const copy = getMessages(locale).navigation;
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1024px)");
+    const synchronizeViewport = () => {
+      setIsMobile(media.matches);
+      if (!media.matches) {
+        setMobileNavOpen(false);
+      }
+    };
+    const handleRequest = (event: Event) => {
+      setMobileNavOpen((event as CustomEvent<MobileNavRequestDetail>).detail.isOpen);
+    };
+
+    synchronizeViewport();
+    media.addEventListener("change", synchronizeViewport);
+    window.addEventListener(MOBILE_NAV_REQUEST_EVENT, handleRequest);
+    return () => {
+      media.removeEventListener("change", synchronizeViewport);
+      window.removeEventListener(MOBILE_NAV_REQUEST_EVENT, handleRequest);
+    };
+  }, []);
+
+  const setMobileNavigationOpen = (isOpen: boolean) => {
+    setMobileNavOpen(isOpen);
+    window.dispatchEvent(
+      new CustomEvent<MobileNavStateDetail>(MOBILE_NAV_STATE_EVENT, { detail: { isOpen } }),
+    );
+  };
+
+  const collapsible: SideNavCollapsibleConfig = {
+    buttonLabel: copy.collapse,
+    isCollapsed: isSidebarCollapsed,
+    onCollapsedChange: setSidebarCollapsed,
+  };
+
+  const courseNavigation = (course: CourseInfo, isCurrentCourse: boolean) => {
+    const hasChildren = course.pages.length > 0 || course.weeks.length > 0;
+
+    return (
+      <SideNavItem
+        {...(hasChildren ? { collapsible: { defaultIsCollapsed: !isCurrentCourse } } : {})}
+        endContent={
+          <Text type="supporting" color="secondary" hasTabularNumbers>
+            {course.progress}%
+          </Text>
+        }
+        href={localizedPath(locale, course.href)}
+        icon={<CourseMark href={localizedPath(locale, course.href)} mark={course.navMark} />}
+        isSelected={currentPath === course.href}
+        key={course.slug}
+        label={course.title}
+      >
+        {hasChildren ? (
+          <>
+            {course.pages.map((page) => (
+              <SideNavItem
+                href={localizedPath(locale, page.href)}
+                isSelected={currentPath === page.href}
+                key={page.page}
+                label={page.label}
+                size="sm"
+              />
+            ))}
+            {course.weeks.map((week) => (
+              <SideNavItem
+                collapsible={{ defaultIsCollapsed: !currentPath.startsWith(week.href) }}
+                href={localizedPath(locale, week.href)}
+                isSelected={currentPath === week.href}
+                key={week.slug}
+                label={`Week ${week.number} · ${week.title}`}
+                size="sm"
+              >
+                {currentPath.startsWith(week.href)
+                  ? week.tasks.map((task) => (
+                      <SideNavItem
+                        href={localizedPath(locale, task.href)}
+                        isSelected={currentPath === task.href}
+                        key={task.slug}
+                        label={task.title}
+                        size="sm"
+                      />
+                    ))
+                  : null}
+              </SideNavItem>
+            ))}
+          </>
+        ) : null}
+      </SideNavItem>
+    );
+  };
+
+  const navigationSections = (
+    <>
+      <SideNavSection title={copy.workspace} isHeaderHidden>
+        <SideNavItem
+          href={localizedPath(locale, "/desk/")}
+          icon={Home}
+          isSelected={currentPath === "/desk/"}
+          label={copy.desk}
+        />
+        <SideNavItem
+          href={localizedPath(locale, "/activity/")}
+          icon={Bell}
+          isSelected={currentPath === "/activity/"}
+          label={copy.activity}
+        />
+        <SideNavItem
+          href={localizedPath(locale, "/announcements/")}
+          icon={Megaphone}
+          isSelected={currentPath === "/announcements/"}
+          label={copy.announcements}
+        />
+      </SideNavSection>
+
+      <SideNavSection title={copy.courses} subtitle={`${courses.length} ${copy.activeCourses}`}>
+        {courses.map((course) => courseNavigation(course, currentPath.startsWith(course.href)))}
+      </SideNavSection>
+    </>
+  );
+
+  return (
+    <>
+      <SideNav
+        collapsible={collapsible}
+        resizable={{
+          defaultWidth: 256,
+          minWidth: 224,
+          maxWidth: 320,
+        }}
+      >
+        {navigationSections}
+      </SideNav>
+
+      {isMobile
+        ? createPortal(
+            <MobileNav
+              data-testid="ainigma-mobile-navigation"
+              header={
+                <TopNavHeading
+                  heading="Ainigma"
+                  headingHref={localizedPath(locale, "/desk/")}
+                  logo={<NavIcon icon={<BookOpenCheck size={17} aria-hidden="true" />} />}
+                  superheading={copy.university}
+                />
+              }
+              id="ainigma-mobile-navigation"
+              isOpen={isMobileNavOpen}
+              label={translateAstryx("@astryx.mobileNav.navigation")}
+              onClick={(event) => {
+                if (event.target instanceof Element && event.target.closest("a[href]")) {
+                  setMobileNavigationOpen(false);
+                }
+              }}
+              onOpenChange={setMobileNavigationOpen}
+              side="end"
+            >
+              {navigationSections}
+            </MobileNav>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+export default function LearningNavigation(props: Props) {
+  return (
+    <InternationalizationProvider
+      locale={getAstryxLocale(props.locale)}
+      messages={{ "fi-FI": fiFI }}
+    >
+      <LearningNavigationContent {...props} />
+    </InternationalizationProvider>
+  );
+}

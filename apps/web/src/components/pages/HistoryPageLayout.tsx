@@ -1,0 +1,26 @@
+import type { ReactNode } from "react";
+import { VStack } from "@astryxdesign/core/Stack";
+import { Heading, Text } from "@astryxdesign/core/Text";
+
+interface Props {
+  title: string;
+  description: string;
+  children: ReactNode;
+}
+
+export default function HistoryPageLayout({ title, description, children }: Props) {
+  return (
+    <VStack className="activity-history-page" gap={8} padding={8} hAlign="stretch">
+      <VStack as="header" className="activity-history-header" gap={2}>
+        <Text className="page-eyebrow" type="supporting" color="secondary" weight="medium">
+          Ainigma
+        </Text>
+        <Heading level={1}>{title}</Heading>
+        <Text type="body" color="secondary">
+          {description}
+        </Text>
+      </VStack>
+      {children}
+    </VStack>
+  );
+}

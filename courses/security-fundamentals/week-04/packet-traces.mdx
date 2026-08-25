@@ -1,0 +1,55 @@
+---
+kind: task
+order: 1
+title: Packet traces and protocol clues
+navLabel: Packet traces
+summary: Read a short capture, isolate an anomaly, and document the evidence behind your conclusion.
+estimatedMinutes: 35
+points: 6
+---
+
+import MultipartLab from "@course-components/MultipartLab.astro";
+import FlagChallenge from "@course-components/FlagChallenge.astro";
+
+## Investigation brief
+
+The service desk has reported intermittent name-resolution failures from a teaching lab. Most requests follow the expected path, but one exchange takes a different route and arrives with a lower time-to-live value.
+
+> **Research note:** treat the capture as evidence. Record what changed before deciding why it changed.
+
+Your task is to identify the unusual exchange, name the application protocol, and submit a compact finding in flag form.
+
+## Reading packet captures
+
+Start with fields that remain comparable across requests:
+
+1. Source and destination address
+2. Transport protocol and destination port
+3. Query name and response code
+4. Time-to-live difference from the baseline
+
+The relevant summary has already been extracted from the larger capture:
+
+```text
+packet 12  10.20.4.18 -> 10.20.0.53  UDP/53  TTL 64  query lab.example
+packet 18  10.20.4.18 -> 10.20.0.91  UDP/53  TTL 47  query lab.example
+packet 19  10.20.0.91 -> 10.20.4.18  UDP/53  TTL 47  response NOERROR
+```
+
+The baseline TTL is `64`. Preserve the difference as a positive integer for the final flag.
+
+## Guided analysis
+
+Use the checkpoints below to keep observation separate from interpretation.
+
+<MultipartLab taskId="packet-triage" />
+
+## Submit the finding
+
+Build the flag from the TTL difference using the form `AINIGMA{TTL-00}`. Capitalization matters in the final submission.
+
+<FlagChallenge taskId="investigation-flag" />
+
+## Wrap-up
+
+This trace does not prove malicious activity by itself. It does establish that the request was answered through a different host with a TTL delta of 17. The next lesson compares the DNS payload and resolver configuration before assigning cause.

@@ -1,0 +1,30 @@
+---
+import { getCollection } from "astro:content";
+import ActivityHistory from "../../components/pages/ActivityHistory";
+import LearningFrame from "../../components/shell/LearningFrame.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getLocale, getMessages } from "../../lib/i18n";
+import { getLearningWorkspace } from "../../lib/learning/catalog";
+
+const entries = await getCollection("courses");
+const workspace = await getLearningWorkspace(entries);
+const locale = getLocale(Astro.currentLocale);
+const metadata = getMessages(locale).metadata;
+---
+
+<BaseLayout
+  title={metadata.activityTitle}
+  description={metadata.activityDescription}
+  {locale}
+>
+  <LearningFrame
+    currentPath="/activity/"
+    courses={workspace.courses}
+    profile={workspace.profile}
+    term={workspace.term}
+    activities={workspace.activity}
+    {locale}
+  >
+    <ActivityHistory activities={workspace.activity} courses={workspace.courses} {locale} />
+  </LearningFrame>
+</BaseLayout>

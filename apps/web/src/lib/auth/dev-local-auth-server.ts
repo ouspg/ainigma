@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabasePublicConfig } from "../supabase/config";
 import type { Database } from "../supabase/database.types";
-import { isLocalAuthPersona, type LocalAuthPersona } from "./local-auth";
+import { isLocalAuthPersona, type LocalAuthPersona } from "./dev-local-auth";
 
 interface LocalAuthPersonaRecord {
   email: string;

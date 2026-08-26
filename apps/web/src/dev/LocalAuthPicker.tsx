@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
-import type { LocalAuthPersonaOption } from "../lib/auth/local-auth";
+import type { LocalAuthPersonaOption } from "../lib/auth/dev-local-auth";
 import { getMessages, type Locale } from "../lib/i18n";
 import { routes, type AppPath } from "../lib/routes";
 

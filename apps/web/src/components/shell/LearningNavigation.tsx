@@ -36,6 +36,23 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const activeCourseKey = courses.find((course) => currentPath.startsWith(course.href))?.slug;
+  const [expandedCourseKey, setExpandedCourseKey] = useState<string | undefined>(activeCourseKey);
+
+  useEffect(() => {
+    setExpandedCourseKey(activeCourseKey);
+  }, [activeCourseKey]);
+
+  const activeWeekKey = courses
+    .flatMap((course) =>
+      course.weeks.map((week) => ({ key: `${course.slug}/${week.slug}`, href: week.href })),
+    )
+    .find(({ href }) => currentPath.startsWith(href))?.key;
+  const [expandedWeekKey, setExpandedWeekKey] = useState<string | undefined>(activeWeekKey);
+
+  useEffect(() => {
+    setExpandedWeekKey(activeWeekKey);
+  }, [activeWeekKey]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1024px)");
@@ -71,12 +88,20 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
     onCollapsedChange: setSidebarCollapsed,
   };
 
-  const courseNavigation = (course: CourseInfo, isCurrentCourse: boolean) => {
+  const courseNavigation = (course: CourseInfo) => {
     const hasChildren = course.pages.length > 0 || course.weeks.length > 0;
 
     return (
       <SideNavItem
-        {...(hasChildren ? { collapsible: { defaultIsCollapsed: !isCurrentCourse } } : {})}
+        {...(hasChildren
+          ? {
+              collapsible: {
+                isCollapsed: expandedCourseKey !== course.slug,
+                onCollapsedChange: (isCollapsed) =>
+                  setExpandedCourseKey(isCollapsed ? undefined : course.slug),
+              },
+            }
+          : {})}
         endContent={
           <Text type="supporting" color="secondary" hasTabularNumbers>
             {course.progress}%
@@ -93,6 +118,7 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
         isSelected={currentPath === course.href}
         key={course.slug}
         label={course.title}
+        onClick={() => setExpandedCourseKey(course.slug)}
       >
         {hasChildren ? (
           <>
@@ -107,14 +133,24 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
             ))}
             {course.weeks.map((week) => (
               <SideNavItem
-                collapsible={{ defaultIsCollapsed: !currentPath.startsWith(week.href) }}
+                {...(week.tasks.length > 0
+                  ? {
+                      collapsible: {
+                        isCollapsed: expandedWeekKey !== `${course.slug}/${week.slug}`,
+                        onCollapsedChange: (isCollapsed) =>
+                          setExpandedWeekKey(
+                            isCollapsed ? undefined : `${course.slug}/${week.slug}`,
+                          ),
+                      },
+                    }
+                  : {})}
                 href={localizedPath(locale, week.href)}
                 isSelected={currentPath === week.href}
                 key={week.slug}
                 label={`Week ${week.number} · ${week.title}`}
                 size="sm"
               >
-                {currentPath.startsWith(week.href)
+                {week.tasks.length > 0
                   ? week.tasks.map((task) => (
                       <SideNavItem
                         href={localizedPath(locale, task.href)}
@@ -124,7 +160,7 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
                         size="sm"
                       />
                     ))
-                  : null}
+                  : undefined}
               </SideNavItem>
             ))}
           </>
@@ -157,7 +193,7 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
       </SideNavSection>
 
       <SideNavSection title={copy.courses} subtitle={`${courses.length} ${copy.activeCourses}`}>
-        {courses.map((course) => courseNavigation(course, currentPath.startsWith(course.href)))}
+        {courses.map((course) => courseNavigation(course))}
       </SideNavSection>
     </>
   );

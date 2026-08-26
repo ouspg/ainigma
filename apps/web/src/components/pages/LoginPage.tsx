@@ -8,7 +8,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import fiFI from "@astryxdesign/core/locales/fi-FI.json";
 import { KeyRound } from "lucide-react";
-import type { LocalAuthPersonaOption } from "../../lib/auth/local-auth";
+import type { LocalAuthPersonaOption } from "../../lib/auth/dev-local-auth";
 import { externalLinks } from "../../lib/external-links";
 import { getAstryxLocale, getMessages, type Locale } from "../../lib/i18n";
 import { routes, type AppPath } from "../../lib/routes";

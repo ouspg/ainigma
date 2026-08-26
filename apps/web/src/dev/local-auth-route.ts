@@ -1,7 +1,10 @@
 import type { APIRoute } from "astro";
 import { safeNextPath } from "../lib/auth/redirects";
-import { isLocalAuthEnabled } from "../lib/auth/local-auth";
-import { createLocalSupabaseAdmin, getLocalAuthPersona } from "../lib/auth/local-auth-server";
+import { isLocalAuthEnabled } from "../lib/auth/dev-local-auth";
+import {
+  createLocalSupabaseAdmin,
+  getLocalAuthPersona,
+} from "../lib/auth/dev-local-auth-server";
 import { routes } from "../lib/routes";
 
 export const prerender = false;

@@ -5,7 +5,8 @@ import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import fiFI from "@astryxdesign/core/locales/fi-FI.json";
 import { BookOpenCheck } from "lucide-react";
-import { getAstryxLocale, getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getAstryxLocale, getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath, routes } from "../../lib/routes";
 
 interface Props {
   locale: Locale;
@@ -41,7 +42,7 @@ export default function LearningFrame({ locale, children, sideNav, topNavEnd }: 
             heading={
               <TopNavHeading
                 heading="Ainigma"
-                headingHref={localizedPath(locale, "/desk/")}
+                headingHref={localizedPath(locale, routes.desk.path())}
                 logo={<NavIcon icon={<BookOpenCheck size={17} aria-hidden="true" />} />}
                 superheading={copy.university}
               />

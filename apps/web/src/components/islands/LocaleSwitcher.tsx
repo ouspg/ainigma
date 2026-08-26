@@ -1,11 +1,11 @@
 import { Button } from "@astryxdesign/core/Button";
 import { features } from "../../lib/features";
-import type { Locale } from "../../lib/i18n";
-import { getMessages, getOtherLocale, localizedPath } from "../../lib/i18n";
+import { getMessages, getOtherLocale, type Locale } from "../../lib/i18n";
+import { localizedPath, type AppPath } from "../../lib/routes";
 
 interface Props {
   locale: Locale;
-  path: string;
+  path: AppPath;
 }
 
 export default function LocaleSwitcher({ locale, path }: Props) {

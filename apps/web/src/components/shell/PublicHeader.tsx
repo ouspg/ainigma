@@ -2,13 +2,14 @@ import { Button } from "@astryxdesign/core/Button";
 import { HStack } from "@astryxdesign/core/Stack";
 import { BookOpenCheck, Palette } from "lucide-react";
 import { appearanceThemes, colorModes } from "../../lib/appearance";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath, routes, type AppPath } from "../../lib/routes";
 import LocaleSwitcher from "../islands/LocaleSwitcher";
 import AppearanceThemeIcon from "../theme/AppearanceThemeIcon";
 import ColorModeIcon from "../theme/ColorModeIcon";
 
 interface Props {
-  currentPath: string;
+  currentPath: AppPath;
   locale: Locale;
   showSignIn?: boolean;
 }
@@ -19,7 +20,7 @@ export default function PublicHeader({ currentPath, locale, showSignIn = false }
   return (
     <header className="public-header">
       <HStack className="public-header-row" gap={3} vAlign="center">
-        <a className="login-wordmark" href={localizedPath(locale, "/")}>
+        <a className="login-wordmark" href={localizedPath(locale, routes.home.path())}>
           <HStack gap={2} vAlign="center">
             <BookOpenCheck size={19} aria-hidden="true" />
             <span>Ainigma</span>
@@ -28,7 +29,7 @@ export default function PublicHeader({ currentPath, locale, showSignIn = false }
         <span className="login-spacer" />
         {showSignIn ? (
           <Button
-            href={localizedPath(locale, "/login/")}
+            href={localizedPath(locale, routes.login.path())}
             label={messages.publicHome.signIn}
             size="sm"
             variant="primary"

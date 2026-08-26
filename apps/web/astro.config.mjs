@@ -2,6 +2,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
+import node from "@astrojs/node";
 import react from "@astrojs/react";
 import { unified } from "@astrojs/markdown-remark";
 import { loadEnv } from "vite";
@@ -13,6 +14,9 @@ const mode = process.env.NODE_ENV === "production" ? "production" : "development
 const featureFlags = resolveFeatureFlags({ ...loadEnv(mode, appRoot, ""), ...process.env });
 
 export default defineConfig({
+  adapter: node({
+    mode: "standalone",
+  }),
   i18n: {
     defaultLocale: "en",
     locales: featureFlags.finnish ? ["en", "fi"] : ["en"],

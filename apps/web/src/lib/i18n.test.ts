@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { featureDefinitions, resolveFeatureFlags } from "./features";
-import { getAstryxLocale, getLocale, getMessages, localizedPath } from "./i18n";
+import { getAstryxLocale, getLocale, getMessages } from "./i18n";
+import { localizedPath } from "./routes";
 
 describe("localization helpers", () => {
   it("maps Astro locales to the supported app locales", () => {
@@ -18,8 +19,8 @@ describe("localization helpers", () => {
   });
 
   it("serves all app copy from the locale catalog", () => {
-    expect(getMessages("fi").navigation.desk).toBe("Oppimispöytä");
-    expect(getMessages("fi").metadata.deskTitle).toContain("Oppimispöytä");
+    expect(getMessages("fi").navigation.desk).toBe("Oma oppiminen");
+    expect(getMessages("fi").metadata.deskTitle).toContain("Oma oppiminen");
     expect(getMessages("en").languageSwitcher.options.fi).toEqual({
       name: "Suomi",
       switchLabel: "Switch language to Finnish",
@@ -35,7 +36,7 @@ describe("localization helpers", () => {
     expect(getMessages("fi").footer.about).toBe("Tietoa palvelusta");
     expect(getMessages("fi").footer.sourceCode).toBe("Lähdekoodi");
     expect(getMessages("en").publicHome.unit).toBe(
-      "Oulu University Secure Programming Group (OUSPG)",
+      "By Oulu University Secure Programming Group (OUSPG)",
     );
   });
 });

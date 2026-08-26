@@ -27,7 +27,12 @@
         "eyebrow": "Week 4 · Network forensics",
         "title": "Packet traces and protocol clues",
         "description": "Isolate the unusual exchange and document the evidence behind your conclusion.",
-        "href": "/courses/security-fundamentals/week-04/packet-traces/",
+        "target": {
+          "route": "courseTask",
+          "course": "security-fundamentals",
+          "week": "week-04",
+          "task": "packet-traces"
+        },
         "estimatedMinutes": 35,
         "completedSteps": 2,
         "totalSteps": 4,
@@ -45,7 +50,7 @@
         "eyebrow": "Module 1 · Protocol goals",
         "title": "Threat models before primitives",
         "description": "Review the protocol brief and identify the guarantees each participant needs.",
-        "href": "/courses/applied-cryptography/",
+        "target": { "route": "course", "course": "applied-cryptography" },
         "estimatedMinutes": 20,
         "completedSteps": 1,
         "totalSteps": 3,
@@ -63,7 +68,7 @@
         "eyebrow": "Start here",
         "title": "Course orientation",
         "description": "Review the environment requirements and prepare your development workspace.",
-        "href": "/courses/secure-programming/",
+        "target": { "route": "course", "course": "secure-programming" },
         "estimatedMinutes": 15,
         "completedSteps": 0,
         "totalSteps": 3,
@@ -79,7 +84,12 @@
       "title": "Packet traces and protocol clues",
       "supporting": "35 min · 6 points",
       "dueLabel": "Today · 23:59",
-      "href": "/courses/security-fundamentals/week-04/packet-traces/",
+      "target": {
+        "route": "courseTask",
+        "course": "security-fundamentals",
+        "week": "week-04",
+        "task": "packet-traces"
+      },
       "status": "in-progress"
     },
     {
@@ -89,7 +99,7 @@
       "title": "Threat models before primitives",
       "supporting": "20 min · Reading",
       "dueLabel": "Wednesday",
-      "href": "/courses/applied-cryptography/",
+      "target": { "route": "course", "course": "applied-cryptography" },
       "status": "todo"
     },
     {
@@ -99,7 +109,7 @@
       "title": "Prepare the course toolchain",
       "supporting": "15 min · Setup",
       "dueLabel": "Friday",
-      "href": "/courses/secure-programming/",
+      "target": { "route": "course", "course": "secure-programming" },
       "status": "todo"
     },
     {
@@ -109,7 +119,11 @@
       "title": "Review the memory safety recap",
       "supporting": "12 min · Reading",
       "dueLabel": "Completed Sunday",
-      "href": "/courses/security-fundamentals/week-03/",
+      "target": {
+        "route": "courseWeek",
+        "course": "security-fundamentals",
+        "week": "week-03"
+      },
       "status": "completed"
     }
   ],
@@ -122,7 +136,12 @@
       "description": "The report bundle from your latest task run is available for download.",
       "timeLabel": "18 minutes ago",
       "occurredAt": "2026-08-24T14:42:00+03:00",
-      "href": "/courses/security-fundamentals/week-04/packet-traces/",
+      "target": {
+        "route": "courseTask",
+        "course": "security-fundamentals",
+        "week": "week-04",
+        "task": "packet-traces"
+      },
       "isUnread": true,
       "isRecent": true
     },
@@ -134,7 +153,12 @@
       "description": "The instance reached its idle limit. You can open a new one from the task.",
       "timeLabel": "47 minutes ago",
       "occurredAt": "2026-08-24T14:13:00+03:00",
-      "href": "/courses/security-fundamentals/week-04/packet-traces/",
+      "target": {
+        "route": "courseTask",
+        "course": "security-fundamentals",
+        "week": "week-04",
+        "task": "packet-traces"
+      },
       "isUnread": true,
       "isRecent": true
     },
@@ -146,7 +170,12 @@
       "description": "Your latest answer passed the task checks and was recorded.",
       "timeLabel": "2 hours ago",
       "occurredAt": "2026-08-24T13:00:00+03:00",
-      "href": "/courses/security-fundamentals/week-04/packet-traces/",
+      "target": {
+        "route": "courseTask",
+        "course": "security-fundamentals",
+        "week": "week-04",
+        "task": "packet-traces"
+      },
       "isUnread": true,
       "isRecent": true
     },
@@ -158,7 +187,7 @@
       "description": "Your isolated exercise environment is ready.",
       "timeLabel": "Yesterday",
       "occurredAt": "2026-08-23T16:25:00+03:00",
-      "href": "/courses/applied-cryptography/",
+      "target": { "route": "course", "course": "applied-cryptography" },
       "isUnread": false,
       "isRecent": false
     },
@@ -170,7 +199,11 @@
       "description": "Course staff reviewed your submission and left feedback.",
       "timeLabel": "Yesterday",
       "occurredAt": "2026-08-23T12:10:00+03:00",
-      "href": "/courses/security-fundamentals/week-03/",
+      "target": {
+        "route": "courseWeek",
+        "course": "security-fundamentals",
+        "week": "week-03"
+      },
       "isUnread": false,
       "isRecent": false
     },
@@ -182,7 +215,11 @@
       "description": "The evidence archive from your completed exercise remains available.",
       "timeLabel": "Sunday",
       "occurredAt": "2026-08-22T18:05:00+03:00",
-      "href": "/courses/security-fundamentals/week-03/",
+      "target": {
+        "route": "courseWeek",
+        "course": "security-fundamentals",
+        "week": "week-03"
+      },
       "isUnread": false,
       "isRecent": false
     }
@@ -193,14 +230,18 @@
       "courseSlug": "security-fundamentals",
       "title": "Lab environment maintenance on Tuesday",
       "timeLabel": "2 hours ago",
-      "href": "/courses/security-fundamentals/announcements/"
+      "target": {
+        "route": "coursePage",
+        "course": "security-fundamentals",
+        "page": "announcements"
+      }
     },
     {
       "id": "office-hours",
       "courseSlug": "applied-cryptography",
       "title": "This week's office hours move to TS135",
       "timeLabel": "Yesterday",
-      "href": "/courses/applied-cryptography/"
+      "target": { "route": "course", "course": "applied-cryptography" }
     }
   ]
 }

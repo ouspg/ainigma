@@ -6,13 +6,7 @@ import { InternationalizationProvider, useTranslator } from "@astryxdesign/core/
 import fiFI from "@astryxdesign/core/locales/fi-FI.json";
 import { Menu, UserRound } from "lucide-react";
 import { features } from "../../lib/features";
-import {
-  getAstryxLocale,
-  getMessages,
-  getOtherLocale,
-  localizedPath,
-  type Locale,
-} from "../../lib/i18n";
+import { getAstryxLocale, getMessages, getOtherLocale, type Locale } from "../../lib/i18n";
 import {
   MOBILE_NAV_REQUEST_EVENT,
   MOBILE_NAV_STATE_EVENT,
@@ -25,13 +19,15 @@ import type {
   LearnerActivity,
   StudentProfile,
 } from "../../lib/learning/types";
+import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
+import { localizedPath, routes, type AppPath } from "../../lib/routes";
 import ActivityCenter from "../islands/ActivityCenter";
 import AppearanceMenu from "../islands/AppearanceMenu";
 import LocaleSwitcher from "../islands/LocaleSwitcher";
 import { AppearanceThemeProvider } from "../theme/AppearanceThemeProvider";
 
 interface Props {
-  currentPath: string;
+  currentPath: AppPath;
   courses: CourseInfo[];
   profile: StudentProfile;
   term: AcademicTerm;
@@ -39,7 +35,7 @@ interface Props {
   locale: Locale;
 }
 
-function goTo(path: string) {
+function goTo(path: AppPath) {
   window.location.assign(path);
 }
 
@@ -70,6 +66,12 @@ function HeaderControls({ currentPath, courses, profile, term, activities, local
     );
   };
 
+  const signOut = async () => {
+    const supabase = createBrowserSupabaseClient();
+    const { error } = await supabase.auth.signOut();
+    if (!error) goTo(localizedPath(locale, routes.home.path()));
+  };
+
   return (
     <HStack gap={2} vAlign="center">
       <ActivityCenter activities={activities} courses={courses} locale={locale} />
@@ -89,7 +91,8 @@ function HeaderControls({ currentPath, courses, profile, term, activities, local
           { type: "divider" },
           {
             label: copy.support,
-            onClick: () => goTo(localizedPath(locale, "/desk/#announcements")),
+            onClick: () =>
+              goTo(`${localizedPath(locale, routes.desk.path())}#announcements` as AppPath),
           },
           ...(features.finnish
             ? [
@@ -101,7 +104,7 @@ function HeaderControls({ currentPath, courses, profile, term, activities, local
             : []),
           {
             label: copy.signOut,
-            onClick: () => goTo(localizedPath(locale, "/login/")),
+            onClick: signOut,
           },
         ]}
         menuWidth={224}

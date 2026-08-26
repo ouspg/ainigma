@@ -1,4 +1,5 @@
 import type { CollectionEntry } from "astro:content";
+import { routes } from "../routes";
 import type {
   Announcement,
   CourseInfo,
@@ -9,14 +10,23 @@ import type {
   WeekInfo,
 } from "./types";
 import { getLearningSnapshot, type LearningSnapshot } from "./repository";
+import {
+  isCourseDefinitionKey,
+  parseCourseDefinitionKey,
+  type CourseDefinitionKey,
+} from "./identifiers";
 
 type CourseEntry = CollectionEntry<"courses">;
 
-function slugOf(entry: CourseEntry): string {
-  return entry.id.split("/")[0] ?? "";
+function slugOf(entry: CourseEntry): CourseDefinitionKey {
+  return parseCourseDefinitionKey(entry.id.split("/")[0] ?? "");
 }
 
-function buildCourse(entries: CourseEntry[], slug: string, learning: LearningSnapshot): CourseInfo {
+function buildCourse(
+  entries: CourseEntry[],
+  slug: CourseDefinitionKey,
+  learning: LearningSnapshot,
+): CourseInfo {
   const snapshot = learning.courses[slug];
   const courseEntries = entries.filter((entry) => slugOf(entry) === slug);
   const overview = courseEntries.find((entry) => entry.data.kind === "course");
@@ -47,7 +57,7 @@ function buildCourse(entries: CourseEntry[], slug: string, learning: LearningSna
             slug: taskSlug,
             title: taskEntry.data.navLabel ?? taskEntry.data.title,
             summary: taskEntry.data.summary,
-            href: `/courses/${slug}/${weekSlug}/${taskSlug}/`,
+            href: routes.courseTask.path({ course: slug, week: weekSlug, task: taskSlug }),
             estimatedMinutes: taskEntry.data.estimatedMinutes,
             points: taskEntry.data.points,
           };
@@ -58,7 +68,7 @@ function buildCourse(entries: CourseEntry[], slug: string, learning: LearningSna
         number: weekEntry.data.weekNumber,
         title: weekEntry.data.title,
         summary: weekEntry.data.summary,
-        href: `/courses/${slug}/${weekSlug}/`,
+        href: routes.courseWeek.path({ course: slug, week: weekSlug }),
         status: snapshot.weekStatuses[weekSlug] ?? ("not-started" as CourseStatus),
         tasks,
       };
@@ -75,7 +85,7 @@ function buildCourse(entries: CourseEntry[], slug: string, learning: LearningSna
         page: entry.data.page,
         title: entry.data.title,
         label: entry.data.navLabel ?? entry.data.title,
-        href: `/courses/${slug}/${entry.data.page}/`,
+        href: routes.coursePage.path({ course: slug, page: entry.data.page }),
       };
     });
 
@@ -88,7 +98,7 @@ function buildCourse(entries: CourseEntry[], slug: string, learning: LearningSna
     endDate: overview.data.endDate,
     title: overview.data.title,
     summary: overview.data.summary,
-    href: `/courses/${slug}/`,
+    href: routes.course.path({ course: slug }),
     ...(overview.data.catalogUrl ? { catalogUrl: overview.data.catalogUrl } : {}),
     tone: overview.data.tone,
     progress: snapshot.progress,
@@ -134,6 +144,7 @@ export async function getLearningWorkspace(entries: CourseEntry[]): Promise<Lear
     ),
   );
   const courses = Object.keys(learning.courses)
+    .filter(isCourseDefinitionKey)
     .filter((slug) => publishedSlugs.has(slug))
     .map((slug) => buildCourse(entries, slug, learning));
   const knownSlugs = new Set(courses.map((course) => course.slug));
@@ -152,7 +163,10 @@ export async function getLearningWorkspace(entries: CourseEntry[]): Promise<Lear
   };
 }
 
-export async function getCourse(entries: CourseEntry[], slug: string): Promise<CourseInfo> {
+export async function getCourse(
+  entries: CourseEntry[],
+  slug: CourseDefinitionKey,
+): Promise<CourseInfo> {
   const learning = await getLearningSnapshot();
   return buildCourse(entries, slug, learning);
 }
@@ -163,6 +177,19 @@ export function getCourseEntry(entries: CourseEntry[], id: string): CourseEntry 
     throw new Error(`Missing course content entry: ${id}`);
   }
   return entry;
+}
+
+export function getPublishedCourseEntry(
+  entries: CourseEntry[],
+  id: string,
+): CourseEntry | undefined {
+  const courseSlug = id.split("/")[0] ?? "";
+  if (!isCourseDefinitionKey(courseSlug)) return undefined;
+  const isPublished = entries.some(
+    (entry) => slugOf(entry) === courseSlug && entry.data.kind === "course" && !entry.data.draft,
+  );
+  if (!isPublished) return undefined;
+  return entries.find((entry) => entry.id === id);
 }
 
 export interface HeadingInfo {

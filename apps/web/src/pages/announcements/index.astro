@@ -6,6 +6,9 @@ import LearningFrame from "../../components/shell/LearningFrame.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
 import { getLearningWorkspace } from "../../lib/learning/catalog";
+import { routes } from "../../lib/routes";
+
+export const prerender = false;
 
 const entries = await getCollection("courses");
 const workspace = await getLearningWorkspace(entries);
@@ -19,7 +22,7 @@ const copy = getMessages(locale);
   {locale}
 >
   <LearningFrame
-    currentPath="/announcements/"
+    currentPath={routes.announcements.path()}
     courses={workspace.courses}
     profile={workspace.profile}
     term={workspace.term}

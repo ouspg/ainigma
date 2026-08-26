@@ -1,5 +1,4 @@
 ---
-import type { CollectionEntry } from "astro:content";
 import { getCollection, render } from "astro:content";
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import LearningFrame from "../../../../components/shell/LearningFrame.astro";
@@ -8,38 +7,27 @@ import {
   buildOutlineSections,
   getCourse,
   getLearningWorkspace,
+  getPublishedCourseEntry,
 } from "../../../../lib/learning/catalog";
 import { getLocale } from "../../../../lib/i18n";
+import { courseDefinitionKeyFromParam } from "../../../../lib/learning/identifiers";
 
-export async function getStaticPaths() {
-  const entries = await getCollection("courses");
-  const publishedCourses = new Set(
-    entries.flatMap((entry) =>
-      entry.data.kind === "course" && !entry.data.draft ? [entry.id.split("/")[0]] : [],
-    ),
-  );
-  return entries
-    .filter(
-      (entry) =>
-        entry.data.kind === "task" && publishedCourses.has(entry.id.split("/")[0] ?? ""),
-    )
-    .map((entry) => {
-      const [course, week, ...slugParts] = entry.id.split("/");
-      return { params: { course, week, slug: slugParts.join("/") }, props: { entry } };
-    });
-}
+export const prerender = false;
 
-interface Props {
-  entry: CollectionEntry<"courses">;
-}
-
-const { entry } = Astro.props;
-if (entry.data.kind !== "task") throw new Error(`Expected task entry: ${entry.id}`);
-const { Content, headings, remarkPluginFrontmatter } = await render(entry);
 const entries = await getCollection("courses");
+const courseSlug = courseDefinitionKeyFromParam(Astro.params.course);
+if (!courseSlug) {
+  return new Response("Not found", { status: 404 });
+}
+const weekSlug = Astro.params.week ?? "";
+const taskSlug = Astro.params.slug ?? "";
+const entry = getPublishedCourseEntry(entries, `${courseSlug}/${weekSlug}/${taskSlug}`);
+if (!entry || entry.data.kind !== "task") {
+  return new Response("Not found", { status: 404 });
+}
+const { Content, headings, remarkPluginFrontmatter } = await render(entry);
 const workspace = await getLearningWorkspace(entries);
-const [courseSlug, weekSlug] = entry.id.split("/");
-const course = await getCourse(entries, courseSlug ?? "");
+const course = await getCourse(entries, courseSlug);
 const week = course.weeks.find((candidate) => candidate.slug === weekSlug);
 if (!week) throw new Error(`Missing week manifest for task: ${entry.id}`);
 const taskIndex = week.tasks.findIndex((task) => entry.id.endsWith(`/${task.slug}`));

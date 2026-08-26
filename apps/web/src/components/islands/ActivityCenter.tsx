@@ -9,8 +9,9 @@ import { Popover } from "@astryxdesign/core/Popover";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Bell, CheckCircle2, ChevronRight, ClipboardCheck, Download, Server } from "lucide-react";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
 import type { CourseInfo, LearnerActivity } from "../../lib/learning/types";
+import { localizedPath, routes } from "../../lib/routes";
 
 interface Props {
   activities: LearnerActivity[];
@@ -145,7 +146,7 @@ export default function ActivityCenter({ activities, courses, locale }: Props) {
             <EmptyState
               actions={
                 <Button
-                  href={localizedPath(locale, "/activity/")}
+                  href={localizedPath(locale, routes.activity.path())}
                   label={copy.historyLink}
                   size="sm"
                   variant="secondary"
@@ -163,7 +164,7 @@ export default function ActivityCenter({ activities, courses, locale }: Props) {
             <>
               <Divider />
               <Button
-                href={localizedPath(locale, "/activity/")}
+                href={localizedPath(locale, routes.activity.path())}
                 label={copy.historyLink}
                 size="sm"
                 variant="secondary"

@@ -25,8 +25,9 @@ import type {
   CourseInfo,
   LearningWorkspace,
 } from "../../lib/learning/types";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
 import { getCourseIcon } from "../../lib/learning/course-icons";
+import { localizedPath, routes } from "../../lib/routes";
 
 interface Props {
   workspace: LearningWorkspace;
@@ -114,7 +115,7 @@ export default function DashboardIsland({ workspace, locale }: Props) {
             <VStack gap={6}>
               <VStack as="section" id="announcements" gap={3}>
                 <VStack gap={1}>
-                  <Link href={localizedPath(locale, "/announcements/")}>
+                  <Link href={localizedPath(locale, routes.announcements.path())}>
                     <Heading level={2}>{copy.recentUpdates}</Heading>
                   </Link>
                   <Text type="supporting" color="secondary">

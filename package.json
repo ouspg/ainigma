@@ -5,12 +5,14 @@
     "apps/web",
     "infra/pulumi"
   ],
+  "type": "module",
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build:web": "npm --workspace apps/web run build",
     "infra:typecheck": "npm --workspace infra/pulumi run typecheck",
     "supabase:start": "supabase start",
-    "supabase:reset": "supabase db reset"
+    "supabase:reset": "supabase db reset",
+    "supabase:types": "supabase gen types typescript --local --schema public > apps/web/src/lib/supabase/database.types.ts"
   },
   "devDependencies": {
     "supabase": "^2.115.0",

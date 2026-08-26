@@ -1,6 +1,13 @@
 import { defineCollection } from "astro:content";
 import { glob } from "astro/loaders";
 import { z } from "astro/zod";
+import type { ExternalUrl } from "./lib/external-links";
+
+const externalUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => value.startsWith("https://"), "External URLs must use HTTPS")
+  .transform((value): ExternalUrl => value as ExternalUrl);
 
 const courses = defineCollection({
   loader: glob({
@@ -18,7 +25,7 @@ const courses = defineCollection({
       startDate: z.string().date(),
       endDate: z.string().date(),
       tone: z.enum(["blue", "orange", "teal"]),
-      catalogUrl: z.string().url().optional(),
+      catalogUrl: externalUrlSchema.optional(),
       title: z.string(),
       navLabel: z.string().optional(),
       summary: z.string(),

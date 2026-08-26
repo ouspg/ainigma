@@ -9,9 +9,10 @@ import type {
   StudentProfile,
 } from "../../lib/learning/types";
 import type { Locale } from "../../lib/i18n";
+import type { AppPath } from "../../lib/routes";
 
 interface Props {
-  currentPath: string;
+  currentPath: AppPath;
   courses: CourseInfo[];
   profile: StudentProfile;
   term: AcademicTerm;

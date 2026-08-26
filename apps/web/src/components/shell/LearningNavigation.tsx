@@ -13,7 +13,7 @@ import { TopNavHeading } from "@astryxdesign/core/TopNav";
 import { InternationalizationProvider, useTranslator } from "@astryxdesign/core/i18n";
 import fiFI from "@astryxdesign/core/locales/fi-FI.json";
 import { Bell, BookOpenCheck, Home, Megaphone } from "lucide-react";
-import { getAstryxLocale, getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getAstryxLocale, getMessages, type Locale } from "../../lib/i18n";
 import { CourseMark } from "../../lib/learning/course-icons";
 import {
   MOBILE_NAV_REQUEST_EVENT,
@@ -22,9 +22,10 @@ import {
   type MobileNavStateDetail,
 } from "../../lib/learning/mobile-navigation";
 import type { CourseInfo } from "../../lib/learning/types";
+import { localizedPath, routes, type AppPath } from "../../lib/routes";
 
 interface Props {
-  currentPath: string;
+  currentPath: AppPath;
   courses: CourseInfo[];
   locale: Locale;
 }
@@ -130,21 +131,21 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
     <>
       <SideNavSection title={copy.workspace} isHeaderHidden>
         <SideNavItem
-          href={localizedPath(locale, "/desk/")}
+          href={localizedPath(locale, routes.desk.path())}
           icon={Home}
-          isSelected={currentPath === "/desk/"}
+          isSelected={currentPath === routes.desk.path()}
           label={copy.desk}
         />
         <SideNavItem
-          href={localizedPath(locale, "/activity/")}
+          href={localizedPath(locale, routes.activity.path())}
           icon={Bell}
-          isSelected={currentPath === "/activity/"}
+          isSelected={currentPath === routes.activity.path()}
           label={copy.activity}
         />
         <SideNavItem
-          href={localizedPath(locale, "/announcements/")}
+          href={localizedPath(locale, routes.announcements.path())}
           icon={Megaphone}
-          isSelected={currentPath === "/announcements/"}
+          isSelected={currentPath === routes.announcements.path()}
           label={copy.announcements}
         />
       </SideNavSection>
@@ -175,7 +176,7 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
               header={
                 <TopNavHeading
                   heading="Ainigma"
-                  headingHref={localizedPath(locale, "/desk/")}
+                  headingHref={localizedPath(locale, routes.desk.path())}
                   logo={<NavIcon icon={<BookOpenCheck size={17} aria-hidden="true" />} />}
                   superheading={copy.university}
                 />

@@ -1,22 +1,26 @@
+import type { ExternalUrl } from "../external-links";
+import type { AppPath } from "../routes";
+import type { CourseDefinitionKey } from "./identifiers";
+
 export type CourseStatus = "not-started" | "in-progress" | "completed";
 export type AgendaStatus = "todo" | "in-progress" | "completed";
 export type CourseTone = "blue" | "orange" | "teal";
 export type ActivityKind = "attempt" | "grading" | "artifact" | "instance";
 
 export interface PublicCourseInfo {
-  slug: string;
+  slug: CourseDefinitionKey;
   code: string;
   title: string;
   summary: string;
   tone: CourseTone;
-  catalogUrl?: string;
+  catalogUrl?: ExternalUrl;
 }
 
 export interface TaskInfo {
   slug: string;
   title: string;
   summary: string;
-  href: string;
+  href: AppPath;
   estimatedMinutes: number;
   points: number;
 }
@@ -26,7 +30,7 @@ export interface WeekInfo {
   number: number;
   title: string;
   summary: string;
-  href: string;
+  href: AppPath;
   status: CourseStatus;
   tasks: TaskInfo[];
 }
@@ -35,14 +39,14 @@ export interface CoursePageInfo {
   page: "announcements" | "materials";
   title: string;
   label: string;
-  href: string;
+  href: AppPath;
 }
 
 export interface NextActivity {
   eyebrow: string;
   title: string;
   description: string;
-  href: string;
+  href: AppPath;
   estimatedMinutes: number;
   completedSteps: number;
   totalSteps: number;
@@ -50,7 +54,7 @@ export interface NextActivity {
 }
 
 export interface CourseInfo {
-  slug: string;
+  slug: CourseDefinitionKey;
   courseKey: string;
   code: string;
   navMark: string;
@@ -58,8 +62,8 @@ export interface CourseInfo {
   endDate: string;
   title: string;
   summary: string;
-  href: string;
-  catalogUrl?: string;
+  href: AppPath;
+  catalogUrl?: ExternalUrl;
   tone: CourseTone;
   progress: number;
   status: CourseStatus;
@@ -73,32 +77,32 @@ export interface CourseInfo {
 
 export interface AgendaItem {
   id: string;
-  courseSlug: string;
+  courseSlug: CourseDefinitionKey;
   type: "lab" | "reading" | "setup";
   title: string;
   supporting: string;
   dueLabel: string;
-  href: string;
+  href: AppPath;
   status: AgendaStatus;
 }
 
 export interface Announcement {
   id: string;
-  courseSlug: string;
+  courseSlug: CourseDefinitionKey;
   title: string;
   timeLabel: string;
-  href: string;
+  href: AppPath;
 }
 
 export interface LearnerActivity {
   id: string;
-  courseSlug: string;
+  courseSlug: CourseDefinitionKey;
   kind: ActivityKind;
   title: string;
   description: string;
   timeLabel: string;
   occurredAt: string;
-  href: string;
+  href: AppPath;
   isUnread: boolean;
   isRecent: boolean;
 }

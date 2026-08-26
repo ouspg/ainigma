@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { parseCourseDefinitionKey } from "./identifiers";
 import { getCourseSnapshot, getLearningSnapshot } from "./repository";
 
 describe("JSON learning repository", () => {
@@ -10,9 +11,9 @@ describe("JSON learning repository", () => {
   });
 
   it("resolves course-specific data without exposing the JSON module", async () => {
-    const course = await getCourseSnapshot("security-fundamentals");
+    const course = await getCourseSnapshot(parseCourseDefinitionKey("security-fundamentals"));
 
     expect(course?.courseKey).toBe("security-fundamentals-2026-autumn");
-    expect(await getCourseSnapshot("missing-course")).toBeUndefined();
+    expect(await getCourseSnapshot(parseCourseDefinitionKey("missing-course"))).toBeUndefined();
   });
 });

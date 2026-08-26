@@ -2,8 +2,9 @@ import { List, ListItem } from "@astryxdesign/core/List";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { CheckCircle2, ChevronRight, ClipboardCheck, Download, Server } from "lucide-react";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
 import type { CourseInfo, LearnerActivity } from "../../lib/learning/types";
+import { localizedPath } from "../../lib/routes";
 import HistoryPageLayout from "./HistoryPageLayout";
 
 interface Props {

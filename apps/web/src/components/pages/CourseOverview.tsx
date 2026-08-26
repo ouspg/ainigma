@@ -19,7 +19,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { CourseInfo, CourseStatus } from "../../lib/learning/types";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath } from "../../lib/routes";
 
 interface Props {
   course: CourseInfo;

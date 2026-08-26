@@ -1,31 +1,30 @@
 ---
-import type { CollectionEntry } from "astro:content";
 import { getCollection, render } from "astro:content";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import LearningFrame from "../../../components/shell/LearningFrame.astro";
 import CourseOverview from "../../../components/pages/CourseOverview";
-import { getCourse, getLearningWorkspace } from "../../../lib/learning/catalog";
+import {
+  getCourse,
+  getLearningWorkspace,
+  getPublishedCourseEntry,
+} from "../../../lib/learning/catalog";
 import { getLocale } from "../../../lib/i18n";
+import { courseDefinitionKeyFromParam } from "../../../lib/learning/identifiers";
 
-export async function getStaticPaths() {
-  const entries = await getCollection("courses");
-  return entries
-    .filter((entry) => entry.data.kind === "course" && !entry.data.draft)
-    .map((entry) => ({
-      params: { course: entry.id.split("/")[0] },
-      props: { entry },
-    }));
-}
+export const prerender = false;
 
-interface Props {
-  entry: CollectionEntry<"courses">;
-}
-
-const { entry } = Astro.props;
-const { Content } = await render(entry);
 const entries = await getCollection("courses");
+const courseSlug = courseDefinitionKeyFromParam(Astro.params.course);
+if (!courseSlug) {
+  return new Response("Not found", { status: 404 });
+}
+const entry = getPublishedCourseEntry(entries, `${courseSlug}/index`);
+if (!entry || entry.data.kind !== "course") {
+  return new Response("Not found", { status: 404 });
+}
+const { Content } = await render(entry);
 const workspace = await getLearningWorkspace(entries);
-const course = await getCourse(entries, entry.id.split("/")[0] ?? "");
+const course = await getCourse(entries, courseSlug);
 const locale = getLocale(Astro.currentLocale);
 ---
 

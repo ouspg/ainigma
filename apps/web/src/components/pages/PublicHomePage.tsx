@@ -1,11 +1,15 @@
+import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Link } from "@astryxdesign/core/Link";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Section } from "@astryxdesign/core/Section";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { ArrowRight } from "lucide-react";
+import { externalLinks } from "../../lib/external-links";
 import type { PublicCourseInfo } from "../../lib/learning/types";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath, routes } from "../../lib/routes";
 import PublicPageFrame from "../shell/PublicPageFrame";
 
 interface Props {
@@ -17,7 +21,7 @@ export default function PublicHomePage({ courses, locale }: Props) {
   const copy = getMessages(locale).publicHome;
 
   return (
-    <PublicPageFrame currentPath="/" locale={locale}>
+    <PublicPageFrame currentPath={routes.home.path()} locale={locale}>
       <Section className="public-intro" padding={0} variant="transparent">
         <section className="public-intro-grid">
           <VStack className="public-intro-copy" gap={4} hAlign="start">
@@ -41,7 +45,7 @@ export default function PublicHomePage({ courses, locale }: Props) {
           <Card className="public-access-card public-access-panel" padding={6}>
             <VStack gap={4}>
               <Text className="public-panel-index" type="supporting" color="secondary">
-                01 / {copy.access}
+                01 / {copy.accessSectionLabel}
               </Text>
               <Heading level={2}>{copy.access}</Heading>
               <Text type="body" color="secondary">
@@ -49,7 +53,7 @@ export default function PublicHomePage({ courses, locale }: Props) {
               </Text>
               <HStack className="public-access-actions" gap={4} wrap="wrap">
                 <Link
-                  href="https://opas.peppi.oulu.fi"
+                  href={externalLinks.peppi}
                   isExternalLink
                   isStandalone
                   newTabLabel={copy.opensInNewTab}
@@ -67,7 +71,7 @@ export default function PublicHomePage({ courses, locale }: Props) {
           <HStack className="public-course-heading" gap={6} vAlign="end" wrap="wrap">
             <VStack className="public-section-heading" gap={2}>
               <Text className="public-panel-index" type="supporting" color="secondary">
-                02 / {copy.courseSpaces}
+                02 / {copy.coursesSectionLabel}
               </Text>
               <Heading level={2}>{copy.courseSpaces}</Heading>
             </VStack>
@@ -90,9 +94,13 @@ export default function PublicHomePage({ courses, locale }: Props) {
                 }
                 endContent={
                   <HStack className="public-course-actions" gap={4} vAlign="center" wrap="wrap">
-                    <Link href={localizedPath(locale, `/courses/${course.slug}/`)} isStandalone>
-                      {copy.viewCourse}
-                    </Link>
+                    <Button
+                      endContent={<ArrowRight size={15} aria-hidden="true" />}
+                      href={localizedPath(locale, routes.course.path({ course: course.slug }))}
+                      label={copy.viewCourse}
+                      size="sm"
+                      variant="primary"
+                    />
                     {course.catalogUrl ? (
                       <Link
                         href={course.catalogUrl}

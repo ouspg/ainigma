@@ -2,6 +2,7 @@ import type { AppearanceTheme } from "./appearance";
 
 export const locales = ["en", "fi"] as const;
 export type Locale = (typeof locales)[number];
+export const defaultLocale: Locale = "en";
 
 export interface AppMessages {
   appearance: {
@@ -43,8 +44,10 @@ export interface AppMessages {
     intro: string;
     alphaLabel: string;
     alphaText: string;
+    coursesSectionLabel: string;
     courseSpaces: string;
     published: string;
+    accessSectionLabel: string;
     access: string;
     accessText: string;
     viewCourse: string;
@@ -76,6 +79,8 @@ export interface AppMessages {
     intro: string;
     continue: string;
     note: string;
+    authError: string;
+    startError: string;
     access: string;
     peppi: string;
   };
@@ -196,7 +201,7 @@ const en: AppMessages = {
   metadata: {
     homeTitle: "Ainigma | Interactive cyber security coursework",
     homeDescription:
-      "A focused academic workspace for interactive security coursework at the University of Oulu.",
+      "A focused academic workspace for interactive cyber security coursework at the University of Oulu.",
     loginTitle: "Sign in | Ainigma",
     loginDescription: "Sign in to your Ainigma learning space.",
     deskTitle: "My learning | Ainigma",
@@ -210,14 +215,17 @@ const en: AppMessages = {
   },
   publicHome: {
     signIn: "Sign in",
-    unit: "Oulu University Secure Programming Group (OUSPG)",
+    unit: "By Oulu University Secure Programming Group (OUSPG)",
     title: "Cybersecurity courses at the University of Oulu",
     intro:
       "This site contains course material and interactive exercises for participating cybersecurity courses. Personal coursework and progress are available to enrolled students after sign-in.",
     alphaLabel: "Alpha",
-    alphaText: "Ainigma is currently in alpha. Course content and features are still evolving.",
+    alphaText:
+      "Ainigma is currently in alpha. Course content and features are still (rapidly) evolving.",
+    coursesSectionLabel: "Courses",
     courseSpaces: "Course spaces",
     published: "course spaces are currently published on Ainigma.",
+    accessSectionLabel: "Start here",
     access: "Access",
     accessText:
       "Use the GitHub account linked to your university email. To access courses, authenticate through the University of Oulu GitHub Enterprise SSO. If an expected course is missing, contact the course staff.",
@@ -255,6 +263,8 @@ const en: AppMessages = {
       "Use the GitHub identity connected to your university email. You must pass Univerity's SSO in order to access courses.",
     continue: "Continue with GitHub",
     note: "Ainigma uses your verified GitHub identity to check course access and bind lab work to the correct learner.",
+    authError: "GitHub sign-in could not be completed. Please try again.",
+    startError: "GitHub sign-in could not be started. Please try again.",
     access: "Need access? Contact your course staff or review the",
     peppi: "Peppi study guide",
   },
@@ -403,9 +413,11 @@ const fi: AppMessages = {
       "Tämä sivusto sisältää osallistuvien kyberturvallisuuskurssien kurssimateriaaleja ja interaktiivisia harjoituksia. Henkilökohtaiset tehtävät ja edistyminen ovat ilmoittautuneiden opiskelijoiden käytettävissä kirjautumisen jälkeen.",
     alphaLabel: "Alphaversio",
     alphaText:
-      "Ainigma on tällä hetkellä alphavaiheessa. Kurssisisältö ja ominaisuudet kehittyvät vielä.",
+      "Ainigma on tällä hetkellä alphavaiheessa. Kurssisisältö ja ominaisuudet kehittyvät (merkittävästi) vielä.",
+    coursesSectionLabel: "Kurssit",
     courseSpaces: "Kurssitilat",
     published: "kurssitilaa on julkaistu Ainigmaan.",
+    accessSectionLabel: "Aloita tästä",
     access: "Käyttöoikeus",
     accessText:
       "Opiskelijat kirjautuvat kurssilleen ilmoittautumiseen liitetyllä GitHub-tunnuksella. Jos odottamasi kurssi ei ole käytettävissä, ota yhteyttä kurssin henkilökuntaan.",
@@ -441,6 +453,8 @@ const fi: AppMessages = {
     intro: "Käytä kurssi-ilmoittautumiseesi liitettyä GitHub-tunnusta.",
     continue: "Jatka GitHubilla",
     note: "Ainigma käyttää vahvistettua GitHub-identiteettiä kurssioikeuksien tarkistamiseen ja tehtävien yhdistämiseen oikeaan opiskelijaan.",
+    authError: "GitHub-kirjautumista ei voitu viimeistellä. Yritä uudelleen.",
+    startError: "GitHub-kirjautumista ei voitu aloittaa. Yritä uudelleen.",
     access: "Tarvitsetko käyttöoikeuden? Ota yhteyttä kurssin henkilökuntaan tai tutustu",
     peppi: "Peppi-oppaaseen",
   },
@@ -564,15 +578,4 @@ export function getAstryxLocale(locale: Locale): "en" | "fi-FI" {
 
 export function getOtherLocale(locale: Locale): Locale {
   return locale === "fi" ? "en" : "fi";
-}
-
-/** Build a locale URL from a canonical, English-shaped application path. */
-export function localizedPath(locale: Locale, path: string): string {
-  if (locale === "en") return path;
-  const match = path.match(/^([^?#]*)(.*)$/);
-  const pathname = match?.[1] ?? path;
-  const suffix = match?.[2] ?? "";
-  if (pathname === "/fi" || pathname.startsWith("/fi/")) return path;
-  if (pathname === "/") return `/fi/${suffix}`;
-  return `/fi${pathname}${suffix}`;
 }

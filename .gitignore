@@ -3,6 +3,7 @@ target/
 .vscode/
 Cargo.lock
 .env
+.env.local
 .ainigma/
 .shots/
 node_modules/

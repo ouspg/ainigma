@@ -2,6 +2,7 @@ import { Section } from "@astryxdesign/core/Section";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { getMessages, type Locale } from "../../lib/i18n";
+import { routes } from "../../lib/routes";
 import PublicPageFrame from "../shell/PublicPageFrame";
 
 type PageKind = "about" | "privacy";
@@ -19,7 +20,7 @@ export default function PublicInfoPage({ kind, locale }: Props) {
   const intro = isAbout ? copy.aboutIntro : copy.privacyIntro;
   const sectionTitle = isAbout ? copy.aboutSectionTitle : copy.privacySectionTitle;
   const placeholder = isAbout ? copy.aboutPlaceholder : copy.privacyPlaceholder;
-  const currentPath = isAbout ? "/about/" : "/privacy/";
+  const currentPath = isAbout ? routes.about.path() : routes.privacy.path();
 
   return (
     <PublicPageFrame currentPath={currentPath} locale={locale}>

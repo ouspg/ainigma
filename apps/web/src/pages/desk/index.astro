@@ -5,6 +5,9 @@ import LearningFrame from "../../components/shell/LearningFrame.astro";
 import DashboardIsland from "../../components/islands/DashboardIsland";
 import { getLearningWorkspace } from "../../lib/learning/catalog";
 import { getLocale, getMessages } from "../../lib/i18n";
+import { routes } from "../../lib/routes";
+
+export const prerender = false;
 
 const entries = await getCollection("courses");
 const workspace = await getLearningWorkspace(entries);
@@ -18,7 +21,7 @@ const metadata = getMessages(locale).metadata;
   {locale}
 >
   <LearningFrame
-    currentPath="/desk/"
+    currentPath={routes.desk.path()}
     courses={workspace.courses}
     profile={workspace.profile}
     term={workspace.term}

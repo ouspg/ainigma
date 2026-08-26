@@ -2,9 +2,10 @@ import { GraduationCap } from "lucide-react";
 import { useSideNavCollapse } from "@astryxdesign/core/SideNav";
 import { navigate } from "astro:transitions/client";
 import { createElement, type MouseEvent } from "react";
+import type { AppPath } from "../routes";
 
 interface CourseMarkProps {
-  href?: string;
+  href?: AppPath;
   mark: string;
 }
 

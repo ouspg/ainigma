@@ -8,6 +8,7 @@ import {
 } from "../lib/appearance";
 import { COLOR_MODE_STORAGE_KEY } from "../lib/color-mode";
 import type { Locale } from "../lib/i18n";
+import { routeUsesLearnerShell } from "../lib/routes";
 
 interface Props {
   title: string;
@@ -16,7 +17,7 @@ interface Props {
 }
 
 const { title, description, locale = "en" } = Astro.props;
-const isLearningRoute = /^\/(?:fi\/)?(?:desk|activity|courses)(?:\/|$)/.test(Astro.url.pathname);
+const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
 ---
 
 <!doctype html>

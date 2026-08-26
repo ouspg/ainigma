@@ -1,12 +1,17 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import LoginPage from "../components/pages/LoginPage";
+import { safeNextPath } from "../lib/auth/redirects";
 import { getLocale, getMessages } from "../lib/i18n";
+
+export const prerender = false;
 
 const locale = getLocale(Astro.currentLocale);
 const metadata = getMessages(locale).metadata;
+const next = safeNextPath(Astro.url.searchParams.get("next"));
+const authError = Astro.url.searchParams.has("error");
 ---
 
 <BaseLayout title={metadata.loginTitle} description={metadata.loginDescription} {locale}>
-  <LoginPage client:load {locale} />
+  <LoginPage client:load {authError} {locale} {next} />
 </BaseLayout>

@@ -2,13 +2,13 @@ import { Link } from "@astryxdesign/core/Link";
 import { Section } from "@astryxdesign/core/Section";
 import { HStack, StackItem } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { externalLinks } from "../../lib/external-links";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath, routes } from "../../lib/routes";
 
 interface Props {
   locale: Locale;
 }
-
-const SOURCE_CODE_URL = "https://github.com/ouspg/ainigma";
 
 export default function SiteFooter({ locale }: Props) {
   const copy = getMessages(locale).footer;
@@ -22,9 +22,9 @@ export default function SiteFooter({ locale }: Props) {
           </Text>
           <StackItem size="fill" />
           <HStack as="nav" aria-label={copy.navigation} gap={4} vAlign="center" wrap="wrap">
-            <Link href={localizedPath(locale, "/about/")}>{copy.about}</Link>
-            <Link href={localizedPath(locale, "/privacy/")}>{copy.privacy}</Link>
-            <Link href={SOURCE_CODE_URL} target="_blank">
+            <Link href={localizedPath(locale, routes.about.path())}>{copy.about}</Link>
+            <Link href={localizedPath(locale, routes.privacy.path())}>{copy.privacy}</Link>
+            <Link href={externalLinks.sourceCode} target="_blank">
               {copy.sourceCode}
             </Link>
           </HStack>

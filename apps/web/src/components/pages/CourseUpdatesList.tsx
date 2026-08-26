@@ -1,8 +1,9 @@
 import { List, ListItem } from "@astryxdesign/core/List";
 import { Text } from "@astryxdesign/core/Text";
 import { ChevronRight } from "lucide-react";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
 import type { Announcement, CourseInfo } from "../../lib/learning/types";
+import { localizedPath } from "../../lib/routes";
 
 interface Props {
   announcements: Announcement[];

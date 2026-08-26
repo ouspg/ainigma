@@ -961,6 +961,10 @@ a {
   width: min(100%, 27rem);
 }
 
+.login-auth-error {
+  color: var(--color-error);
+}
+
 html[data-appearance-theme="terminal"] .login-panel {
   width: min(100%, 34rem);
 }

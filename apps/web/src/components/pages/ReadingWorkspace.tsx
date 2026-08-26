@@ -5,10 +5,11 @@ import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { ArrowLeft, ArrowRight, Clock3 } from "lucide-react";
 import type { OutlineSection } from "../../lib/learning/catalog";
-import { getMessages, localizedPath, type Locale } from "../../lib/i18n";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath, type AppPath } from "../../lib/routes";
 
 interface PageLink {
-  href: string;
+  href: AppPath;
   label: string;
 }
 

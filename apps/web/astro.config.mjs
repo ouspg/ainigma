@@ -23,7 +23,7 @@ function localAuthDevRoute() {
 
         injectRoute({
           pattern: "/auth/local",
-          entrypoint: fileURLToPath(new URL("./src/dev/local-auth-route.ts", import.meta.url)),
+          entrypoint: fileURLToPath(new URL("./src/dev/dev-local-auth-route.ts", import.meta.url)),
           prerender: false,
         });
       },

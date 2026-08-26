@@ -2,7 +2,7 @@ import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { VStack } from "@astryxdesign/core/Stack";
 import { Heading, Text } from "@astryxdesign/core/Text";
-import type { LocalAuthPersonaOption } from "../lib/auth/dev-local-auth";
+import type { LocalAuthPersonaOption } from "./dev-local-auth";
 import { getMessages, type Locale } from "../lib/i18n";
 import { routes, type AppPath } from "../lib/routes";
 
@@ -12,7 +12,7 @@ interface Props {
   personas: readonly LocalAuthPersonaOption[];
 }
 
-export default function LocalAuthPicker({ locale, next, personas }: Props) {
+export default function DevLocalAuthPicker({ locale, next, personas }: Props) {
   const copy = getMessages(locale).login;
 
   const signInAsLocalPersona = (persona: LocalAuthPersonaOption["key"]) => {

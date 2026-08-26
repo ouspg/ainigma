@@ -8,7 +8,7 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import fiFI from "@astryxdesign/core/locales/fi-FI.json";
 import { KeyRound } from "lucide-react";
-import type { LocalAuthPersonaOption } from "../../lib/auth/dev-local-auth";
+import type { LocalAuthPersonaOption } from "../../dev/dev-local-auth";
 import { externalLinks } from "../../lib/external-links";
 import { getAstryxLocale, getMessages, type Locale } from "../../lib/i18n";
 import { routes, type AppPath } from "../../lib/routes";
@@ -18,7 +18,7 @@ import SiteFooter from "../shell/SiteFooter";
 import { AppearanceThemeProvider } from "../theme/AppearanceThemeProvider";
 
 const LocalAuthPicker = import.meta.env.DEV
-  ? lazy(() => import("../../dev/LocalAuthPicker"))
+  ? lazy(() => import("../../dev/DevLocalAuthPicker"))
   : null;
 
 interface Props {

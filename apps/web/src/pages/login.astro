@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import LoginPage from "../components/pages/LoginPage";
-import type { LocalAuthPersonaOption } from "../lib/auth/dev-local-auth";
+import type { LocalAuthPersonaOption } from "../dev/dev-local-auth";
 import { safeNextPath } from "../lib/auth/redirects";
 import { getLocale, getMessages } from "../lib/i18n";
 
@@ -15,7 +15,7 @@ let localAuth = false;
 let localAuthPersonas: readonly LocalAuthPersonaOption[] = [];
 
 if (import.meta.env.DEV && import.meta.env.PUBLIC_AUTH_MODE === "local") {
-  const localAuthModule = await import("../lib/auth/dev-local-auth");
+  const localAuthModule = await import("../dev/dev-local-auth");
   localAuth = true;
   localAuthPersonas = localAuthModule.localAuthPersonas;
 }

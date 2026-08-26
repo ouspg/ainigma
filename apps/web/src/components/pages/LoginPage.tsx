@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Center } from "@astryxdesign/core/Center";
@@ -12,7 +12,6 @@ import type { LocalAuthPersonaOption } from "../../dev/dev-local-auth";
 import { externalLinks } from "../../lib/external-links";
 import { getAstryxLocale, getMessages, type Locale } from "../../lib/i18n";
 import { routes, type AppPath } from "../../lib/routes";
-import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import PublicHeader from "../shell/PublicHeader";
 import SiteFooter from "../shell/SiteFooter";
 import { AppearanceThemeProvider } from "../theme/AppearanceThemeProvider";
@@ -38,28 +37,6 @@ export default function LoginPage({
 }: Props) {
   const messages = getMessages(locale);
   const copy = messages.login;
-  const [isSigningIn, setSigningIn] = useState(false);
-  const [startError, setStartError] = useState(false);
-
-  const signIn = async () => {
-    setSigningIn(true);
-    setStartError(false);
-
-    try {
-      const callbackUrl = new URL(routes.authCallback.path(), window.location.origin);
-      callbackUrl.searchParams.set("next", next);
-      const supabase = createBrowserSupabaseClient();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo: callbackUrl.toString() },
-      });
-
-      if (error) throw error;
-    } catch {
-      setStartError(true);
-      setSigningIn(false);
-    }
-  };
 
   return (
     <InternationalizationProvider locale={getAstryxLocale(locale)} messages={{ "fi-FI": fiFI }}>
@@ -81,21 +58,23 @@ export default function LoginPage({
               </VStack>
               <Card padding={6}>
                 <VStack gap={4}>
-                  <Button
-                    icon={<KeyRound size={17} />}
-                    isLoading={isSigningIn}
-                    label={copy.continue}
-                    onClick={signIn}
-                    size="lg"
-                    variant="primary"
-                    width="100%"
-                  />
+                  <form action={routes.authStart.path()} method="post">
+                    <input name="next" type="hidden" value={next} />
+                    <Button
+                      icon={<KeyRound size={17} />}
+                      label={copy.continue}
+                      size="lg"
+                      type="submit"
+                      variant="primary"
+                      width="100%"
+                    />
+                  </form>
                   <Text type="supporting" color="secondary">
                     {copy.note}
                   </Text>
-                  {authError || startError ? (
+                  {authError ? (
                     <Text className="login-auth-error" type="supporting">
-                      {startError ? copy.startError : copy.authError}
+                      {copy.authError}
                     </Text>
                   ) : null}
                 </VStack>

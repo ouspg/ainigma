@@ -22,5 +22,5 @@ if (import.meta.env.DEV && import.meta.env.PUBLIC_AUTH_MODE === "local") {
 ---
 
 <BaseLayout title={metadata.loginTitle} description={metadata.loginDescription} {locale}>
-  <LoginPage client:load {authError} {locale} {next} {localAuth} localAuthPersonas={localAuthPersonas} />
+  <LoginPage {authError} {locale} {next} {localAuth} localAuthPersonas={localAuthPersonas} />
 </BaseLayout>

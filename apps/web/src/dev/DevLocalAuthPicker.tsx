@@ -15,11 +15,11 @@ interface Props {
 export default function DevLocalAuthPicker({ locale, next, personas }: Props) {
   const copy = getMessages(locale).login;
 
-  const signInAsLocalPersona = (persona: LocalAuthPersonaOption["key"]) => {
-    const localAuthUrl = new URL(routes.authLocal.path(), window.location.origin);
+  const localAuthHref = (persona: LocalAuthPersonaOption["key"]): string => {
+    const localAuthUrl = new URL(routes.authLocal.path(), "https://ainigma.invalid");
     localAuthUrl.searchParams.set("next", next);
     localAuthUrl.searchParams.set("persona", persona);
-    window.location.assign(localAuthUrl);
+    return `${localAuthUrl.pathname}${localAuthUrl.search}`;
   };
 
   return (
@@ -34,8 +34,8 @@ export default function DevLocalAuthPicker({ locale, next, personas }: Props) {
         {personas.map((persona) => (
           <VStack key={persona.key} gap={1}>
             <Button
+              href={localAuthHref(persona.key)}
               label={persona.label}
-              onClick={() => signInAsLocalPersona(persona.key)}
               size="md"
               variant="secondary"
               width="100%"

@@ -1,6 +1,8 @@
--- Identity foundation: provider-neutral profiles, Auth links, and verified identifiers.
--- Course authorization is defined in the later authorization migration.
+-- Declarative identity foundation: provider-neutral profiles, Auth links, and verified identifiers.
+-- The initial baseline omits one-time Auth reconciliation because this database is fresh;
+-- schema diffs do not capture data changes.
 create extension if not exists pgcrypto with schema extensions;
+create extension if not exists "uuid-ossp" with schema extensions;
 
 create schema if not exists private;
 
@@ -57,7 +59,7 @@ $roles$;
 -- explicit grants and dedicated internal RLS policies below.
 
 
--- These private, migration-owned views are the only bridge through Auth's RLS.
+-- These private, application-owned views are the only bridge through Auth's RLS.
 -- They expose the minimum trusted columns needed by reconciliation functions
 -- and are never granted to browser or maintenance roles.
 create view private.auth_users as
@@ -586,13 +588,12 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function private.handle_auth_user_created();
 -- The function owner cannot log in. Its table access is constrained by
--- explicit grants; browser access is granted by the authorization migration.
+-- explicit grants; browser access is granted by the authorization schema.
 grant usage on schema public, private to ainigma_function_owner;
 grant select on private.auth_users, private.auth_identities to ainigma_function_owner;
 grant select, insert, update on public.profiles to ainigma_function_owner;
 grant select, insert on private.auth_user_links to ainigma_function_owner;
 grant select, insert, update on private.profile_identifiers to ainigma_function_owner;
-grant ainigma_function_owner to postgres;
 grant create on schema public, private to ainigma_function_owner;
 
 alter function private.ensure_auth_user_profile(uuid) owner to ainigma_function_owner;
@@ -617,7 +618,6 @@ revoke all on function
 from public, anon, authenticated, service_role, ainigma_maintenance;
 grant execute on function private.request_auth_user_id() to ainigma_function_owner;
 
-set role ainigma_function_owner;
 revoke all on function
   private.ensure_auth_user_profile(uuid),
   private.handle_auth_user_created(),
@@ -628,19 +628,9 @@ revoke all on function
   private.report_identity_anomalies(),
   private.current_profile_id()
 from public, anon, authenticated, service_role, ainigma_maintenance;
-reset role;
 
 grant execute on function private.ensure_auth_user_profile(uuid) to ainigma_maintenance;
 grant execute on function private.sync_auth_identity(uuid) to ainigma_maintenance;
 grant execute on function private.reconcile_auth_users() to ainigma_maintenance;
 grant execute on function private.reconcile_auth_identities() to ainigma_maintenance;
 grant execute on function private.report_identity_anomalies() to ainigma_maintenance;
-revoke ainigma_function_owner from postgres;
-
--- Provision profiles for Auth users that predate this migration. This operation
--- is idempotent and never merges identities by email.
-grant ainigma_maintenance to postgres;
-set role ainigma_maintenance;
-select * from private.reconcile_auth_users();
-reset role;
-revoke ainigma_maintenance from postgres;

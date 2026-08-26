@@ -1,5 +1,5 @@
--- Course offerings: operational identity for authored course definitions.
--- Memberships and access policy are defined in the authorization migration.
+-- Declarative course offerings: operational identity for authored course definitions.
+-- Memberships and access policy are declared in the later authorization schema.
 create table public.courses (
   id uuid primary key default gen_random_uuid(),
   course_key text not null unique,
@@ -48,3 +48,4 @@ alter table public.courses
 create trigger courses_set_updated_at
 before update on public.courses
 for each row execute function private.set_updated_at();
+

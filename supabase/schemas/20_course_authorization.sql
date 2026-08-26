@@ -1,4 +1,4 @@
--- Course authorization lifecycle: memberships, requests, trusted rosters,
+-- Declarative course authorization lifecycle: memberships, requests, trusted rosters,
 -- GitHub organization access, and the RPC-only browser API.
 create table public.course_memberships (
   course_id uuid not null references public.courses (id) on delete restrict,
@@ -842,8 +842,8 @@ security definer
 set search_path = ''
 as $function$
 declare
-  v_course_id uuid;
   v_profile_id uuid := private.current_profile_id();
+  v_course_id uuid;
 begin
   select course.id into v_course_id
   from public.courses as course
@@ -1123,7 +1123,6 @@ grant usage, select on sequence private.course_membership_events_id_seq to ainig
 grant select, insert, update on private.course_access_requests to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.course_roster_allowlist to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.github_course_access to ainigma_function_owner, ainigma_maintenance;
-grant ainigma_function_owner to postgres;
 grant create on schema public, private to ainigma_function_owner;
 
 alter function private.has_course_role(uuid, text[]) owner to ainigma_function_owner;
@@ -1141,7 +1140,6 @@ alter function public.approve_course_access_requests(text, uuid[]) owner to aini
 alter function public.reject_course_access_requests(text, uuid[], text) owner to ainigma_function_owner;
 revoke create on schema public, private from ainigma_function_owner;
 
-set role ainigma_function_owner;
 revoke all on function
   private.reject_mutation(),
   private.has_course_role(uuid, text[]),
@@ -1187,8 +1185,6 @@ grant execute on function
   public.approve_course_access_requests(text, uuid[]),
   public.reject_course_access_requests(text, uuid[], text)
 to authenticated;
-reset role;
-revoke ainigma_function_owner from postgres;
 
 alter table public.profiles enable row level security;
 alter table public.profiles force row level security;

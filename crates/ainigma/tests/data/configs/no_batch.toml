@@ -13,9 +13,7 @@ name = "How does this standard work?"
 # description = "Find the flag."
 points = 1.0
 # Just one flag for the task
-stages = [
-    { id = "task0021", name = "problem", weight = 1, flag = { kind = "user_derived" } },
-]
+stages = [{ id = "task0021", name = "problem", weight = 1, flag = { kind = "user_derived" } }]
 
 [categories.tasks.build]
 directory = "ansible"

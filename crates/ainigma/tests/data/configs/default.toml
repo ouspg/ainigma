@@ -5,15 +5,15 @@
 # - A CTF competition
 # - Other similar content
 
-identifier = "01908498-ac98-708d-b886-b6f2747ef785"  # Required: Module's unique ID (UUIDv7)
-name = "Cybersecurity"                                # Required: Module name
+identifier = "01908498-ac98-708d-b886-b6f2747ef785" # Required: Module's unique ID (UUIDv7)
+name = "Cybersecurity" # Required: Module name
 description = "A comprehensive course covering various aspects of cybersecurity"
-version = "0.0.1"                                     # Required: Update when tasks change
+version = "0.0.1" # Required: Update when tasks change
 
 # Categories
 # These are the main sections of your content (like weeks or modules)
 [[categories]]
-number = 1                                           # Required: Category order number
+number = 1 # Required: Category order number
 name = "Introduction to Cybersecurity"
 
 [[categories.tasks]]
@@ -21,10 +21,10 @@ name = "Introduction to Cybersecurity"
 # A task can be:
 # - Single challenge
 # - Multiple challenges (using stages)
-id = "task001"                                       # Required: Unique task ID
-name = "Challenge 1"                                 # Required: Task name
+id = "task001" # Required: Unique task ID
+name = "Challenge 1" # Required: Task name
 description = "Exploit few buffer overflow vulnerabilities"
-points = 1.0                                         # Required: Task points (float)
+points = 1.0 # Required: Task points (float)
 
 # Stages
 # Use stages when:
@@ -32,29 +32,29 @@ points = 1.0                                         # Required: Task points (fl
 # - Task has multiple parts (a, b, c...)
 # Each stage needs unique ID containing the task ID as prefix
 stages = [
-    { id = "task001A", name = "Subpart A", description = "Task A", weight = 1, flag = { kind = "user_derived" } },
-    { id = "task001B", name = "Subpart B", description = "Task B", weight = 1, flag = { kind = "pure_random" } },
-    { id = "task001C", name = "Subpart C", description = "Task C", weight = 1, flag = { kind = "rng_seed" } },
+  { id = "task001A", name = "Subpart A", description = "Task A", weight = 1, flag = { kind = "user_derived" } },
+  { id = "task001B", name = "Subpart B", description = "Task B", weight = 1, flag = { kind = "pure_random" } },
+  { id = "task001C", name = "Subpart C", description = "Task C", weight = 1, flag = { kind = "rng_seed" } },
 ]
 
 [categories.tasks.build]
-directory = "tasks/category1/buffer_overflow"         # Location of task files
-builder = { shell = {} }                             # Build system to use
-enabled_modes = ["sequential"]                       # How to build the task
+directory = "tasks/category1/buffer_overflow" # Location of task files
+builder = { shell = {} } # Build system to use
+enabled_modes = ["sequential"] # How to build the task
 
 # Output Files
 # These define what files the build creates:
 [[categories.tasks.build.output]]
-kind = { resource = "exloitable.bin" }              # Files for users to download
+kind = { resource = "exloitable.bin" } # Files for users to download
 
 [[categories.tasks.build.output]]
-kind = { internal = "vulnerable_server.py" }         # Files for internal use (e.g., server setup)
+kind = { internal = "vulnerable_server.py" } # Files for internal use (e.g., server setup)
 
 [[categories.tasks.build.output]]
-kind = { readme = "readme.txt" }                    # Task instructions
+kind = { readme = "readme.txt" } # Task instructions
 
 [[categories.tasks.build.output]]
-kind = { meta = "meta.json" }                       # Task metadata (URLs, settings, etc)
+kind = { meta = "meta.json" } # Task metadata (URLs, settings, etc)
 
 [[categories.tasks]]
 id = "task002"
@@ -142,20 +142,20 @@ kind = { readme = "readme.txt" }
 # Defines how flags are generated
 [flag_config]
 # Three types of flags:
-pure_random = { length = 32 }                       # Random string of given length
+pure_random = { length = 32 } # Random string of given length
 # Creates user-specific flags that can be reproduced
-user_derived = { algorithm = "HMAC_SHA3_256", secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" }  # At least 32 bytes
-rng_seed = { secret = "You must know me to predict the seed of the other users"}  # For generating deterministic content 
+user_derived = { algorithm = "HMAC_SHA3_256", secret = "6b2c0c4535ea5b7c7f4fc603a738840fce80e0c8e2632f139f1aa9d27f540f15" } # At least 32 bytes
+rng_seed = { secret = "You must know me to predict the seed of the other users" } # For generating deterministic content 
 
 # Deployment Settings
 [deployment]
-build_timeout = 300                                 # Max build time in seconds
+build_timeout = 300 # Max build time in seconds
 
 [deployment.upload]
-AWS_S3_ENDPOINT = "https://a3s.fi"                 # S3 storage endpoint
-AWS_REGION = "us-west-2"                           # Required for AWS SDK
-BUCKET_NAME = "hardware-software-security"          # Storage bucket name
-USE_PRE_SIGNED = false                             # If true: temporary links, if false: public files
-LINK_EXPIRATION = 7                                # Days links remain valid (max 7 for S3)
-FILE_EXPIRATION = 21                               # Days until files are deleted
+AWS_S3_ENDPOINT = "https://a3s.fi" # S3 storage endpoint
+AWS_REGION = "us-west-2" # Required for AWS SDK
+BUCKET_NAME = "hardware-software-security" # Storage bucket name
+USE_PRE_SIGNED = false # If true: temporary links, if false: public files
+LINK_EXPIRATION = 7 # Days links remain valid (max 7 for S3)
+FILE_EXPIRATION = 21 # Days until files are deleted
 # Note: AWS credentials come from environment variables

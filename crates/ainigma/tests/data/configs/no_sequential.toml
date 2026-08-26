@@ -12,7 +12,7 @@ name = "How does OCI standard work?"
 points = 1.0
 # Just one flag for the tsk
 stages = [
-    { id = "task0021", name = "Jupyter problem", weight = 1, flag = { kind = "pure_random" } },
+  { id = "task0021", name = "Jupyter problem", weight = 1, flag = { kind = "pure_random" } },
 ]
 
 [categories.tasks.build]

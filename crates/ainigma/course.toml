@@ -2,8 +2,8 @@
 # Can be a course, subpart of the course, CTF competition, or something else.
 
 # UUIDv7
-identifier = "01908498-ac98-708d-b886-b6f2747ef785"                              # mandatory
-name = "Cybersecurity"                                                           # mandatory
+identifier = "01908498-ac98-708d-b886-b6f2747ef785" # mandatory
+name = "Cybersecurity" # mandatory
 description = "A comprehensive course covering various aspects of cybersecurity"
 # We likely need to think this further. If some task is changed, this should be changed as well.
 version = "0.0.1" # mandatory
@@ -11,13 +11,13 @@ version = "0.0.1" # mandatory
 # Domains are the main sections of the course
 # For a more general setting, we use word "category" instead of "week" or "module"
 [[categories]]
-number = 1                             # mandatory
+number = 1 # mandatory
 name = "Introduction to Cybersecurity"
 
 [[categories.tasks]]
 # Tasks can be a single whole task or tasks with stages (sub-parts like a, b c)
-id = "task001"                                              # mandatory
-name = "Challenge 1"                                        # mandatory
+id = "task001" # mandatory
+name = "Challenge 1" # mandatory
 description = "Exploit few buffer overflow vulnerabilities"
 # Note the float type here
 points = 1.0 # mandatory
@@ -32,16 +32,16 @@ points = 1.0 # mandatory
 # Task ID is used as flag prefix. Maybe further obfuscation needed for that but maybe not necessary
 # Task ID must contain the overall task ID as prefix
 stages = [
-    { id = "task001A", name = "Subpart A", description = "Task A", weight = 1, flag = { kind = "user_derived" } },
-    { id = "task001B", name = "Subpart B", description = "Task B", weight = 1, flag = { kind = "pure_random" } },
-    { id = "task001C", name = "Subpart C", description = "Task C", weight = 1, flag = { kind = "rng_seed" } },
+  { id = "task001A", name = "Subpart A", description = "Task A", weight = 1, flag = { kind = "user_derived" } },
+  { id = "task001B", name = "Subpart B", description = "Task B", weight = 1, flag = { kind = "pure_random" } },
+  { id = "task001C", name = "Subpart C", description = "Task C", weight = 1, flag = { kind = "rng_seed" } },
 ]
 
 [categories.tasks.build]
 # Directory where the task configuration files are located
 # Can be symbolic link to the actual task directory as well
 directory = "tasks/category1/buffer_overflow"
-builder = { shell = {} }                      # Shell builder without entrypoint
+builder = { shell = {} } # Shell builder without entrypoint
 # Default is entrypoint.sh, but we could override it
 # builder = { shell = { entrypoint = "my_entrypoint.sh" } }
 
@@ -167,7 +167,7 @@ build_timeout = 300 # seconds
 
 [deployment.upload]
 AWS_S3_ENDPOINT = "https://a3s.fi"
-AWS_REGION = "us-west-2"                   # Something to make AWS SDK happy
+AWS_REGION = "us-west-2" # Something to make AWS SDK happy
 BUCKET_NAME = "hardware-software-security"
 # Whether to use pre-signed URLs for the uploads with lifetime
 # If not set, *all* uploaded files in the bucket are public and not tied to expiration or access token

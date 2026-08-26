@@ -1,7 +1,7 @@
 identifier = "01908498-ac98-708d-b886-b6f2747ef785"
 name = "Cybersecurity"
 description = "A comprehensive course covering various aspects of cybersecurity"
-version = "0.0.1"                                                                # mandatory
+version = "0.0.1" # mandatory
 [[categories]]
 number = 1
 name = "Network Security Fundamentals"

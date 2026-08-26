@@ -1,17 +1,15 @@
 import { GraduationCap } from "lucide-react";
-import { useSideNavCollapse } from "@astryxdesign/core/SideNav";
 import { navigate } from "astro:transitions/client";
 import { createElement, type MouseEvent } from "react";
 import type { AppPath } from "../routes";
 
 interface CourseMarkProps {
   href?: AppPath;
+  isCollapsed: boolean;
   mark: string;
 }
 
-export function CourseMark({ href, mark }: CourseMarkProps) {
-  const { isCollapsed } = useSideNavCollapse();
-
+export function CourseMark({ href, isCollapsed, mark }: CourseMarkProps) {
   const openCourse = (event: MouseEvent<HTMLSpanElement>) => {
     if (!isCollapsed || !href) return;
     event.preventDefault();

@@ -70,9 +70,18 @@ The MDX collection is still compiled at build time; protected pages render those
 only after authentication and course authorization. Database authorization also remains enforced
 by RLS. The public front page deliberately reads no learner progress data.
 
+For local front-end development, set `PUBLIC_AUTH_MODE=local` in `apps/web/.env.local`. The login
+page then shows four fixed seeded personas: empty learner, pending learner, member learner, and
+course owner. Choosing one calls the loopback-only `/auth/local` endpoint, which uses the server-only
+Supabase Auth Admin key to generate a one-time magic-link token and sends it through the same
+`/auth/callback` cookie exchange used by GitHub. This tests the real Supabase session, middleware,
+RLS, and RPC path without adding product email/password authentication. It does not replace a real
+GitHub OAuth test. The endpoint and picker are injected/loaded only during `astro dev`; they are not
+part of the production route manifest or production client bundle.
+
 See `../../supabase/README.md` for the GitHub OAuth App callback, local secrets, and Supabase CLI
 commands. The browser receives only the Supabase URL and publishable key from `.env.local`; GitHub
-and service-role secrets must never use Astro's `PUBLIC_` prefix.
+and Auth Admin/service-role secrets must never use Astro's `PUBLIC_` prefix.
 
 ## Routes and access policy
 

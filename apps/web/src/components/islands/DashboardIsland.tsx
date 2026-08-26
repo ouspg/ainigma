@@ -73,7 +73,7 @@ function formatCourseDate(value: string, locale: Locale): string {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
-export default function DashboardIsland({ workspace, locale }: Props) {
+function DashboardContent({ workspace, locale }: Props) {
   const [filter, setFilter] = useState<AgendaFilter>("upcoming");
   const courseBySlug = useMemo(
     () => new Map(workspace.courses.map((course) => [course.slug, course])),
@@ -368,4 +368,11 @@ export default function DashboardIsland({ workspace, locale }: Props) {
       </Layout>
     </VStack>
   );
+}
+
+// Astro probes framework components during SSR renderer detection by invoking
+// the exported function once. Keep that probe hook-free; the actual component
+// with hooks is rendered by React in the returned element tree.
+export default function DashboardIsland(props: Props) {
+  return <DashboardContent {...props} />;
 }

@@ -13,11 +13,19 @@ function noStore(response: Response): Response {
 export const GET: APIRoute = async ({ cookies, redirect, request }) => {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const tokenHash = requestUrl.searchParams.get("token_hash");
+  const tokenType = requestUrl.searchParams.get("type");
   const next = safeNextPath(requestUrl.searchParams.get("next"));
 
   if (code) {
     const supabase = createServerSupabaseClient({ request, cookies });
     const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return noStore(redirect(next));
+  }
+
+  if (tokenHash && tokenType === "magiclink") {
+    const supabase = createServerSupabaseClient({ request, cookies });
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
     if (!error) return noStore(redirect(next));
   }
 

@@ -25,7 +25,7 @@ if (!entry || entry.data.kind !== "course-page" || entry.data.page !== "material
   return new Response("Not found", { status: 404 });
 }
 const { Content, headings, remarkPluginFrontmatter } = await render(entry);
-const workspace = await getLearningWorkspace(entries);
+const workspace = await getLearningWorkspace(entries, Astro.locals.profile);
 const course = await getCourse(entries, courseSlug);
 const outline = buildOutlineSections(headings, remarkPluginFrontmatter.activityOutline);
 const currentPath = routes.coursePage.path({ course: course.slug, page: "materials" });

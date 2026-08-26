@@ -23,7 +23,7 @@ if (!entry || entry.data.kind !== "course") {
   return new Response("Not found", { status: 404 });
 }
 const { Content } = await render(entry);
-const workspace = await getLearningWorkspace(entries);
+const workspace = await getLearningWorkspace(entries, Astro.locals.profile);
 const course = await getCourse(entries, courseSlug);
 const locale = getLocale(Astro.currentLocale);
 ---

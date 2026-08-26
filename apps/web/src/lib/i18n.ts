@@ -79,6 +79,9 @@ export interface AppMessages {
     intro: string;
     continue: string;
     note: string;
+    localTitle: string;
+    localDescription: string;
+    localNote: string;
     authError: string;
     startError: string;
     access: string;
@@ -263,6 +266,10 @@ const en: AppMessages = {
       "Use the GitHub identity connected to your university email. You must pass Univerity's SSO in order to access courses.",
     continue: "Continue with GitHub",
     note: "Ainigma uses your verified GitHub identity to check course access and bind lab work to the correct learner.",
+    localTitle: "Local development users",
+    localDescription:
+      "Use a seeded Supabase user to test an application state without GitHub OAuth.",
+    localNote: "Visible only when local authentication mode is enabled.",
     authError: "GitHub sign-in could not be completed. Please try again.",
     startError: "GitHub sign-in could not be started. Please try again.",
     access: "Need access? Contact your course staff or review the",
@@ -453,6 +460,9 @@ const fi: AppMessages = {
     intro: "Käytä kurssi-ilmoittautumiseesi liitettyä GitHub-tunnusta.",
     continue: "Jatka GitHubilla",
     note: "Ainigma käyttää vahvistettua GitHub-identiteettiä kurssioikeuksien tarkistamiseen ja tehtävien yhdistämiseen oikeaan opiskelijaan.",
+    localTitle: "Paikallisen kehityksen käyttäjät",
+    localDescription: "Testaa Supabaseen kylvettyä käyttäjää ilman GitHub OAuth -kirjautumista.",
+    localNote: "Näkyy vain, kun paikallinen kirjautumistila on käytössä.",
     authError: "GitHub-kirjautumista ei voitu viimeistellä. Yritä uudelleen.",
     startError: "GitHub-kirjautumista ei voitu aloittaa. Yritä uudelleen.",
     access: "Tarvitsetko käyttöoikeuden? Ota yhteyttä kurssin henkilökuntaan tai tutustu",

@@ -35,6 +35,7 @@ describe("application routes", () => {
     expect(matchAppRoute("/")?.access).toBe("public");
     expect(matchAppRoute("/login/")?.access).toBe("guestOnly");
     expect(matchAppRoute("/auth/callback")?.access).toBe("protocol");
+    expect(matchAppRoute("/auth/local")?.access).toBe("protocol");
     expect(matchAppRoute("/fi/desk/")?.access).toBe("authenticated");
     expect(matchAppRoute("/courses/security-fundamentals/week-04/task/")).toMatchObject({
       access: "courseMember",

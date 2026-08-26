@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import LoginPage from "../components/pages/LoginPage";
+import type { LocalAuthPersonaOption } from "../lib/auth/local-auth";
 import { safeNextPath } from "../lib/auth/redirects";
 import { getLocale, getMessages } from "../lib/i18n";
 
@@ -10,8 +11,16 @@ const locale = getLocale(Astro.currentLocale);
 const metadata = getMessages(locale).metadata;
 const next = safeNextPath(Astro.url.searchParams.get("next"));
 const authError = Astro.url.searchParams.has("error");
+let localAuth = false;
+let localAuthPersonas: readonly LocalAuthPersonaOption[] = [];
+
+if (import.meta.env.DEV && import.meta.env.PUBLIC_AUTH_MODE === "local") {
+  const localAuthModule = await import("../lib/auth/local-auth");
+  localAuth = true;
+  localAuthPersonas = localAuthModule.localAuthPersonas;
+}
 ---
 
 <BaseLayout title={metadata.loginTitle} description={metadata.loginDescription} {locale}>
-  <LoginPage client:load {authError} {locale} {next} />
+  <LoginPage client:load {authError} {locale} {next} {localAuth} localAuthPersonas={localAuthPersonas} />
 </BaseLayout>

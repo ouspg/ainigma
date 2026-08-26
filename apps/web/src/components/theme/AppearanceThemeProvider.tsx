@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -34,7 +33,6 @@ interface Props {
 }
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
-const useIsomorphicLayoutEffect = typeof document === "undefined" ? useEffect : useLayoutEffect;
 
 const themes = {
   academic: academicThemeBuilt,
@@ -54,13 +52,15 @@ function applyColorModeAttribute(mode: ColorMode) {
 }
 
 export function AppearanceThemeProvider({ children }: Props) {
-  // The SSR defaults match BaseLayout. Saved preferences are applied to the
-  // document before first paint and synchronized into React during hydration.
+  // The first render must be identical on the server and in the browser.
+  // BaseLayout applies localStorage preferences to <html> before paint, but
+  // localStorage is not available during SSR. Synchronize the provider after
+  // hydration instead of reading the browser-only value in the initial state.
   const [appearanceTheme, setAppearanceThemeState] =
     useState<AppearanceTheme>(DEFAULT_APPEARANCE_THEME);
   const [colorMode, setColorModeState] = useState<ColorMode>(DEFAULT_COLOR_MODE);
 
-  useIsomorphicLayoutEffect(() => {
+  useEffect(() => {
     setAppearanceThemeState(
       resolveAppearanceTheme(document.documentElement.dataset.appearanceTheme),
     );

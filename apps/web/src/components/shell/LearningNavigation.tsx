@@ -83,7 +83,13 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
           </Text>
         }
         href={localizedPath(locale, course.href)}
-        icon={<CourseMark href={localizedPath(locale, course.href)} mark={course.navMark} />}
+        icon={
+          <CourseMark
+            href={localizedPath(locale, course.href)}
+            isCollapsed={isSidebarCollapsed}
+            mark={course.navMark}
+          />
+        }
         isSelected={currentPath === course.href}
         key={course.slug}
         label={course.title}

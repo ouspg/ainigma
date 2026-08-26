@@ -51,7 +51,6 @@ const linkedCourseItemSchema = {
 };
 
 const learningSchema = z.object({
-  profile: z.object({ displayName: z.string().min(1), firstName: z.string().min(1) }),
   term: z.object({
     label: z.string().min(1),
     dateLabel: z.string().min(1),

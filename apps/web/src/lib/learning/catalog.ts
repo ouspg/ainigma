@@ -7,6 +7,7 @@ import type {
   LearnerActivity,
   LearningWorkspace,
   PublicCourseInfo,
+  StudentProfile,
   WeekInfo,
 } from "./types";
 import { getLearningSnapshot, type LearningSnapshot } from "./repository";
@@ -136,8 +137,14 @@ export function getPublicCourseCatalog(entries: CourseEntry[]): PublicCourseInfo
     }));
 }
 
-export async function getLearningWorkspace(entries: CourseEntry[]): Promise<LearningWorkspace> {
+export async function getLearningWorkspace(
+  entries: CourseEntry[],
+  profile?: StudentProfile,
+): Promise<LearningWorkspace> {
   const learning = await getLearningSnapshot();
+  if (!profile) {
+    throw new Error("Authenticated student profile is required for the learning workspace.");
+  }
   const publishedSlugs = new Set(
     entries.flatMap((entry) =>
       entry.data.kind === "course" && !entry.data.draft ? [slugOf(entry)] : [],
@@ -150,7 +157,7 @@ export async function getLearningWorkspace(entries: CourseEntry[]): Promise<Lear
   const knownSlugs = new Set(courses.map((course) => course.slug));
 
   return {
-    profile: learning.profile,
+    profile,
     term: learning.term,
     courses,
     agenda: learning.agenda.filter((item) => knownSlugs.has(item.courseSlug)),

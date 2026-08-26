@@ -3,6 +3,7 @@ import { getLocale } from "../i18n";
 import type { AppRouteMatch } from "../routes";
 import { createServerSupabaseClient } from "../supabase/server";
 import { hasCourseAccess } from "./course-access";
+import { loadStudentProfile } from "./profile";
 import { safeNextPath, signInPath } from "./redirects";
 
 export function responseWithoutSharedCaching(response: Response): Response {
@@ -17,8 +18,8 @@ export function routeUsesPrivateSession(route: AppRouteMatch): boolean {
 /**
  * Enforce the page-level access policy from routeAccessGroups.
  *
- * Database operations still enforce their own grants, RLS, and ownership or membership rules;
- * this guard controls only whether Astro may render the requested page.
+ * Database operations still enforce their own grants, RLS, and ownership or membership rules.
+ * This guard controls only whether Astro may render the requested page.
  */
 export async function enforceRouteAccess(
   context: APIContext,
@@ -45,6 +46,12 @@ export async function enforceRouteAccess(
   }
 
   context.locals.userId = userId;
+
+  try {
+    context.locals.profile = await loadStudentProfile(supabase);
+  } catch {
+    return new Response("Unable to load learner profile.", { status: 503 });
+  }
 
   if (route.access !== "courseMember") return null;
 

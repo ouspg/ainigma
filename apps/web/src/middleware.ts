@@ -11,6 +11,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (!route) return next();
 
   const accessResponse = await enforceRouteAccess(context, route);
-  const response = accessResponse ?? (await next());
+  if (accessResponse) return accessResponse;
+
+  const response = await next();
   return routeUsesPrivateSession(route) ? responseWithoutSharedCaching(response) : response;
 });

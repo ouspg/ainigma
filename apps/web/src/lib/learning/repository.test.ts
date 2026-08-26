@@ -3,10 +3,9 @@ import { parseCourseDefinitionKey } from "./identifiers";
 import { getCourseSnapshot, getLearningSnapshot } from "./repository";
 
 describe("JSON learning repository", () => {
-  it("returns a validated learner snapshot", async () => {
+  it("returns a validated learning snapshot without account data", async () => {
     const snapshot = await getLearningSnapshot();
 
-    expect(snapshot.profile.displayName).toBeTruthy();
     expect(Object.keys(snapshot.courses).length).toBeGreaterThan(0);
   });
 

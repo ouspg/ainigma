@@ -7,6 +7,7 @@ import { localizedPath, routes, type AppPath } from "../../lib/routes";
 import LocaleSwitcher from "../islands/LocaleSwitcher";
 import AppearanceThemeIcon from "../theme/AppearanceThemeIcon";
 import ColorModeIcon from "../theme/ColorModeIcon";
+import { useAppearance } from "../theme/AppearanceThemeProvider";
 
 interface Props {
   currentPath: AppPath;
@@ -16,6 +17,7 @@ interface Props {
 
 export default function PublicHeader({ currentPath, locale, showSignIn = false }: Props) {
   const messages = getMessages(locale);
+  const { appearanceTheme, colorMode } = useAppearance();
 
   return (
     <header className="public-header">
@@ -50,7 +52,7 @@ export default function PublicHeader({ currentPath, locale, showSignIn = false }
             {appearanceThemes.map((theme) => (
               <li key={theme}>
                 <button
-                  aria-pressed={theme === "academic"}
+                  aria-pressed={theme === appearanceTheme}
                   className="public-theme-menu-option"
                   data-appearance-theme-choice={theme}
                   type="button"
@@ -65,7 +67,7 @@ export default function PublicHeader({ currentPath, locale, showSignIn = false }
             {colorModes.map((mode) => (
               <li key={mode}>
                 <button
-                  aria-pressed={mode === "system"}
+                  aria-pressed={mode === colorMode}
                   className="public-theme-menu-option"
                   data-color-mode-choice={mode}
                   type="button"

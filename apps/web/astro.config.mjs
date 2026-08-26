@@ -13,6 +13,24 @@ const appRoot = fileURLToPath(new URL(".", import.meta.url));
 const mode = process.env.NODE_ENV === "production" ? "production" : "development";
 const featureFlags = resolveFeatureFlags({ ...loadEnv(mode, appRoot, ""), ...process.env });
 
+/** @returns {import("astro").AstroIntegration} */
+function localAuthDevRoute() {
+  return {
+    name: "ainigma-local-auth",
+    hooks: {
+      "astro:config:setup": ({ command, injectRoute }) => {
+        if (command !== "dev") return;
+
+        injectRoute({
+          pattern: "/auth/local",
+          entrypoint: fileURLToPath(new URL("./src/dev/local-auth-route.ts", import.meta.url)),
+          prerender: false,
+        });
+      },
+    },
+  };
+}
+
 export default defineConfig({
   adapter: node({
     mode: "standalone",
@@ -31,6 +49,10 @@ export default defineConfig({
       alias: {
         "@course-components": fileURLToPath(new URL("./src/components/content", import.meta.url)),
       },
+      // Keep React and ReactDOM as singletons in dev as well as production.
+      // Source-package imports can otherwise produce a second module identity,
+      // which makes otherwise valid hooks fail at runtime.
+      dedupe: ["react", "react-dom"],
     },
   },
   markdown: {
@@ -43,5 +65,5 @@ export default defineConfig({
       defaultColor: false,
     },
   },
-  integrations: [react(), mdx()],
+  integrations: [react(), mdx(), localAuthDevRoute()],
 });

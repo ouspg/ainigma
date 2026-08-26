@@ -72,11 +72,29 @@ const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
         applySavedAppearance(event.newDocument.documentElement);
       });
     </script>
-    <script is:inline>
-      const publicAstryxThemeNames = {
-        academic: "ainigma-academic",
-        terminal: "ainigma-terminal",
+    <script is:inline define:vars={{ astryxThemeNames: ASTRYX_THEME_NAMES }}>
+      const syncThemeProviderAttributes = () => {
+        const activeTheme = document.documentElement.dataset.appearanceTheme;
+        const activeThemeName = Object.prototype.hasOwnProperty.call(
+          astryxThemeNames,
+          activeTheme,
+        )
+          ? astryxThemeNames[activeTheme]
+          : astryxThemeNames.academic;
+        const activeMode = document.documentElement.dataset.colorMode ?? "system";
+        const knownThemeNames = Object.values(astryxThemeNames);
+
+        document.querySelectorAll("[data-astryx-theme]").forEach((element) => {
+          if (!knownThemeNames.includes(element.getAttribute("data-astryx-theme"))) return;
+          element.setAttribute("data-astryx-theme", activeThemeName);
+          if (activeMode === "system") {
+            element.removeAttribute("data-theme");
+          } else {
+            element.setAttribute("data-theme", activeMode);
+          }
+        });
       };
+
       const syncAppearanceThemeChoices = () => {
         const activeTheme = document.documentElement.dataset.appearanceTheme;
         document.querySelectorAll("[data-appearance-theme-choice]").forEach((choice) => {
@@ -85,8 +103,8 @@ const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
             choice.getAttribute("data-appearance-theme-choice") === activeTheme ? "true" : "false",
           );
         });
+        syncThemeProviderAttributes();
       };
-      document.addEventListener("DOMContentLoaded", syncAppearanceThemeChoices, { once: true });
 
       const syncColorModeChoices = () => {
         const activeMode = document.documentElement.dataset.colorMode ?? "system";
@@ -96,8 +114,8 @@ const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
             choice.getAttribute("data-color-mode-choice") === activeMode ? "true" : "false",
           );
         });
+        syncThemeProviderAttributes();
       };
-      document.addEventListener("DOMContentLoaded", syncColorModeChoices, { once: true });
 
       document.addEventListener("click", (event) => {
         const target = event.target;
@@ -105,9 +123,9 @@ const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
         const themeChoice = target.closest("[data-appearance-theme-choice]");
         if (themeChoice) {
           const theme = themeChoice.getAttribute("data-appearance-theme-choice");
-          if (theme && Object.prototype.hasOwnProperty.call(publicAstryxThemeNames, theme)) {
+          if (theme && Object.prototype.hasOwnProperty.call(astryxThemeNames, theme)) {
             document.documentElement.dataset.appearanceTheme = theme;
-            document.documentElement.dataset.astryxTheme = publicAstryxThemeNames[theme];
+            document.documentElement.dataset.astryxTheme = astryxThemeNames[theme];
             try {
               localStorage.setItem("ainigma.appearance-theme", theme);
             } catch {

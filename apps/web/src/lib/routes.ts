@@ -90,6 +90,7 @@ export const routes = {
   privacy: staticRoute("/privacy/"),
   login: staticRoute("/login/"),
   authCallback: staticRoute("/auth/callback"),
+  authLocal: staticRoute("/auth/local"),
   desk: staticRoute("/desk/"),
   activity: staticRoute("/activity/"),
   announcements: staticRoute("/announcements/"),
@@ -149,7 +150,7 @@ export type RouteAccess = "public" | "guestOnly" | "protocol" | "authenticated" 
 export const routeAccessGroups = {
   public: ["home", "about", "privacy"],
   guestOnly: ["login"],
-  protocol: ["authCallback"],
+  protocol: ["authCallback", "authLocal"],
   authenticated: ["desk", "activity", "announcements"],
   courseMember: ["course", "coursePage", "courseWeek", "courseTask"],
 } as const satisfies Record<RouteAccess, readonly RouteId[]>;
@@ -172,6 +173,7 @@ const matchOrder: readonly RouteId[] = [
   "privacy",
   "login",
   "authCallback",
+  "authLocal",
   "desk",
   "activity",
   "announcements",

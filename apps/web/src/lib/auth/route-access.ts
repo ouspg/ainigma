@@ -5,20 +5,12 @@ import { getCourseDefinitionKey } from "../learning/course-manifest";
 import { routes, type AppRouteMatch } from "../routes";
 import { createServerSupabaseClient } from "../supabase/server";
 import { hasCourseAccess } from "./course-access";
+import { routeRequiresPrivateResponse } from "./private-response";
 import { loadStudentProfile } from "./profile";
 import { safeNextPath, signInPath } from "./redirects";
 
-export function markResponsePrivate(response: Response): Response {
-  response.headers.set("Cache-Control", "private, no-store");
-  return response;
-}
-
 function rewriteToStatus(context: APIContext, status: 403 | 404 | 503): Promise<Response> {
   return context.rewrite(new URL(routes.status.path({ code: String(status) }), context.url));
-}
-
-export function routeRequiresPrivateResponse(route: AppRouteMatch): boolean {
-  return ["guestOnly", "authenticated", "courseMember"].includes(route.access);
 }
 
 /**

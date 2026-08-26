@@ -1,0 +1,13 @@
+---
+import ErrorPage from "../components/pages/ErrorPage";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getLocale, getMessages } from "../lib/i18n";
+
+Astro.response.status = 500;
+const locale = getLocale(Astro.currentLocale);
+const title = getMessages(locale).errors.serverErrorTitle;
+---
+
+<BaseLayout title={`${title} | Ainigma`} description={title} {locale}>
+  <ErrorPage status={500} {locale} />
+</BaseLayout>

@@ -73,6 +73,17 @@ export interface AppMessages {
     privacySectionTitle: string;
     privacyPlaceholder: string;
   };
+  errors: {
+    notFoundTitle: string;
+    notFoundMessage: string;
+    accessDeniedTitle: string;
+    accessDeniedMessage: string;
+    unavailableTitle: string;
+    unavailableMessage: string;
+    serverErrorTitle: string;
+    serverErrorMessage: string;
+    returnHome: string;
+  };
   login: {
     university: string;
     title: string;
@@ -258,6 +269,17 @@ const en: AppMessages = {
     privacySectionTitle: "Privacy notice pending",
     privacyPlaceholder:
       "This is a placeholder. Before production use, this page will describe the data controller, purposes and legal bases for processing, data categories, retention, recipients, learner rights, contact details, and the use of browser storage.",
+  },
+  errors: {
+    notFoundTitle: "Page not found",
+    notFoundMessage: "The page may have moved, or the address may be incorrect.",
+    accessDeniedTitle: "Course access required",
+    accessDeniedMessage: "Your account does not currently have access to this course.",
+    unavailableTitle: "Temporarily unavailable",
+    unavailableMessage: "We could not verify your access right now. Please try again shortly.",
+    serverErrorTitle: "Something went wrong",
+    serverErrorMessage: "An unexpected error occurred. Please try again later.",
+    returnHome: "Return to the front page",
   },
   login: {
     university: "University of Oulu",
@@ -453,6 +475,17 @@ const fi: AppMessages = {
     privacySectionTitle: "Tietosuojaseloste valmisteilla",
     privacyPlaceholder:
       "Tämä on paikkamerkki. Ennen tuotantokäyttöä sivulle lisätään tiedot rekisterinpitäjästä, käsittelyn tarkoituksista ja oikeusperusteista, tietoryhmistä, säilytysajoista, vastaanottajista, opiskelijan oikeuksista, yhteystiedoista ja selaintallennuksen käytöstä.",
+  },
+  errors: {
+    notFoundTitle: "Sivua ei löytynyt",
+    notFoundMessage: "Sivu on ehkä siirretty tai osoite on virheellinen.",
+    accessDeniedTitle: "Kurssin käyttöoikeus vaaditaan",
+    accessDeniedMessage: "Tililläsi ei tällä hetkellä ole käyttöoikeutta tälle kurssille.",
+    unavailableTitle: "Palvelu on tilapäisesti poissa käytöstä",
+    unavailableMessage: "Käyttöoikeuttasi ei voitu tarkistaa. Yritä hetken kuluttua uudelleen.",
+    serverErrorTitle: "Jokin meni vikaan",
+    serverErrorMessage: "Tapahtui odottamaton virhe. Yritä myöhemmin uudelleen.",
+    returnHome: "Palaa etusivulle",
   },
   login: {
     university: "Oulun yliopisto",

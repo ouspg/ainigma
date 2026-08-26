@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildOutlineSections, getPublicCourseCatalog } from "./catalog";
+import { buildOutlineSections, getPublishedCourseEntry, getPublicCourseCatalog } from "./catalog";
 
 describe("getPublicCourseCatalog", () => {
   it("discovers every course overview without reading learner progress", () => {
@@ -119,5 +119,25 @@ describe("buildOutlineSections", () => {
       },
       { depth: 3, slug: "verify", text: "Verify", activityIds: ["packet-flag"] },
     ]);
+  });
+});
+
+describe("getPublishedCourseEntry", () => {
+  it("uses Astro's directory ID for index files", () => {
+    const entries = [
+      {
+        id: "test-course-a",
+        data: { kind: "course", draft: false },
+      },
+      {
+        id: "test-course-a/week-01",
+        data: { kind: "week" },
+      },
+    ] as unknown as Parameters<typeof getPublishedCourseEntry>[0];
+
+    expect(getPublishedCourseEntry(entries, "test-course-a")?.id).toBe("test-course-a");
+    expect(getPublishedCourseEntry(entries, "test-course-a/week-01")?.id).toBe(
+      "test-course-a/week-01",
+    );
   });
 });

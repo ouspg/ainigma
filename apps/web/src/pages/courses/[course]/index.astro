@@ -18,7 +18,7 @@ const courseSlug = courseSlugFromParam(Astro.params.course);
 if (!courseSlug) {
   return new Response("Not found", { status: 404 });
 }
-const entry = getPublishedCourseEntry(entries, `${courseSlug}/index`);
+const entry = getPublishedCourseEntry(entries, courseSlug);
 if (!entry || entry.data.kind !== "course") {
   return new Response("Not found", { status: 404 });
 }

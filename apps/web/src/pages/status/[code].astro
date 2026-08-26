@@ -1,0 +1,26 @@
+---
+import ErrorPage, { type ErrorStatus } from "../../components/pages/ErrorPage";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getLocale, getMessages } from "../../lib/i18n";
+
+export const prerender = false;
+
+const code = Astro.params.code;
+const status: ErrorStatus =
+  code === "403" || code === "500" || code === "503" ? Number(code) : 404;
+Astro.response.status = status;
+const locale = getLocale(Astro.currentLocale);
+const messages = getMessages(locale);
+const title =
+  status === 403
+    ? messages.errors.accessDeniedTitle
+    : status === 500
+      ? messages.errors.serverErrorTitle
+    : status === 503
+      ? messages.errors.unavailableTitle
+      : messages.errors.notFoundTitle;
+---
+
+<BaseLayout title={`${title} | Ainigma`} description={title} {locale}>
+  <ErrorPage {status} {locale} />
+</BaseLayout>

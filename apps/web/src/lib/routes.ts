@@ -5,6 +5,7 @@ export type AppPath = `/${string}`;
 export type CoursePageName = "announcements" | "materials";
 
 interface RouteMatchParams {
+  code?: string;
   course?: CourseSlug;
   page?: CoursePageName;
   task?: string;
@@ -91,6 +92,14 @@ export const routes = {
   login: staticRoute("/login/"),
   authCallback: staticRoute("/auth/callback"),
   authLocal: staticRoute("/auth/local"),
+  status: {
+    path: ({ code }: { code: string }) => asAppPath(`/status/${encodeSegment(code)}/`),
+    match(pathname: AppPath) {
+      const match = pathname.match(/^\/status\/([^/]+)\/?$/);
+      const code = match?.[1] ? decodeSegment(match[1]) : null;
+      return code ? { code } : null;
+    },
+  },
   desk: staticRoute("/desk/"),
   activity: staticRoute("/activity/"),
   announcements: staticRoute("/announcements/"),
@@ -147,7 +156,7 @@ export type RouteAccess = "public" | "guestOnly" | "protocol" | "authenticated" 
  * moving it to `public` later must be paired with removing learner data from the course shell.
  */
 export const routeAccessGroups = {
-  public: ["home", "about", "privacy"],
+  public: ["home", "about", "privacy", "status"],
   guestOnly: ["login"],
   protocol: ["authCallback", "authLocal"],
   authenticated: ["desk", "activity", "announcements"],
@@ -173,6 +182,7 @@ const matchOrder: readonly RouteId[] = [
   "login",
   "authCallback",
   "authLocal",
+  "status",
   "desk",
   "activity",
   "announcements",

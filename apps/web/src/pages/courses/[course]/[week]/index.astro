@@ -20,7 +20,7 @@ if (!courseSlug) {
   return new Response("Not found", { status: 404 });
 }
 const weekSlug = Astro.params.week ?? "";
-const entry = getPublishedCourseEntry(entries, `${courseSlug}/${weekSlug}/index`);
+const entry = getPublishedCourseEntry(entries, `${courseSlug}/${weekSlug}`);
 if (!entry || entry.data.kind !== "week") {
   return new Response("Not found", { status: 404 });
 }

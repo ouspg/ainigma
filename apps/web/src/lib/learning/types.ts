@@ -1,6 +1,6 @@
 import type { ExternalUrl } from "../external-links";
 import type { AppPath } from "../routes";
-import type { CourseDefinitionKey } from "./identifiers";
+import type { CourseDefinitionKey, CourseSlug } from "./identifiers";
 
 export type CourseStatus = "not-started" | "in-progress" | "completed";
 export type AgendaStatus = "todo" | "in-progress" | "completed";
@@ -8,7 +8,8 @@ export type CourseTone = "blue" | "orange" | "teal";
 export type ActivityKind = "attempt" | "grading" | "artifact" | "instance";
 
 export interface PublicCourseInfo {
-  slug: CourseDefinitionKey;
+  slug: CourseSlug;
+  definitionKey: CourseDefinitionKey;
   code: string;
   title: string;
   summary: string;
@@ -54,7 +55,8 @@ export interface NextActivity {
 }
 
 export interface CourseInfo {
-  slug: CourseDefinitionKey;
+  slug: CourseSlug;
+  definitionKey: CourseDefinitionKey;
   courseKey: string;
   code: string;
   navMark: string;
@@ -77,7 +79,7 @@ export interface CourseInfo {
 
 export interface AgendaItem {
   id: string;
-  courseSlug: CourseDefinitionKey;
+  courseSlug: CourseSlug;
   type: "lab" | "reading" | "setup";
   title: string;
   supporting: string;
@@ -88,7 +90,7 @@ export interface AgendaItem {
 
 export interface Announcement {
   id: string;
-  courseSlug: CourseDefinitionKey;
+  courseSlug: CourseSlug;
   title: string;
   timeLabel: string;
   href: AppPath;
@@ -96,7 +98,7 @@ export interface Announcement {
 
 export interface LearnerActivity {
   id: string;
-  courseSlug: CourseDefinitionKey;
+  courseSlug: CourseSlug;
   kind: ActivityKind;
   title: string;
   description: string;

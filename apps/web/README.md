@@ -30,6 +30,10 @@ vp check
   uses design tokens.
 - Course titles, public directory metadata, and authored material come from the repository-level
   `courses/` collection. Adding a `kind: course` overview file adds it to the front-page directory.
+- Every course overview declares an immutable `definitionKey`. The top-level directory name is only
+  its mutable URL slug: renaming a directory must leave `definitionKey` unchanged. Database
+  memberships reference the offering UUID, while the route guard resolves URL slug → authored
+  `definitionKey` → the authorized offering returned by `list_my_courses()`.
 - Course offering dates are authored as `startDate` and `endDate` in each course overview frontmatter
   and are shown in the learning desk's Course progress list.
 - `src/data/learning.json` is typed prototype state for enrollments, agenda items, and progress. It is
@@ -89,8 +93,9 @@ and Auth Admin/service-role secrets must never use Astro's `PUBLIC_` prefix.
 locale handling, route matching, the exhaustive `routeAccessGroups` policy, and the independent
 `learnerShellRouteIds` list. Components and data adapters must use `routes.*.path()` instead of
 constructing internal URLs. Prototype data in `src/data/learning.json` stores typed course route
-targets rather than URLs; `lib/learning/repository.ts` validates those targets and resolves them
-through the same builders.
+targets keyed by stable course `definitionKey` values rather than URLs;
+`lib/learning/course-manifest.ts` maps those identities to the current directory slugs before the
+same route builders generate links.
 
 `src/middleware.ts` only dispatches the matched policy. All session and course-membership checks
 live in `lib/auth/route-access.ts`, so there is one function to review for page-level access. This

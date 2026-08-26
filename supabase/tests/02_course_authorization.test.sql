@@ -2,11 +2,24 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(30);
+select extensions.plan(38);
 
 select extensions.has_table('public', 'courses', 'courses table exists');
 select extensions.has_table('public', 'course_memberships', 'course membership table exists');
 select extensions.has_table('private', 'course_membership_events', 'membership audit table exists');
+select extensions.ok(
+  exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.course_memberships'::regclass
+      and conname = 'course_memberships_owner_status_check'
+  ),
+  'owner memberships must remain active'
+);
+select extensions.ok(
+  to_regclass('public.course_memberships_one_active_owner_uidx') is not null,
+  'each course has at most one active owner'
+);
 select extensions.ok(
   (select relrowsecurity from pg_class where oid = 'public.profiles'::regclass),
   'profiles has RLS enabled'
@@ -265,23 +278,81 @@ select extensions.is(
 );
 
 set role ainigma_maintenance;
-select private.add_course_membership(
-  current_setting('ainigma_test.course_id')::uuid,
-  current_setting('ainigma_test.outsider_profile_id')::uuid,
-  'owner',
-  current_setting('ainigma_test.owner_profile_id')::uuid,
-  'second test owner'
+do $direct_owner_guard$
+begin
+  begin
+    perform private.add_course_membership(
+      current_setting('ainigma_test.course_id')::uuid,
+      current_setting('ainigma_test.outsider_profile_id')::uuid,
+      'owner',
+      current_setting('ainigma_test.owner_profile_id')::uuid,
+      'direct owner creation is not allowed'
+    );
+    perform set_config('ainigma_test.direct_owner_guard', 'failed', true);
+  exception when insufficient_privilege then
+    perform set_config('ainigma_test.direct_owner_guard', 'blocked', true);
+  end;
+end
+$direct_owner_guard$;
+reset role;
+
+select extensions.is(
+  current_setting('ainigma_test.direct_owner_guard', true),
+  'blocked'::text,
+  'owner membership creation requires the ownership transfer function'
 );
+
+set role ainigma_maintenance;
 select private.transition_course_membership(
   current_setting('ainigma_test.course_id')::uuid,
-  current_setting('ainigma_test.owner_profile_id')::uuid,
+  current_setting('ainigma_test.instructor_profile_id')::uuid,
   'instructor',
   'active',
   current_setting('ainigma_test.owner_profile_id')::uuid,
-  'ownership transfer test'
+  'reactivate instructor for ownership transfer'
 );
+select private.transfer_course_ownership(
+  current_setting('ainigma_test.course_id')::uuid,
+  current_setting('ainigma_test.instructor_profile_id')::uuid,
+  current_setting('ainigma_test.owner_profile_id')::uuid,
+  'test ownership transfer'
+);
+
+do $staff_admin_guard$
+begin
+  begin
+    perform private.transition_course_membership(
+      current_setting('ainigma_test.course_id')::uuid,
+      current_setting('ainigma_test.instructor_profile_id')::uuid,
+      'learner',
+      'active',
+      current_setting('ainigma_test.owner_profile_id')::uuid,
+      'instructor cannot administer staff'
+    );
+    perform set_config('ainigma_test.staff_admin_guard', 'failed', true);
+  exception when insufficient_privilege then
+    perform set_config('ainigma_test.staff_admin_guard', 'blocked', true);
+  end;
+end
+$staff_admin_guard$;
+
+do $former_owner_guard$
+begin
+  begin
+    perform private.transfer_course_ownership(
+      current_setting('ainigma_test.course_id')::uuid,
+      current_setting('ainigma_test.owner_profile_id')::uuid,
+      current_setting('ainigma_test.owner_profile_id')::uuid,
+      'invalid transfer actor'
+    );
+    perform set_config('ainigma_test.former_owner_guard', 'failed', true);
+  exception when insufficient_privilege then
+    perform set_config('ainigma_test.former_owner_guard', 'blocked', true);
+  end;
+end
+$former_owner_guard$;
+
 reset role;
-revoke ainigma_maintenance from postgres;
 
 select extensions.is(
   (
@@ -296,13 +367,56 @@ select extensions.is(
 );
 select extensions.is(
   (
+    select role
+    from public.course_memberships
+    where course_id = current_setting('ainigma_test.course_id')::uuid
+      and profile_id = current_setting('ainigma_test.owner_profile_id')::uuid
+  ),
+  'instructor'::text,
+  'ownership transfer demotes the previous owner to instructor'
+);
+select extensions.is(
+  (
+    select role
+    from public.course_memberships
+    where course_id = current_setting('ainigma_test.course_id')::uuid
+      and profile_id = current_setting('ainigma_test.instructor_profile_id')::uuid
+  ),
+  'owner'::text,
+  'ownership transfer promotes the selected instructor to owner'
+);
+select extensions.is(
+  (
     select count(*)::bigint
     from private.course_membership_events
     where course_id = current_setting('ainigma_test.course_id')::uuid
   ),
-  6::bigint,
-  'membership creation and transitions append audit events'
+  7::bigint,
+  'membership creation, reactivation, and transfer append audit events'
 );
+
+select extensions.is(
+  current_setting('ainigma_test.staff_admin_guard', true),
+  'blocked'::text,
+  'an instructor cannot administer staff memberships'
+);
+
+select extensions.is(
+  current_setting('ainigma_test.former_owner_guard', true),
+  'blocked'::text,
+  'the former owner cannot transfer ownership after demotion'
+);
+
+select extensions.ok(
+  not has_function_privilege(
+    'authenticated',
+    'private.transfer_course_ownership(uuid, uuid, uuid, text)',
+    'execute'
+  ),
+  'ownership transfer is not exposed to browser roles'
+);
+
+revoke ainigma_maintenance from postgres;
 select extensions.throws_ok(
   $$update private.course_membership_events set reason = 'tampered'$$,
   '55000',

@@ -10,9 +10,9 @@ describe("JSON learning repository", () => {
   });
 
   it("resolves course-specific data without exposing the JSON module", async () => {
-    const course = await getCourseSnapshot(parseCourseDefinitionKey("security-fundamentals"));
+    const course = await getCourseSnapshot(parseCourseDefinitionKey("test-course-a"));
 
-    expect(course?.courseKey).toBe("security-fundamentals-2026-autumn");
+    expect(course?.courseKey).toBe("test-course-a-local");
     expect(await getCourseSnapshot(parseCourseDefinitionKey("missing-course"))).toBeUndefined();
   });
 });

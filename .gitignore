@@ -5,10 +5,9 @@ Cargo.lock
 .env
 .env.local
 .ainigma/
+.astro
 .shots/
 node_modules/
-apps/web/dist/
-apps/web/.astro/
-infra/pulumi/dist/
 result
 result-*
+dist

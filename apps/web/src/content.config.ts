@@ -17,6 +17,7 @@ const courses = defineCollection({
   schema: z.discriminatedUnion("kind", [
     z.object({
       kind: z.literal("course"),
+      definitionKey: z.string().regex(/^[a-z][a-z0-9-]{2,63}$/),
       draft: z.boolean().default(false),
       order: z.number().int().nonnegative(),
       catalogOrder: z.number().int().nonnegative(),

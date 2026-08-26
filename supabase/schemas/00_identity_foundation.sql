@@ -85,7 +85,7 @@ revoke all on private.auth_users, private.auth_identities
 
 create table public.profiles (
   id uuid primary key default gen_random_uuid(),
-  display_name text,
+  display_name text not null default 'Learner',
   created_at timestamptz not null default clock_timestamp(),
   updated_at timestamptz not null default clock_timestamp(),
   constraint profiles_display_name_check check (

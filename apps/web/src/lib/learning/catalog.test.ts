@@ -8,6 +8,7 @@ describe("getPublicCourseCatalog", () => {
         id: "security-fundamentals/index",
         data: {
           kind: "course",
+          definitionKey: "security-fundamentals",
           order: 0,
           catalogOrder: 2,
           code: "IC00AJ74",
@@ -21,6 +22,7 @@ describe("getPublicCourseCatalog", () => {
         id: "applied-cryptography/index",
         data: {
           kind: "course",
+          definitionKey: "applied-cryptography",
           order: 0,
           catalogOrder: 3,
           code: "IC00AJ82",
@@ -34,6 +36,7 @@ describe("getPublicCourseCatalog", () => {
         id: "secure-programming/index",
         data: {
           kind: "course",
+          definitionKey: "secure-programming",
           order: 0,
           catalogOrder: 4,
           code: "IC00AJ91",
@@ -47,6 +50,7 @@ describe("getPublicCourseCatalog", () => {
         id: "new-course/index",
         data: {
           kind: "course",
+          definitionKey: "new-course-definition",
           order: 0,
           catalogOrder: 1,
           code: "NEW100",
@@ -61,6 +65,7 @@ describe("getPublicCourseCatalog", () => {
         id: "draft-course/index",
         data: {
           kind: "course",
+          definitionKey: "draft-course-definition",
           draft: true,
           order: 0,
           catalogOrder: 5,
@@ -79,6 +84,7 @@ describe("getPublicCourseCatalog", () => {
     expect(catalog.some((course) => course.slug === "draft-course")).toBe(false);
     expect(catalog[0]).toEqual({
       slug: "new-course",
+      definitionKey: "new-course-definition",
       code: "NEW100",
       catalogUrl: "https://example.edu/courses/NEW100",
       title: "New authored course",

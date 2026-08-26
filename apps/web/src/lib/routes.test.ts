@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { parseCourseDefinitionKey } from "./learning/identifiers";
+import { parseCourseSlug } from "./learning/identifiers";
 import {
   canonicalPath,
   courseRouteTargetPath,
@@ -10,7 +10,7 @@ import {
   routes,
 } from "./routes";
 
-const course = parseCourseDefinitionKey("security-fundamentals");
+const course = parseCourseSlug("security-fundamentals");
 
 describe("application routes", () => {
   it("generates canonical and localized course paths", () => {

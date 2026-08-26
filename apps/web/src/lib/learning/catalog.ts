@@ -1,4 +1,3 @@
-import type { CollectionEntry } from "astro:content";
 import { routes } from "../routes";
 import type {
   Announcement,
@@ -11,29 +10,42 @@ import type {
   WeekInfo,
 } from "./types";
 import { getLearningSnapshot, type LearningSnapshot } from "./repository";
-import {
-  isCourseDefinitionKey,
-  parseCourseDefinitionKey,
-  type CourseDefinitionKey,
-} from "./identifiers";
+import { isCourseSlug, type CourseSlug } from "./identifiers";
+import { courseDefinitionKeyOf, courseSlugOf, type CourseEntry } from "./course-manifest";
+type SnapshotRouteTarget = LearningSnapshot["agenda"][number]["target"];
 
-type CourseEntry = CollectionEntry<"courses">;
-
-function slugOf(entry: CourseEntry): CourseDefinitionKey {
-  return parseCourseDefinitionKey(entry.id.split("/")[0] ?? "");
+function routeTargetPath(target: SnapshotRouteTarget, slug: CourseSlug) {
+  switch (target.route) {
+    case "course":
+      return routes.course.path({ course: slug });
+    case "coursePage":
+      return routes.coursePage.path({ course: slug, page: target.page });
+    case "courseWeek":
+      return routes.courseWeek.path({ course: slug, week: target.week });
+    case "courseTask":
+      return routes.courseTask.path({
+        course: slug,
+        week: target.week,
+        task: target.task,
+      });
+  }
 }
 
 function buildCourse(
   entries: CourseEntry[],
-  slug: CourseDefinitionKey,
+  slug: CourseSlug,
   learning: LearningSnapshot,
 ): CourseInfo {
-  const snapshot = learning.courses[slug];
-  const courseEntries = entries.filter((entry) => slugOf(entry) === slug);
+  const courseEntries = entries.filter((entry) => courseSlugOf(entry) === slug);
   const overview = courseEntries.find((entry) => entry.data.kind === "course");
 
-  if (!snapshot || !overview || overview.data.kind !== "course") {
+  if (!overview || overview.data.kind !== "course") {
     throw new Error(`Incomplete course manifest for ${slug}`);
+  }
+  const definitionKey = courseDefinitionKeyOf(overview);
+  const snapshot = learning.courses[definitionKey];
+  if (!snapshot) {
+    throw new Error(`Missing learner snapshot for course definition ${definitionKey}`);
   }
 
   const weeks: WeekInfo[] = courseEntries
@@ -92,6 +104,7 @@ function buildCourse(
 
   return {
     slug,
+    definitionKey,
     courseKey: snapshot.courseKey,
     code: overview.data.code,
     navMark: overview.data.navMark,
@@ -109,7 +122,16 @@ function buildCourse(
     weeks,
     pages,
     taskCount: weeks.reduce((total, week) => total + week.tasks.length, 0),
-    nextActivity: snapshot.nextActivity,
+    nextActivity: {
+      eyebrow: snapshot.nextActivity.eyebrow,
+      title: snapshot.nextActivity.title,
+      description: snapshot.nextActivity.description,
+      href: routeTargetPath(snapshot.nextActivity.target, slug),
+      estimatedMinutes: snapshot.nextActivity.estimatedMinutes,
+      completedSteps: snapshot.nextActivity.completedSteps,
+      totalSteps: snapshot.nextActivity.totalSteps,
+      savedLabel: snapshot.nextActivity.savedLabel,
+    },
   };
 }
 
@@ -128,7 +150,8 @@ export function getPublicCourseCatalog(entries: CourseEntry[]): PublicCourseInfo
         a.data.catalogOrder - b.data.catalogOrder || a.data.title.localeCompare(b.data.title),
     )
     .map(({ entry, data }) => ({
-      slug: slugOf(entry),
+      slug: courseSlugOf(entry),
+      definitionKey: courseDefinitionKeyOf(entry),
       code: data.code,
       title: data.title,
       summary: data.summary,
@@ -145,35 +168,51 @@ export async function getLearningWorkspace(
   if (!profile) {
     throw new Error("Authenticated student profile is required for the learning workspace.");
   }
-  const publishedSlugs = new Set(
-    entries.flatMap((entry) =>
-      entry.data.kind === "course" && !entry.data.draft ? [slugOf(entry)] : [],
-    ),
+  const courses = entries
+    .flatMap((entry) =>
+      entry.data.kind === "course" &&
+      !entry.data.draft &&
+      learning.courses[courseDefinitionKeyOf(entry)]
+        ? [buildCourse(entries, courseSlugOf(entry), learning)]
+        : [],
+    )
+    .sort((a, b) => a.title.localeCompare(b.title));
+  const courseByDefinitionKey = new Map(
+    courses.map((course) => [course.definitionKey, course] as const),
   );
-  const courses = Object.keys(learning.courses)
-    .filter(isCourseDefinitionKey)
-    .filter((slug) => publishedSlugs.has(slug))
-    .map((slug) => buildCourse(entries, slug, learning));
-  const knownSlugs = new Set(courses.map((course) => course.slug));
 
   return {
     profile,
     term: learning.term,
     courses,
-    agenda: learning.agenda.filter((item) => knownSlugs.has(item.courseSlug)),
-    announcements: learning.announcements.filter((item): item is Announcement =>
-      knownSlugs.has(item.courseSlug),
-    ),
-    activity: learning.activity.filter((item): item is LearnerActivity =>
-      knownSlugs.has(item.courseSlug),
-    ),
+    agenda: learning.agenda.flatMap((item) => {
+      const course = courseByDefinitionKey.get(item.courseDefinitionKey);
+      if (!course) return [];
+      const { courseDefinitionKey: _definitionKey, target, ...agenda } = item;
+      return [{ ...agenda, courseSlug: course.slug, href: routeTargetPath(target, course.slug) }];
+    }),
+    announcements: learning.announcements.flatMap((item): Announcement[] => {
+      const course = courseByDefinitionKey.get(item.courseDefinitionKey);
+      if (!course) return [];
+      const { courseDefinitionKey: _definitionKey, target, ...announcement } = item;
+      return [
+        {
+          ...announcement,
+          courseSlug: course.slug,
+          href: routeTargetPath(target, course.slug),
+        },
+      ];
+    }),
+    activity: learning.activity.flatMap((item): LearnerActivity[] => {
+      const course = courseByDefinitionKey.get(item.courseDefinitionKey);
+      if (!course) return [];
+      const { courseDefinitionKey: _definitionKey, target, ...activity } = item;
+      return [{ ...activity, courseSlug: course.slug, href: routeTargetPath(target, course.slug) }];
+    }),
   };
 }
 
-export async function getCourse(
-  entries: CourseEntry[],
-  slug: CourseDefinitionKey,
-): Promise<CourseInfo> {
+export async function getCourse(entries: CourseEntry[], slug: CourseSlug): Promise<CourseInfo> {
   const learning = await getLearningSnapshot();
   return buildCourse(entries, slug, learning);
 }
@@ -191,9 +230,10 @@ export function getPublishedCourseEntry(
   id: string,
 ): CourseEntry | undefined {
   const courseSlug = id.split("/")[0] ?? "";
-  if (!isCourseDefinitionKey(courseSlug)) return undefined;
+  if (!isCourseSlug(courseSlug)) return undefined;
   const isPublished = entries.some(
-    (entry) => slugOf(entry) === courseSlug && entry.data.kind === "course" && !entry.data.draft,
+    (entry) =>
+      courseSlugOf(entry) === courseSlug && entry.data.kind === "course" && !entry.data.draft,
   );
   if (!isPublished) return undefined;
   return entries.find((entry) => entry.id === id);

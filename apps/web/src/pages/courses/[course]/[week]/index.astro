@@ -10,12 +10,12 @@ import {
   getPublishedCourseEntry,
 } from "../../../../lib/learning/catalog";
 import { getLocale } from "../../../../lib/i18n";
-import { courseDefinitionKeyFromParam } from "../../../../lib/learning/identifiers";
+import { courseSlugFromParam } from "../../../../lib/learning/identifiers";
 
 export const prerender = false;
 
 const entries = await getCollection("courses");
-const courseSlug = courseDefinitionKeyFromParam(Astro.params.course);
+const courseSlug = courseSlugFromParam(Astro.params.course);
 if (!courseSlug) {
   return new Response("Not found", { status: 404 });
 }

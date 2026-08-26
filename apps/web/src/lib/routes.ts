@@ -1,11 +1,11 @@
 import { defaultLocale, locales, type Locale } from "./i18n";
-import { isCourseDefinitionKey, type CourseDefinitionKey } from "./learning/identifiers";
+import { isCourseSlug, type CourseSlug } from "./learning/identifiers";
 
 export type AppPath = `/${string}`;
 export type CoursePageName = "announcements" | "materials";
 
 interface RouteMatchParams {
-  course?: CourseDefinitionKey;
+  course?: CourseSlug;
   page?: CoursePageName;
   task?: string;
   week?: string;
@@ -51,9 +51,9 @@ function decodeSegment(value: string): string | null {
   }
 }
 
-function decodeCourse(value: string): CourseDefinitionKey | null {
+function decodeCourse(value: string): CourseSlug | null {
   const decoded = decodeSegment(value);
-  return decoded && isCourseDefinitionKey(decoded) ? decoded : null;
+  return decoded && isCourseSlug(decoded) ? decoded : null;
 }
 
 function splitSuffix(path: string): { pathname: string; suffix: string } {
@@ -95,8 +95,7 @@ export const routes = {
   activity: staticRoute("/activity/"),
   announcements: staticRoute("/announcements/"),
   course: {
-    path: ({ course }: { course: CourseDefinitionKey }) =>
-      asAppPath(`/courses/${encodeSegment(course)}/`),
+    path: ({ course }: { course: CourseSlug }) => asAppPath(`/courses/${encodeSegment(course)}/`),
     match(pathname: AppPath) {
       const match = pathname.match(/^\/courses\/([^/]+)\/?$/);
       const course = match?.[1] ? decodeCourse(match[1]) : null;
@@ -104,7 +103,7 @@ export const routes = {
     },
   },
   coursePage: {
-    path: ({ course, page }: { course: CourseDefinitionKey; page: CoursePageName }) =>
+    path: ({ course, page }: { course: CourseSlug; page: CoursePageName }) =>
       asAppPath(`/courses/${encodeSegment(course)}/${page}/`),
     match(pathname: AppPath) {
       const match = pathname.match(/^\/courses\/([^/]+)\/(announcements|materials)\/?$/);
@@ -114,7 +113,7 @@ export const routes = {
     },
   },
   courseWeek: {
-    path: ({ course, week }: { course: CourseDefinitionKey; week: string }) =>
+    path: ({ course, week }: { course: CourseSlug; week: string }) =>
       asAppPath(`/courses/${encodeSegment(course)}/${encodeSegment(week)}/`),
     match(pathname: AppPath) {
       const match = pathname.match(/^\/courses\/([^/]+)\/([^/]+)\/?$/);
@@ -124,7 +123,7 @@ export const routes = {
     },
   },
   courseTask: {
-    path: ({ course, task, week }: { course: CourseDefinitionKey; task: string; week: string }) =>
+    path: ({ course, task, week }: { course: CourseSlug; task: string; week: string }) =>
       asAppPath(`/courses/${encodeSegment(course)}/${encodeSegment(week)}/${encodeSubpath(task)}/`),
     match(pathname: AppPath) {
       const match = pathname.match(/^\/courses\/([^/]+)\/([^/]+)\/(.+?)\/?$/);
@@ -223,10 +222,10 @@ export function routeUsesLearnerShell(pathname: string): boolean {
 }
 
 export type CourseRouteTarget =
-  | { route: "course"; course: CourseDefinitionKey }
-  | { route: "coursePage"; course: CourseDefinitionKey; page: CoursePageName }
-  | { route: "courseWeek"; course: CourseDefinitionKey; week: string }
-  | { route: "courseTask"; course: CourseDefinitionKey; task: string; week: string };
+  | { route: "course"; course: CourseSlug }
+  | { route: "coursePage"; course: CourseSlug; page: CoursePageName }
+  | { route: "courseWeek"; course: CourseSlug; week: string }
+  | { route: "courseTask"; course: CourseSlug; task: string; week: string };
 
 export function courseRouteTargetPath(target: CourseRouteTarget): AppPath {
   switch (target.route) {

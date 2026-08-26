@@ -8,25 +8,24 @@
     "totalActivities": 38
   },
   "courses": {
-    "security-fundamentals": {
-      "courseKey": "security-fundamentals-2026-autumn",
+    "test-course-a": {
+      "courseKey": "test-course-a-local",
       "progress": 42,
       "status": "in-progress",
       "earnedPoints": 12,
       "availablePoints": 35,
       "weekStatuses": {
-        "week-03": "completed",
-        "week-04": "in-progress",
-        "week-05": "not-started"
+        "week-01": "in-progress",
+        "week-02": "not-started"
       },
       "nextActivity": {
-        "eyebrow": "Week 4 · Network forensics",
+        "eyebrow": "Week 1 · Network forensics",
         "title": "Packet traces and protocol clues",
         "description": "Isolate the unusual exchange and document the evidence behind your conclusion.",
         "target": {
           "route": "courseTask",
-          "course": "security-fundamentals",
-          "week": "week-04",
+          "course": "test-course-a",
+          "week": "week-01",
           "task": "packet-traces"
         },
         "estimatedMinutes": 35,
@@ -34,91 +33,55 @@
         "totalSteps": 4,
         "savedLabel": "Progress saved 18 minutes ago"
       }
-    },
-    "applied-cryptography": {
-      "courseKey": "applied-cryptography-2026-autumn",
-      "progress": 18,
-      "status": "in-progress",
-      "earnedPoints": 3,
-      "availablePoints": 24,
-      "weekStatuses": {},
-      "nextActivity": {
-        "eyebrow": "Module 1 · Protocol goals",
-        "title": "Threat models before primitives",
-        "description": "Review the protocol brief and identify the guarantees each participant needs.",
-        "target": { "route": "course", "course": "applied-cryptography" },
-        "estimatedMinutes": 20,
-        "completedSteps": 1,
-        "totalSteps": 3,
-        "savedLabel": "Last opened yesterday"
-      }
-    },
-    "secure-programming": {
-      "courseKey": "secure-programming-2026-autumn",
-      "progress": 0,
-      "status": "not-started",
-      "earnedPoints": 0,
-      "availablePoints": 30,
-      "weekStatuses": {},
-      "nextActivity": {
-        "eyebrow": "Start here",
-        "title": "Course orientation",
-        "description": "Review the environment requirements and prepare your development workspace.",
-        "target": { "route": "course", "course": "secure-programming" },
-        "estimatedMinutes": 15,
-        "completedSteps": 0,
-        "totalSteps": 3,
-        "savedLabel": "Not started"
-      }
     }
   },
   "agenda": [
     {
       "id": "packet-traces",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "type": "lab",
       "title": "Packet traces and protocol clues",
       "supporting": "35 min · 6 points",
       "dueLabel": "Today · 23:59",
       "target": {
         "route": "courseTask",
-        "course": "security-fundamentals",
-        "week": "week-04",
+        "course": "test-course-a",
+        "week": "week-01",
         "task": "packet-traces"
       },
       "status": "in-progress"
     },
     {
       "id": "protocol-goals",
-      "courseSlug": "applied-cryptography",
+      "courseDefinitionKey": "test-course-a",
       "type": "reading",
       "title": "Threat models before primitives",
       "supporting": "20 min · Reading",
       "dueLabel": "Wednesday",
-      "target": { "route": "course", "course": "applied-cryptography" },
+      "target": { "route": "course", "course": "test-course-a" },
       "status": "todo"
     },
     {
       "id": "toolchain",
-      "courseSlug": "secure-programming",
+      "courseDefinitionKey": "test-course-a",
       "type": "setup",
       "title": "Prepare the course toolchain",
       "supporting": "15 min · Setup",
       "dueLabel": "Friday",
-      "target": { "route": "course", "course": "secure-programming" },
+      "target": { "route": "course", "course": "test-course-a" },
       "status": "todo"
     },
     {
       "id": "week-three-recap",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "type": "reading",
       "title": "Review the memory safety recap",
       "supporting": "12 min · Reading",
       "dueLabel": "Completed Sunday",
       "target": {
         "route": "courseWeek",
-        "course": "security-fundamentals",
-        "week": "week-03"
+        "course": "test-course-a",
+        "week": "week-02"
       },
       "status": "completed"
     }
@@ -126,7 +89,7 @@
   "activity": [
     {
       "id": "packet-export-ready",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "kind": "artifact",
       "title": "Packet analysis export is ready",
       "description": "The report bundle from your latest task run is available for download.",
@@ -134,8 +97,8 @@
       "occurredAt": "2026-08-24T14:42:00+03:00",
       "target": {
         "route": "courseTask",
-        "course": "security-fundamentals",
-        "week": "week-04",
+        "course": "test-course-a",
+        "week": "week-01",
         "task": "packet-traces"
       },
       "isUnread": true,
@@ -143,7 +106,7 @@
     },
     {
       "id": "forensics-instance-closed",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "kind": "instance",
       "title": "Forensics lab instance closed",
       "description": "The instance reached its idle limit. You can open a new one from the task.",
@@ -151,8 +114,8 @@
       "occurredAt": "2026-08-24T14:13:00+03:00",
       "target": {
         "route": "courseTask",
-        "course": "security-fundamentals",
-        "week": "week-04",
+        "course": "test-course-a",
+        "week": "week-01",
         "task": "packet-traces"
       },
       "isUnread": true,
@@ -160,7 +123,7 @@
     },
     {
       "id": "packet-attempt-succeeded",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "kind": "attempt",
       "title": "Packet trace attempt accepted",
       "description": "Your latest answer passed the task checks and was recorded.",
@@ -168,8 +131,8 @@
       "occurredAt": "2026-08-24T13:00:00+03:00",
       "target": {
         "route": "courseTask",
-        "course": "security-fundamentals",
-        "week": "week-04",
+        "course": "test-course-a",
+        "week": "week-01",
         "task": "packet-traces"
       },
       "isUnread": true,
@@ -177,19 +140,19 @@
     },
     {
       "id": "crypto-instance-opened",
-      "courseSlug": "applied-cryptography",
+      "courseDefinitionKey": "test-course-a",
       "kind": "instance",
       "title": "Protocol lab instance opened",
       "description": "Your isolated exercise environment is ready.",
       "timeLabel": "Yesterday",
       "occurredAt": "2026-08-23T16:25:00+03:00",
-      "target": { "route": "course", "course": "applied-cryptography" },
+      "target": { "route": "course", "course": "test-course-a" },
       "isUnread": false,
       "isRecent": false
     },
     {
       "id": "memory-safety-reviewed",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "kind": "grading",
       "title": "Memory safety exercise reviewed",
       "description": "Course staff reviewed your submission and left feedback.",
@@ -197,15 +160,15 @@
       "occurredAt": "2026-08-23T12:10:00+03:00",
       "target": {
         "route": "courseWeek",
-        "course": "security-fundamentals",
-        "week": "week-03"
+        "course": "test-course-a",
+        "week": "week-02"
       },
       "isUnread": false,
       "isRecent": false
     },
     {
       "id": "memory-safety-artifact",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "kind": "artifact",
       "title": "Memory safety evidence archive created",
       "description": "The evidence archive from your completed exercise remains available.",
@@ -213,8 +176,8 @@
       "occurredAt": "2026-08-22T18:05:00+03:00",
       "target": {
         "route": "courseWeek",
-        "course": "security-fundamentals",
-        "week": "week-03"
+        "course": "test-course-a",
+        "week": "week-02"
       },
       "isUnread": false,
       "isRecent": false
@@ -223,21 +186,21 @@
   "announcements": [
     {
       "id": "lab-maintenance",
-      "courseSlug": "security-fundamentals",
+      "courseDefinitionKey": "test-course-a",
       "title": "Lab environment maintenance on Tuesday",
       "timeLabel": "2 hours ago",
       "target": {
         "route": "coursePage",
-        "course": "security-fundamentals",
+        "course": "test-course-a",
         "page": "announcements"
       }
     },
     {
       "id": "office-hours",
-      "courseSlug": "applied-cryptography",
+      "courseDefinitionKey": "test-course-a",
       "title": "This week's office hours move to TS135",
       "timeLabel": "Yesterday",
-      "target": { "route": "course", "course": "applied-cryptography" }
+      "target": { "route": "course", "course": "test-course-a" }
     }
   ]
 }

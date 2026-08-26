@@ -19,6 +19,9 @@ create table public.course_memberships (
     (status = 'active' and suspended_at is null and revoked_at is null)
     or (status = 'suspended' and suspended_at is not null and revoked_at is null)
     or (status = 'revoked' and revoked_at is not null)
+  ),
+  constraint course_memberships_owner_status_check check (
+    role <> 'owner' or status = 'active'
   )
 );
 
@@ -28,6 +31,10 @@ create index course_memberships_profile_status_role_idx
 
 create index course_memberships_course_role_status_idx
   on public.course_memberships (course_id, role, status);
+
+create unique index course_memberships_one_active_owner_uidx
+  on public.course_memberships (course_id)
+  where role = 'owner' and status = 'active';
 
 create table private.course_membership_events (
   id bigint generated always as identity primary key,
@@ -379,6 +386,13 @@ as $function$
 declare
   v_actor_role text;
 begin
+  if p_role is null or p_role not in ('instructor', 'learner') then
+    if p_role = 'owner' then
+      raise exception using errcode = '42501', message = 'course_owner_transfer_required';
+    end if;
+    raise exception using errcode = '22023', message = 'invalid_course_membership_role';
+  end if;
+
   perform 1 from public.courses as course where course.id = p_course_id for update;
   if not found then
     raise exception using errcode = '23503', message = 'course_not_found';
@@ -441,6 +455,14 @@ declare
   v_actor_role text;
   v_active_owner_count integer;
 begin
+  if p_new_role is null or p_new_role not in ('owner', 'instructor', 'learner') then
+    raise exception using errcode = '22023', message = 'invalid_course_membership_role';
+  end if;
+
+  if p_new_role = 'owner' then
+    raise exception using errcode = '42501', message = 'course_owner_transfer_required';
+  end if;
+
   perform 1 from public.courses as course where course.id = p_course_id for update;
   if not found then
     raise exception using errcode = '23503', message = 'course_not_found';
@@ -476,6 +498,10 @@ begin
 
   if not found then
     raise exception using errcode = '23503', message = 'course_membership_not_found';
+  end if;
+
+  if v_actor_role = 'instructor' and v_membership.role <> 'learner' then
+    raise exception using errcode = '42501', message = 'course_staff_admin_required';
   end if;
 
   if v_membership.role = p_new_role and v_membership.status = p_new_status then
@@ -525,6 +551,136 @@ begin
     v_membership.status,
     p_new_role,
     p_new_status,
+    p_actor_profile_id,
+    p_reason
+  );
+end
+$function$;
+
+create function private.transfer_course_ownership(
+  p_course_id uuid,
+  p_new_owner_profile_id uuid,
+  p_actor_profile_id uuid,
+  p_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_current_owner_profile_id uuid;
+  v_target_membership public.course_memberships%rowtype;
+begin
+  if p_course_id is null or p_new_owner_profile_id is null or p_actor_profile_id is null then
+    raise exception using errcode = '22004', message = 'course_ownership_transfer_arguments_required';
+  end if;
+
+  if p_reason is null or p_reason <> btrim(p_reason) or char_length(p_reason) not between 1 and 2000 then
+    raise exception using errcode = '22023', message = 'invalid_course_membership_reason';
+  end if;
+
+  -- All membership mutations lock the course row, so ownership changes are
+  -- serialized with staff and learner membership changes.
+  perform 1
+  from public.courses as course
+  where course.id = p_course_id
+  for update;
+
+  if not found then
+    raise exception using errcode = '23503', message = 'course_not_found';
+  end if;
+
+  select membership.profile_id
+  into v_current_owner_profile_id
+  from public.course_memberships as membership
+  where membership.course_id = p_course_id
+    and membership.role = 'owner'
+    and membership.status = 'active'
+  for update;
+
+  if not found then
+    raise exception using errcode = '23514', message = 'course_requires_active_owner';
+  end if;
+
+  if p_actor_profile_id <> v_current_owner_profile_id then
+    raise exception using errcode = '42501', message = 'course_owner_required';
+  end if;
+
+  if p_new_owner_profile_id = v_current_owner_profile_id then
+    return;
+  end if;
+
+  select membership.*
+  into v_target_membership
+  from public.course_memberships as membership
+  where membership.course_id = p_course_id
+    and membership.profile_id = p_new_owner_profile_id
+    and membership.status = 'active'
+  for update;
+
+  if not found then
+    raise exception using errcode = '23503', message = 'course_owner_target_membership_not_found';
+  end if;
+
+  if v_target_membership.role <> 'instructor' then
+    raise exception using errcode = '42501', message = 'course_owner_target_must_be_instructor';
+  end if;
+
+  -- Demote first so the partial unique index can enforce one active owner
+  -- throughout the transaction, then promote the selected instructor.
+  update public.course_memberships
+  set role = 'instructor'
+  where course_id = p_course_id
+    and profile_id = v_current_owner_profile_id;
+
+  insert into private.course_membership_events (
+    course_id,
+    profile_id,
+    event_kind,
+    previous_role,
+    previous_status,
+    new_role,
+    new_status,
+    actor_profile_id,
+    reason
+  )
+  values (
+    p_course_id,
+    v_current_owner_profile_id,
+    'transitioned',
+    'owner',
+    'active',
+    'instructor',
+    'active',
+    p_actor_profile_id,
+    p_reason
+  );
+
+  update public.course_memberships
+  set role = 'owner'
+  where course_id = p_course_id
+    and profile_id = p_new_owner_profile_id;
+
+  insert into private.course_membership_events (
+    course_id,
+    profile_id,
+    event_kind,
+    previous_role,
+    previous_status,
+    new_role,
+    new_status,
+    actor_profile_id,
+    reason
+  )
+  values (
+    p_course_id,
+    v_target_membership.profile_id,
+    'transitioned',
+    v_target_membership.role,
+    v_target_membership.status,
+    'owner',
+    'active',
     p_actor_profile_id,
     p_reason
   );
@@ -1130,6 +1286,7 @@ alter function private.can_view_profile(uuid) owner to ainigma_function_owner;
 alter function private.create_course_with_initial_owner(text, text, text, uuid, timestamptz, timestamptz, text) owner to ainigma_function_owner;
 alter function private.add_course_membership(uuid, uuid, text, uuid, text) owner to ainigma_function_owner;
 alter function private.transition_course_membership(uuid, uuid, text, text, uuid, text) owner to ainigma_function_owner;
+alter function private.transfer_course_ownership(uuid, uuid, uuid, text) owner to ainigma_function_owner;
 alter function public.list_my_courses() owner to ainigma_function_owner;
 alter function public.list_course_roster(text) owner to ainigma_function_owner;
 alter function private.confirm_github_course_access(uuid, uuid, bigint, text, text) owner to ainigma_function_owner;
@@ -1147,6 +1304,7 @@ revoke all on function
   private.create_course_with_initial_owner(text, text, text, uuid, timestamptz, timestamptz, text),
   private.add_course_membership(uuid, uuid, text, uuid, text),
   private.transition_course_membership(uuid, uuid, text, text, uuid, text),
+  private.transfer_course_ownership(uuid, uuid, uuid, text),
   public.get_my_profile(),
   public.update_my_profile(text),
   public.list_my_courses(),
@@ -1170,6 +1328,7 @@ grant execute on function private.report_identity_anomalies() to ainigma_mainten
 grant execute on function private.create_course_with_initial_owner(text, text, text, uuid, timestamptz, timestamptz, text) to ainigma_maintenance;
 grant execute on function private.add_course_membership(uuid, uuid, text, uuid, text) to ainigma_maintenance;
 grant execute on function private.transition_course_membership(uuid, uuid, text, text, uuid, text) to ainigma_maintenance;
+grant execute on function private.transfer_course_ownership(uuid, uuid, uuid, text) to ainigma_maintenance;
 grant execute on function private.confirm_github_course_access(uuid, uuid, bigint, text, text) to ainigma_maintenance;
 
 grant execute on function

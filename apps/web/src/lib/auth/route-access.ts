@@ -1,5 +1,7 @@
 import type { APIContext } from "astro";
+import { getCollection } from "astro:content";
 import { getLocale } from "../i18n";
+import { getCourseDefinitionKey } from "../learning/course-manifest";
 import type { AppRouteMatch } from "../routes";
 import { createServerSupabaseClient } from "../supabase/server";
 import { hasCourseAccess } from "./course-access";
@@ -55,9 +57,13 @@ export async function enforceRouteAccess(
 
   if (route.access !== "courseMember") return null;
 
-  const courseDefinitionKey = route.params.course;
-  if (!courseDefinitionKey) {
+  const courseSlug = route.params.course;
+  if (!courseSlug) {
     return new Response("Course route is invalid.", { status: 404 });
+  }
+  const courseDefinitionKey = getCourseDefinitionKey(await getCollection("courses"), courseSlug);
+  if (!courseDefinitionKey) {
+    return new Response("Course not found.", { status: 404 });
   }
 
   const { data: courseAccess, error: courseAccessError } = await supabase.rpc("list_my_courses");

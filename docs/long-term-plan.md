@@ -187,11 +187,11 @@ Publishes only previously built artifacts, records the source commit, performs e
 
 Use three distinct digests:
 
-| Digest | Meaning | Used by learner API? |
-| --- | --- | --- |
-| `course_release_digest` | Exact safe compiled frontend/course release | No |
-| `task_release_digest` | One task interaction contract bound to one runtime digest | Yes |
-| `runtime_digest` | Private generation/provisioning implementation | Indirectly, through the task version |
+| Digest                  | Meaning                                                   | Used by learner API?                 |
+| ----------------------- | --------------------------------------------------------- | ------------------------------------ |
+| `course_release_digest` | Exact safe compiled frontend/course release               | No                                   |
+| `task_release_digest`   | One task interaction contract bound to one runtime digest | Yes                                  |
+| `runtime_digest`        | Private generation/provisioning implementation            | Indirectly, through the task version |
 
 A typo changes only `course_release_digest`. A runtime-aware MDX contract change also changes `task_release_digest`. A runtime definition or runtime artifact change changes all three in the newly bound course release.
 

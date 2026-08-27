@@ -135,7 +135,7 @@ One row represents one concrete operational course offering, not a second copy o
 - Optional `external_url` for public course information
 - `created_at` and `updated_at`
 
-Git contains `definition_key`, not an environment- or semester-specific database UUID. Publisher configuration binds that definition to a target `course_key`/UUID and emits the bound safe frontend manifest. This lets the same validated source artifact be promoted between environments or reused for a later offering without editing Git solely to replace an operational UUID.
+Git contains `definition_key`, not an environment- or semester-specific database UUID. The course overview frontmatter declares this immutable identity explicitly; the content directory name is only a mutable route slug and may be renamed without changing `definition_key`. Publisher configuration binds that definition to a target `course_key`/UUID and emits the bound safe frontend manifest. This lets the same validated source artifact be promoted between environments or reused for a later offering without editing Git solely to replace an operational UUID.
 
 Course title, summary, navigation label, and content ordering remain authored in Git. The frontend and instructor dashboard read them from the generated course/frontend manifest; they are not independently edited on this row.
 
@@ -162,7 +162,7 @@ Provider-independent enrollment:
 - A learner membership is created as `active` only after the required external GitHub course-organization access is confirmed; approval alone is not membership.
 - Primary key `(course_id, profile_id)`
 
-Role and status transitions occur only through constrained functions and an append-only audit event. Creation of the initial owner is an explicit publisher/administrator operation. Ownership transfer must lock the course membership set and may not revoke or demote the final active owner.
+Role and status transitions occur only through constrained functions and an append-only audit event. Each course has exactly one active owner; it may have any number of instructors and learners. Creation of the initial owner is an explicit publisher/administrator operation. Ownership transfer locks the course row, atomically demotes the previous owner to instructor and promotes an existing instructor, and may not leave the course without an active owner.
 
 GitHub organization membership will NOT control course access.
 

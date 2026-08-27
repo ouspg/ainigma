@@ -8,7 +8,7 @@ export const prerender = false;
 
 const code = Astro.params.code;
 const status: ErrorStatus =
-  code === "403" || code === "500" || code === "503" ? Number(code) : 404;
+  code === "403" ? 403 : code === "500" ? 500 : code === "503" ? 503 : 404;
 Astro.response.status = status;
 const locale = getLocale(Astro.currentLocale);
 const messages = getMessages(locale);

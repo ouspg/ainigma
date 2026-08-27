@@ -5,8 +5,7 @@ import LearningFrame from "../../../../components/shell/LearningFrame.astro";
 import ReadingWorkspace from "../../../../components/pages/ReadingWorkspace";
 import {
   buildOutlineSections,
-  getCourse,
-  getLearningWorkspace,
+  getLearningPageData,
   getPublishedCourseEntry,
 } from "../../../../lib/learning/catalog";
 import { getLocale } from "../../../../lib/i18n";
@@ -25,8 +24,7 @@ if (!entry || entry.data.kind !== "week") {
   return new Response("Not found", { status: 404 });
 }
 const { Content, headings, remarkPluginFrontmatter } = await render(entry);
-const workspace = await getLearningWorkspace(entries, Astro.locals.profile);
-const course = await getCourse(entries, courseSlug);
+const { course, workspace } = await getLearningPageData(entries, Astro.locals.profile!, courseSlug);
 const week = course.weeks.find((candidate) => candidate.slug === weekSlug);
 if (!week) throw new Error(`Missing week manifest: ${entry.id}`);
 const outline = buildOutlineSections(headings, remarkPluginFrontmatter.activityOutline);

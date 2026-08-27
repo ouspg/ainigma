@@ -13,6 +13,10 @@ import { getLearningSnapshot, type LearningSnapshot } from "./repository";
 import { isCourseSlug, type CourseSlug } from "./identifiers";
 import { courseDefinitionKeyOf, courseSlugOf, type CourseEntry } from "./course-manifest";
 type SnapshotRouteTarget = LearningSnapshot["agenda"][number]["target"];
+type LinkedSnapshotItem =
+  | LearningSnapshot["agenda"][number]
+  | LearningSnapshot["announcements"][number]
+  | LearningSnapshot["activity"][number];
 
 function routeTargetPath(target: SnapshotRouteTarget, slug: CourseSlug) {
   switch (target.route) {
@@ -29,6 +33,19 @@ function routeTargetPath(target: SnapshotRouteTarget, slug: CourseSlug) {
         task: target.task,
       });
   }
+}
+
+function courseForLinkedItem(
+  item: LinkedSnapshotItem,
+  courseByDefinitionKey: Map<CourseInfo["definitionKey"], CourseInfo>,
+): CourseInfo | undefined {
+  if (item.courseDefinitionKey !== item.target.course) {
+    throw new Error(
+      `Course definition mismatch for learning item ${item.id}: ` +
+        `${item.courseDefinitionKey} !== ${item.target.course}`,
+    );
+  }
+  return courseByDefinitionKey.get(item.courseDefinitionKey);
 }
 
 function buildCourse(
@@ -163,12 +180,19 @@ export function getPublicCourseCatalog(entries: CourseEntry[]): PublicCourseInfo
 export async function getLearningWorkspace(
   entries: CourseEntry[],
   profile?: StudentProfile,
+  learning?: LearningSnapshot,
 ): Promise<LearningWorkspace> {
-  const learning = await getLearningSnapshot();
+  const snapshot = learning ?? (await getLearningSnapshot());
   if (!profile) {
     throw new Error("Authenticated student profile is required for the learning workspace.");
   }
-  const courses = entries
+  const courses = buildCourses(entries, snapshot);
+
+  return buildWorkspace(profile, snapshot, courses);
+}
+
+function buildCourses(entries: CourseEntry[], learning: LearningSnapshot): CourseInfo[] {
+  return entries
     .flatMap((entry) =>
       entry.data.kind === "course" &&
       !entry.data.draft &&
@@ -177,6 +201,13 @@ export async function getLearningWorkspace(
         : [],
     )
     .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function buildWorkspace(
+  profile: StudentProfile,
+  learning: LearningSnapshot,
+  courses: CourseInfo[],
+): LearningWorkspace {
   const courseByDefinitionKey = new Map(
     courses.map((course) => [course.definitionKey, course] as const),
   );
@@ -186,13 +217,13 @@ export async function getLearningWorkspace(
     term: learning.term,
     courses,
     agenda: learning.agenda.flatMap((item) => {
-      const course = courseByDefinitionKey.get(item.courseDefinitionKey);
+      const course = courseForLinkedItem(item, courseByDefinitionKey);
       if (!course) return [];
       const { courseDefinitionKey: _definitionKey, target, ...agenda } = item;
       return [{ ...agenda, courseSlug: course.slug, href: routeTargetPath(target, course.slug) }];
     }),
     announcements: learning.announcements.flatMap((item): Announcement[] => {
-      const course = courseByDefinitionKey.get(item.courseDefinitionKey);
+      const course = courseForLinkedItem(item, courseByDefinitionKey);
       if (!course) return [];
       const { courseDefinitionKey: _definitionKey, target, ...announcement } = item;
       return [
@@ -204,7 +235,7 @@ export async function getLearningWorkspace(
       ];
     }),
     activity: learning.activity.flatMap((item): LearnerActivity[] => {
-      const course = courseByDefinitionKey.get(item.courseDefinitionKey);
+      const course = courseForLinkedItem(item, courseByDefinitionKey);
       if (!course) return [];
       const { courseDefinitionKey: _definitionKey, target, ...activity } = item;
       return [{ ...activity, courseSlug: course.slug, href: routeTargetPath(target, course.slug) }];
@@ -215,6 +246,20 @@ export async function getLearningWorkspace(
 export async function getCourse(entries: CourseEntry[], slug: CourseSlug): Promise<CourseInfo> {
   const learning = await getLearningSnapshot();
   return buildCourse(entries, slug, learning);
+}
+
+export async function getLearningPageData(
+  entries: CourseEntry[],
+  profile: StudentProfile,
+  slug: CourseSlug,
+): Promise<{ course: CourseInfo; workspace: LearningWorkspace }> {
+  const learning = await getLearningSnapshot();
+  const courses = buildCourses(entries, learning);
+  const course = courses.find((candidate) => candidate.slug === slug);
+  if (!course) {
+    throw new Error(`Incomplete course manifest for ${slug}`);
+  }
+  return { course, workspace: buildWorkspace(profile, learning, courses) };
 }
 
 export function getCourseEntry(entries: CourseEntry[], id: string): CourseEntry {

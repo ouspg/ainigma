@@ -7,39 +7,69 @@ export type AgendaStatus = "todo" | "in-progress" | "completed";
 export type CourseTone = "blue" | "orange" | "teal";
 export type ActivityKind = "attempt" | "grading" | "artifact" | "instance";
 
-export interface PublicCourseInfo {
-  slug: CourseSlug;
-  definitionKey: CourseDefinitionKey;
+interface CourseOverviewFields {
   code: string;
   title: string;
   summary: string;
   tone: CourseTone;
+}
+
+export interface PublicCourseInfo extends CourseOverviewFields {
+  slug: CourseSlug;
+  definitionKey: CourseDefinitionKey;
   catalogUrl?: ExternalUrl;
 }
 
-export interface TaskInfo {
+interface CourseSchedule {
+  startDate: string;
+  endDate: string;
+}
+
+interface TaskDefinition {
   slug: string;
   title: string;
   summary: string;
-  href: AppPath;
   estimatedMinutes: number;
   points: number;
 }
 
-export interface WeekInfo {
+export interface TaskInfo extends TaskDefinition {
+  href: AppPath;
+}
+
+interface WeekDefinition {
   slug: string;
   number: number;
   title: string;
   summary: string;
+  tasks: TaskDefinition[];
+}
+
+interface PageDefinition {
+  page: "announcements" | "materials";
+  title: string;
+  label: string;
+}
+
+export interface CourseDefinition extends CourseOverviewFields, CourseSchedule {
+  slug: string;
+  definitionKey: string;
+  navMark: string;
+  catalogUrl: ExternalUrl | null;
+  catalogOrder: number;
+  draft: boolean;
+  weeks: WeekDefinition[];
+  pages: PageDefinition[];
+  taskCount: number;
+}
+
+export interface WeekInfo extends Omit<WeekDefinition, "tasks"> {
   href: AppPath;
   status: CourseStatus;
   tasks: TaskInfo[];
 }
 
-export interface CoursePageInfo {
-  page: "announcements" | "materials";
-  title: string;
-  label: string;
+export interface CoursePageInfo extends PageDefinition {
   href: AppPath;
 }
 
@@ -54,16 +84,11 @@ export interface NextActivity {
   savedLabel: string;
 }
 
-export interface CourseInfo {
+export interface CourseInfo extends CourseOverviewFields, CourseSchedule {
   slug: CourseSlug;
   definitionKey: CourseDefinitionKey;
   courseKey: string;
-  code: string;
   navMark: string;
-  startDate: string;
-  endDate: string;
-  title: string;
-  summary: string;
   href: AppPath;
   catalogUrl?: ExternalUrl;
   tone: CourseTone;

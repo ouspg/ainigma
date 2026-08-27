@@ -1,7 +1,7 @@
 import type { APIContext } from "astro";
-import { getCollection } from "astro:content";
 import { getLocale } from "../i18n";
-import { getCourseDefinitionKey } from "../learning/course-manifest";
+import { parseCourseDefinitionKey } from "../learning/identifiers";
+import { COURSE_DEFINITIONS } from "../learning/course-manifest.generated";
 import { routes, type AppRouteMatch } from "../routes";
 import { createServerSupabaseClient } from "../supabase/server";
 import { hasCourseAccess } from "./course-access";
@@ -70,7 +70,12 @@ export async function authorizeRouteRequest(
   if (!courseSlug) {
     return rewriteToStatus(context, 404);
   }
-  const courseDefinitionKey = getCourseDefinitionKey(await getCollection("courses"), courseSlug);
+  const courseDefinition = COURSE_DEFINITIONS.find(
+    (definition) => definition.slug === courseSlug && !definition.draft,
+  );
+  const courseDefinitionKey = courseDefinition
+    ? parseCourseDefinitionKey(courseDefinition.definitionKey)
+    : null;
   if (!courseDefinitionKey) {
     return rewriteToStatus(context, 404);
   }

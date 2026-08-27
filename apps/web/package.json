@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "node scripts/build-theme.mjs",
+    "predev": "node scripts/build-theme.mjs && node scripts/build-course-manifest.mjs",
     "dev": "astro dev --port 4323",
-    "prebuild": "node scripts/build-theme.mjs",
+    "prebuild": "node scripts/build-theme.mjs && node scripts/build-course-manifest.mjs",
     "build": "astro build",
     "preview": "astro preview --port 4323",
     "astro": "astro"

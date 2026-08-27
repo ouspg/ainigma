@@ -1,5 +1,4 @@
 ---
-import { getCollection } from "astro:content";
 import ActivityHistory from "../../components/pages/ActivityHistory";
 import LearningFrame from "../../components/shell/LearningFrame.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
@@ -9,8 +8,7 @@ import { routes } from "../../lib/routes";
 
 export const prerender = false;
 
-const entries = await getCollection("courses");
-const workspace = await getLearningWorkspace(entries, Astro.locals.profile);
+const workspace = await getLearningWorkspace(Astro.locals.profile);
 const locale = getLocale(Astro.currentLocale);
 const metadata = getMessages(locale).metadata;
 ---

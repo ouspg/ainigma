@@ -2,6 +2,7 @@ import { routes } from "../routes";
 import type {
   Announcement,
   CourseInfo,
+  CourseDefinition,
   CourseStatus,
   LearnerActivity,
   LearningWorkspace,
@@ -10,8 +11,18 @@ import type {
   WeekInfo,
 } from "./types";
 import { getLearningSnapshot, type LearningSnapshot } from "./repository";
-import { isCourseSlug, type CourseSlug } from "./identifiers";
-import { courseDefinitionKeyOf, courseSlugOf, type CourseEntry } from "./course-manifest";
+import { parseCourseDefinitionKey, parseCourseSlug, type CourseSlug } from "./identifiers";
+import type { CourseEntry } from "./course-manifest";
+import { COURSE_DEFINITIONS } from "./course-manifest.generated";
+type TypedCourseDefinition = Omit<CourseDefinition, "slug" | "definitionKey"> & {
+  slug: CourseSlug;
+  definitionKey: ReturnType<typeof parseCourseDefinitionKey>;
+};
+const COURSE_DEFINITIONS_TYPED: TypedCourseDefinition[] = COURSE_DEFINITIONS.map((definition) => ({
+  ...definition,
+  slug: parseCourseSlug(definition.slug),
+  definitionKey: parseCourseDefinitionKey(definition.definitionKey),
+}));
 type SnapshotRouteTarget = LearningSnapshot["agenda"][number]["target"];
 type LinkedSnapshotItem =
   | LearningSnapshot["agenda"][number]
@@ -48,97 +59,48 @@ function courseForLinkedItem(
   return courseByDefinitionKey.get(item.courseDefinitionKey);
 }
 
-function buildCourse(
-  entries: CourseEntry[],
-  slug: CourseSlug,
-  learning: LearningSnapshot,
-): CourseInfo {
-  const courseEntries = entries.filter((entry) => courseSlugOf(entry) === slug);
-  const overview = courseEntries.find((entry) => entry.data.kind === "course");
-
-  if (!overview || overview.data.kind !== "course") {
-    throw new Error(`Incomplete course manifest for ${slug}`);
-  }
-  const definitionKey = courseDefinitionKeyOf(overview);
+function buildCourse(definition: TypedCourseDefinition, learning: LearningSnapshot): CourseInfo {
+  const slug = definition.slug;
+  const definitionKey = definition.definitionKey;
   const snapshot = learning.courses[definitionKey];
   if (!snapshot) {
     throw new Error(`Missing learner snapshot for course definition ${definitionKey}`);
   }
 
-  const weeks: WeekInfo[] = courseEntries
-    .filter((entry) => entry.data.kind === "week")
-    .sort((a, b) => a.data.order - b.data.order)
-    .map((weekEntry) => {
-      if (weekEntry.data.kind !== "week") {
-        throw new Error(`Expected week entry: ${weekEntry.id}`);
-      }
-      const weekSlug = weekEntry.id.split("/")[1] ?? "";
-      const tasks = courseEntries
-        .filter(
-          (entry) => entry.data.kind === "task" && entry.id.startsWith(`${slug}/${weekSlug}/`),
-        )
-        .sort((a, b) => a.data.order - b.data.order)
-        .map((taskEntry) => {
-          if (taskEntry.data.kind !== "task") {
-            throw new Error(`Expected task entry: ${taskEntry.id}`);
-          }
-          const taskSlug = taskEntry.id.slice(`${slug}/${weekSlug}/`.length);
-          return {
-            slug: taskSlug,
-            title: taskEntry.data.navLabel ?? taskEntry.data.title,
-            summary: taskEntry.data.summary,
-            href: routes.courseTask.path({ course: slug, week: weekSlug, task: taskSlug }),
-            estimatedMinutes: taskEntry.data.estimatedMinutes,
-            points: taskEntry.data.points,
-          };
-        });
-
-      return {
-        slug: weekSlug,
-        number: weekEntry.data.weekNumber,
-        title: weekEntry.data.title,
-        summary: weekEntry.data.summary,
-        href: routes.courseWeek.path({ course: slug, week: weekSlug }),
-        status: snapshot.weekStatuses[weekSlug] ?? ("not-started" as CourseStatus),
-        tasks,
-      };
-    });
-
-  const pages = courseEntries
-    .filter((entry) => entry.data.kind === "course-page")
-    .sort((a, b) => a.data.order - b.data.order)
-    .map((entry) => {
-      if (entry.data.kind !== "course-page") {
-        throw new Error(`Expected course page entry: ${entry.id}`);
-      }
-      return {
-        page: entry.data.page,
-        title: entry.data.title,
-        label: entry.data.navLabel ?? entry.data.title,
-        href: routes.coursePage.path({ course: slug, page: entry.data.page }),
-      };
-    });
+  const weeks: WeekInfo[] = definition.weeks.map((week) => ({
+    ...week,
+    href: routes.courseWeek.path({ course: slug, week: week.slug }),
+    status: snapshot.weekStatuses[week.slug] ?? ("not-started" as CourseStatus),
+    tasks: week.tasks.map((task) => ({
+      ...task,
+      href: routes.courseTask.path({ course: slug, week: week.slug, task: task.slug }),
+    })),
+  }));
+  const pages = definition.pages.map((page) => ({
+    ...page,
+    href: routes.coursePage.path({ course: slug, page: page.page }),
+  }));
 
   return {
     slug,
     definitionKey,
     courseKey: snapshot.courseKey,
-    code: overview.data.code,
-    navMark: overview.data.navMark,
-    startDate: overview.data.startDate,
-    endDate: overview.data.endDate,
-    title: overview.data.title,
-    summary: overview.data.summary,
+    code: definition.code,
+    navMark: definition.navMark,
+    startDate: definition.startDate,
+    endDate: definition.endDate,
+    title: definition.title,
+    summary: definition.summary,
     href: routes.course.path({ course: slug }),
-    ...(overview.data.catalogUrl ? { catalogUrl: overview.data.catalogUrl } : {}),
-    tone: overview.data.tone,
+    ...(definition.catalogUrl ? { catalogUrl: definition.catalogUrl } : {}),
+    tone: definition.tone,
     progress: snapshot.progress,
     status: snapshot.status,
     earnedPoints: snapshot.earnedPoints,
     availablePoints: snapshot.availablePoints,
     weeks,
     pages,
-    taskCount: weeks.reduce((total, week) => total + week.tasks.length, 0),
+    taskCount: definition.taskCount,
     nextActivity: {
       eyebrow: snapshot.nextActivity.eyebrow,
       title: snapshot.nextActivity.title,
@@ -157,28 +119,21 @@ function buildCourse(
  * Learner enrollment and progress snapshots must never be needed to render
  * the signed-out front page.
  */
-export function getPublicCourseCatalog(entries: CourseEntry[]): PublicCourseInfo[] {
-  return entries
-    .flatMap((entry) =>
-      entry.data.kind === "course" && !entry.data.draft ? [{ entry, data: entry.data }] : [],
-    )
-    .sort(
-      (a, b) =>
-        a.data.catalogOrder - b.data.catalogOrder || a.data.title.localeCompare(b.data.title),
-    )
-    .map(({ entry, data }) => ({
-      slug: courseSlugOf(entry),
-      definitionKey: courseDefinitionKeyOf(entry),
-      code: data.code,
-      title: data.title,
-      summary: data.summary,
-      tone: data.tone,
-      ...(data.catalogUrl ? { catalogUrl: data.catalogUrl } : {}),
+export function getPublicCourseCatalog(): PublicCourseInfo[] {
+  return COURSE_DEFINITIONS_TYPED.filter((definition) => !definition.draft)
+    .sort((a, b) => a.catalogOrder - b.catalogOrder || a.title.localeCompare(b.title))
+    .map((definition) => ({
+      slug: definition.slug,
+      definitionKey: definition.definitionKey,
+      code: definition.code,
+      title: definition.title,
+      summary: definition.summary,
+      tone: definition.tone,
+      ...(definition.catalogUrl ? { catalogUrl: definition.catalogUrl } : {}),
     }));
 }
 
 export async function getLearningWorkspace(
-  entries: CourseEntry[],
   profile?: StudentProfile,
   learning?: LearningSnapshot,
 ): Promise<LearningWorkspace> {
@@ -186,20 +141,16 @@ export async function getLearningWorkspace(
   if (!profile) {
     throw new Error("Authenticated student profile is required for the learning workspace.");
   }
-  const courses = buildCourses(entries, snapshot);
+  const courses = buildCourses(snapshot);
 
   return buildWorkspace(profile, snapshot, courses);
 }
 
-function buildCourses(entries: CourseEntry[], learning: LearningSnapshot): CourseInfo[] {
-  return entries
-    .flatMap((entry) =>
-      entry.data.kind === "course" &&
-      !entry.data.draft &&
-      learning.courses[courseDefinitionKeyOf(entry)]
-        ? [buildCourse(entries, courseSlugOf(entry), learning)]
-        : [],
-    )
+function buildCourses(learning: LearningSnapshot): CourseInfo[] {
+  return COURSE_DEFINITIONS_TYPED.filter(
+    (definition) => !definition.draft && learning.courses[definition.definitionKey],
+  )
+    .map((definition) => buildCourse(definition, learning))
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
@@ -243,18 +194,12 @@ function buildWorkspace(
   };
 }
 
-export async function getCourse(entries: CourseEntry[], slug: CourseSlug): Promise<CourseInfo> {
-  const learning = await getLearningSnapshot();
-  return buildCourse(entries, slug, learning);
-}
-
 export async function getLearningPageData(
-  entries: CourseEntry[],
   profile: StudentProfile,
   slug: CourseSlug,
 ): Promise<{ course: CourseInfo; workspace: LearningWorkspace }> {
   const learning = await getLearningSnapshot();
-  const courses = buildCourses(entries, learning);
+  const courses = buildCourses(learning);
   const course = courses.find((candidate) => candidate.slug === slug);
   if (!course) {
     throw new Error(`Incomplete course manifest for ${slug}`);
@@ -268,20 +213,6 @@ export function getCourseEntry(entries: CourseEntry[], id: string): CourseEntry 
     throw new Error(`Missing course content entry: ${id}`);
   }
   return entry;
-}
-
-export function getPublishedCourseEntry(
-  entries: CourseEntry[],
-  id: string,
-): CourseEntry | undefined {
-  const courseSlug = id.split("/")[0] ?? "";
-  if (!isCourseSlug(courseSlug)) return undefined;
-  const isPublished = entries.some(
-    (entry) =>
-      courseSlugOf(entry) === courseSlug && entry.data.kind === "course" && !entry.data.draft,
-  );
-  if (!isPublished) return undefined;
-  return entries.find((entry) => entry.id === id);
 }
 
 export interface HeadingInfo {

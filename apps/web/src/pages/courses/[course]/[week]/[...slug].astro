@@ -1,31 +1,30 @@
 ---
-import { getCollection, render } from "astro:content";
+import { render } from "astro:content";
 import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import LearningFrame from "../../../../components/shell/LearningFrame.astro";
 import ReadingWorkspace from "../../../../components/pages/ReadingWorkspace";
 import {
   buildOutlineSections,
   getLearningPageData,
-  getPublishedCourseEntry,
 } from "../../../../lib/learning/catalog";
+import { getPublishedCourseEntry } from "../../../../lib/learning/content-entry";
 import { getLocale } from "../../../../lib/i18n";
 import { courseSlugFromParam } from "../../../../lib/learning/identifiers";
 
 export const prerender = false;
 
-const entries = await getCollection("courses");
 const courseSlug = courseSlugFromParam(Astro.params.course);
 if (!courseSlug) {
   return new Response("Not found", { status: 404 });
 }
 const weekSlug = Astro.params.week ?? "";
 const taskSlug = Astro.params.slug ?? "";
-const entry = getPublishedCourseEntry(entries, `${courseSlug}/${weekSlug}/${taskSlug}`);
+const entry = await getPublishedCourseEntry(`${courseSlug}/${weekSlug}/${taskSlug}`);
 if (!entry || entry.data.kind !== "task") {
   return new Response("Not found", { status: 404 });
 }
 const { Content, headings, remarkPluginFrontmatter } = await render(entry);
-const { course, workspace } = await getLearningPageData(entries, Astro.locals.profile!, courseSlug);
+const { course, workspace } = await getLearningPageData(Astro.locals.profile!, courseSlug);
 const week = course.weeks.find((candidate) => candidate.slug === weekSlug);
 if (!week) throw new Error(`Missing week manifest for task: ${entry.id}`);
 const taskIndex = week.tasks.findIndex((task) => entry.id.endsWith(`/${task.slug}`));

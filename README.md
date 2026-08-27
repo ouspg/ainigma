@@ -1,15 +1,24 @@
-# Ainigma
+# _αἰνίσσομαι_ - _to speak in riddles_
 
-- `apps/web`: Astro frontend.
-- `crates/ainigma`: Rust course compiler and CLI.
-- `courses`: public course presentation and MDX.
-- `supabase`: database configuration, migrations, and tests.
+This software tries to effortlessly turn your cybersecurity assignment dreams into reality—complete with automatic grading.
+Think of it as a dynamic CTF challenge generator, but with a twist: every participant gets their own special flag to hunt down. No copy-pasting answers here!
+
+It may or may not be completed. Heavily work-in-progress.
+
+- `apps/web`: Astro frontend. Astro renders the mostly static site and MDX course material, while
+  dynamic behavior is isolated to small interactive islands.
+- `crates/ainigma`: Rust workers for task generation and grading.
+- `courses`: course source code, authored content, and MDX presentation.
+- `supabase`: backend database, authentication, authorization, configuration, and tests.
 - `infra/pulumi`: CSC cPouta infrastructure.
 - `infra/nix`: NixOS images and host configuration.
 - `docs`: architecture plans.
-- `fixtures`: safe compiler and runtime test courses.
+- `fixtures`: safe compiler and runtime test courses (some day).
 
-Private runtime definitions live under the gitignored `.ainigma/sources/runtime/`. Public courses refer to them by logical `runtimeContract` keys; the compiler joins and validates both source roots.
+The overall goal is to define courses as code and publish them through a verified build pipeline. The
+compiler parses course content and front matter, checks that required fields and interactive worker
+contracts match, and produces immutable build artifacts. Deployment then serves those artifacts through
+Astro while Supabase provides the runtime user, enrollment, progress, and authorization state.
 
 ## Agent skills
 

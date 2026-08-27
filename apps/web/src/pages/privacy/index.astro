@@ -1,5 +1,6 @@
 ---
 import PublicInfoPage from "../../components/pages/PublicInfoPage";
+import SiteFooter from "../../components/layout/SiteFooter.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
 
@@ -9,4 +10,7 @@ const metadata = getMessages(locale).metadata;
 
 <BaseLayout title={metadata.privacyTitle} description={metadata.privacyDescription} {locale}>
   <PublicInfoPage kind="privacy" {locale} />
+  <div class="public-footer-frame">
+    <SiteFooter {locale} />
+  </div>
 </BaseLayout>

@@ -1,5 +1,6 @@
 ---
 import ErrorPage, { type ErrorStatus } from "../../components/pages/ErrorPage";
+import SiteFooter from "../../components/layout/SiteFooter.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
 
@@ -23,4 +24,7 @@ const title =
 
 <BaseLayout title={`${title} | Ainigma`} description={title} {locale}>
   <ErrorPage {status} {locale} />
+  <div class="public-footer-frame">
+    <SiteFooter {locale} />
+  </div>
 </BaseLayout>

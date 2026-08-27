@@ -93,8 +93,3 @@ export const terminalTheme = defineTheme({
   extends: academicTheme,
   ...terminalOverrides,
 });
-
-export const terminalThemeBuilt = {
-  ...terminalTheme,
-  __built: true,
-} as const;

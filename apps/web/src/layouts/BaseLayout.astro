@@ -55,8 +55,10 @@ const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
           const savedColorMode = localStorage.getItem(colorModeStorageKey);
           if (savedColorMode === "light" || savedColorMode === "dark") {
             root.dataset.colorMode = savedColorMode;
+            root.dataset.theme = savedColorMode;
           } else {
             delete root.dataset.colorMode;
+            delete root.dataset.theme;
           }
         } catch {
           // A blocked storage API should not block the first render.
@@ -72,95 +74,7 @@ const isLearningRoute = routeUsesLearnerShell(Astro.url.pathname);
         applySavedAppearance(event.newDocument.documentElement);
       });
     </script>
-    <script is:inline define:vars={{ astryxThemeNames: ASTRYX_THEME_NAMES }}>
-      const syncThemeProviderAttributes = () => {
-        const activeTheme = document.documentElement.dataset.appearanceTheme;
-        const activeThemeName = Object.prototype.hasOwnProperty.call(
-          astryxThemeNames,
-          activeTheme,
-        )
-          ? astryxThemeNames[activeTheme]
-          : astryxThemeNames.academic;
-        const activeMode = document.documentElement.dataset.colorMode ?? "system";
-        const knownThemeNames = Object.values(astryxThemeNames);
-
-        document.querySelectorAll("[data-astryx-theme]").forEach((element) => {
-          if (!knownThemeNames.includes(element.getAttribute("data-astryx-theme"))) return;
-          element.setAttribute("data-astryx-theme", activeThemeName);
-          if (activeMode === "system") {
-            element.removeAttribute("data-theme");
-          } else {
-            element.setAttribute("data-theme", activeMode);
-          }
-        });
-      };
-
-      const syncAppearanceThemeChoices = () => {
-        const activeTheme = document.documentElement.dataset.appearanceTheme;
-        document.querySelectorAll("[data-appearance-theme-choice]").forEach((choice) => {
-          choice.setAttribute(
-            "aria-pressed",
-            choice.getAttribute("data-appearance-theme-choice") === activeTheme ? "true" : "false",
-          );
-        });
-        syncThemeProviderAttributes();
-      };
-
-      const syncColorModeChoices = () => {
-        const activeMode = document.documentElement.dataset.colorMode ?? "system";
-        document.querySelectorAll("[data-color-mode-choice]").forEach((choice) => {
-          choice.setAttribute(
-            "aria-pressed",
-            choice.getAttribute("data-color-mode-choice") === activeMode ? "true" : "false",
-          );
-        });
-        syncThemeProviderAttributes();
-      };
-
-      document.addEventListener("click", (event) => {
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        const themeChoice = target.closest("[data-appearance-theme-choice]");
-        if (themeChoice) {
-          const theme = themeChoice.getAttribute("data-appearance-theme-choice");
-          if (theme && Object.prototype.hasOwnProperty.call(astryxThemeNames, theme)) {
-            document.documentElement.dataset.appearanceTheme = theme;
-            document.documentElement.dataset.astryxTheme = astryxThemeNames[theme];
-            try {
-              localStorage.setItem("ainigma.appearance-theme", theme);
-            } catch {
-              // The in-page preference still works when browser storage is blocked.
-            }
-            syncAppearanceThemeChoices();
-            themeChoice.closest("details")?.removeAttribute("open");
-          }
-          return;
-        }
-        const colorModeChoice = target.closest("[data-color-mode-choice]");
-        if (colorModeChoice) {
-          const mode = colorModeChoice.getAttribute("data-color-mode-choice");
-          if (mode === "system" || mode === "light" || mode === "dark") {
-            if (mode === "system") {
-              delete document.documentElement.dataset.colorMode;
-            } else {
-              document.documentElement.dataset.colorMode = mode;
-            }
-            try {
-              if (mode === "system") {
-                localStorage.removeItem("ainigma.color-mode");
-              } else {
-                localStorage.setItem("ainigma.color-mode", mode);
-              }
-            } catch {
-              // The in-page preference still works when browser storage is blocked.
-            }
-            syncColorModeChoices();
-            colorModeChoice.closest("details")?.removeAttribute("open");
-          }
-          return;
-        }
-      });
-    </script>
+    <script src="../scripts/appearance-controller.ts" />
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />

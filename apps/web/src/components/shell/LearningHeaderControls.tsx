@@ -24,7 +24,6 @@ import { localizedPath, routes, type AppPath } from "../../lib/routes";
 import ActivityCenter from "../islands/ActivityCenter";
 import AppearanceMenu from "../islands/AppearanceMenu";
 import LocaleSwitcher from "../islands/LocaleSwitcher";
-import { AppearanceThemeProvider } from "../theme/AppearanceThemeProvider";
 
 interface Props {
   currentPath: AppPath;
@@ -130,9 +129,7 @@ export default function LearningHeaderControls(props: Props) {
       locale={getAstryxLocale(props.locale)}
       messages={{ "fi-FI": fiFI }}
     >
-      <AppearanceThemeProvider>
-        <HeaderControls {...props} />
-      </AppearanceThemeProvider>
+      <HeaderControls {...props} />
     </InternationalizationProvider>
   );
 }

@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import LoginPage from "../components/pages/LoginPage";
+import SiteFooter from "../components/layout/SiteFooter.astro";
 import type { LocalAuthPersonaOption } from "../dev/dev-local-auth";
 import { safeNextPath } from "../lib/auth/redirects";
 import { getLocale, getMessages } from "../lib/i18n";
@@ -22,5 +23,8 @@ if (import.meta.env.DEV && import.meta.env.PUBLIC_AUTH_MODE === "local") {
 ---
 
 <BaseLayout title={metadata.loginTitle} description={metadata.loginDescription} {locale}>
-  <LoginPage {authError} {locale} {next} {localAuth} localAuthPersonas={localAuthPersonas} />
+  <div class="login-page-frame">
+    <LoginPage {authError} {locale} {next} {localAuth} localAuthPersonas={localAuthPersonas} />
+    <SiteFooter {locale} />
+  </div>
 </BaseLayout>

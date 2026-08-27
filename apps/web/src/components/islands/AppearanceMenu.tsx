@@ -8,7 +8,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Palette } from "lucide-react";
 import { appearanceThemes, isAppearanceTheme, isColorMode } from "../../lib/appearance";
 import { getMessages, type Locale } from "../../lib/i18n";
-import { useAppearance } from "../theme/AppearanceThemeProvider";
+import { useAppearance } from "../theme/useAppearance";
 import AppearanceThemeIcon from "../theme/AppearanceThemeIcon";
 import ColorModeIcon from "../theme/ColorModeIcon";
 

@@ -458,6 +458,13 @@ a {
   margin-block-start: auto;
 }
 
+.public-footer-frame {
+  --ainigma-public-max: 72rem;
+  width: min(100%, var(--ainigma-public-max));
+  margin-inline: auto;
+  padding-inline: var(--spacing-8);
+}
+
 .public-footer-row {
   min-height: var(--size-element-md);
 }
@@ -951,10 +958,17 @@ a {
 
 /* ── Login ────────────────────────────────────────────────────────── */
 
-.login-page {
+.login-page-frame {
+  display: flex;
   min-height: 100dvh;
+  flex-direction: column;
   --ainigma-public-max: 68rem;
   background: var(--color-background-body);
+}
+
+.login-page {
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .login-panel {
@@ -991,7 +1005,7 @@ html[data-appearance-theme="terminal"] .login-title {
   text-decoration: none;
 }
 
-.login-page > .site-footer {
+.login-page-frame > .site-footer {
   width: min(100%, var(--ainigma-public-max));
   margin-inline: auto;
   padding-inline: var(--spacing-8);
@@ -1122,7 +1136,7 @@ html[data-appearance-theme="terminal"] .login-title {
     padding: var(--spacing-4);
   }
 
-  .login-page > .site-footer {
+  .login-page-frame > .site-footer {
     padding-inline: var(--spacing-4);
   }
 

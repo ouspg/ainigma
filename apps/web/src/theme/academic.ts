@@ -79,8 +79,3 @@ export const academicTheme = defineTheme({
     },
   },
 });
-
-export const academicThemeBuilt = {
-  ...academicTheme,
-  __built: true,
-} as const;

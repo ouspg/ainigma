@@ -2,6 +2,7 @@
 import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PublicHomePage from "../components/pages/PublicHomePage";
+import SiteFooter from "../components/layout/SiteFooter.astro";
 import { getPublicCourseCatalog } from "../lib/learning/catalog";
 import { getLocale, getMessages } from "../lib/i18n";
 
@@ -17,4 +18,7 @@ const metadata = getMessages(locale).metadata;
   {locale}
 >
   <PublicHomePage {courses} {locale} />
+  <div class="public-footer-frame">
+    <SiteFooter {locale} />
+  </div>
 </BaseLayout>

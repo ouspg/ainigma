@@ -5,9 +5,7 @@ import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import fiFI from "@astryxdesign/core/locales/fi-FI.json";
 import { getAstryxLocale, type Locale } from "../../lib/i18n";
 import { routes, type AppPath } from "../../lib/routes";
-import { AppearanceThemeProvider } from "../theme/AppearanceThemeProvider";
 import PublicHeader from "./PublicHeader";
-import SiteFooter from "./SiteFooter";
 
 interface Props {
   children: ReactNode;
@@ -18,8 +16,7 @@ interface Props {
 export default function PublicPageFrame({ children, currentPath, locale }: Props) {
   return (
     <InternationalizationProvider locale={getAstryxLocale(locale)} messages={{ "fi-FI": fiFI }}>
-      <AppearanceThemeProvider>
-        <AppShell
+      <AppShell
           className={`public-shell${currentPath === routes.home.path() ? " public-home-shell" : ""}`}
           contentPadding={0}
           height="auto"
@@ -35,10 +32,8 @@ export default function PublicPageFrame({ children, currentPath, locale }: Props
         >
           <VStack className="public-page" gap={0} hAlign="stretch">
             {children}
-            {currentPath === routes.home.path() ? <SiteFooter locale={locale} /> : null}
           </VStack>
         </AppShell>
-      </AppearanceThemeProvider>
     </InternationalizationProvider>
   );
 }

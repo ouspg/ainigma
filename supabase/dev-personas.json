@@ -1,0 +1,83 @@
+[
+  {
+    "key": "emptyLearner",
+    "label": "Empty learner",
+    "description": "Signed in with no course membership or access request.",
+    "email": "empty-learner@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000003",
+    "identityId": "51000000-0000-0000-0000-000000000003",
+    "providerId": "90000003",
+    "profileLabel": "Empty Learner",
+    "memberships": []
+  },
+  {
+    "key": "pendingLearner",
+    "label": "Pending learner",
+    "description": "Has requested access to test course A.",
+    "email": "pending-learner@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000004",
+    "identityId": "51000000-0000-0000-0000-000000000004",
+    "providerId": "90000004",
+    "profileLabel": "Pending Learner",
+    "memberships": [],
+    "accessRequests": [{ "courseKey": "test-course-a-local", "reason": "development seed pending request" }]
+  },
+  {
+    "key": "memberCourseA",
+    "label": "Member · course A",
+    "description": "Has active learner access to test course A only.",
+    "email": "learner-a@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000002",
+    "identityId": "51000000-0000-0000-0000-000000000002",
+    "providerId": "90000002",
+    "profileLabel": "Ainoa · Course A",
+    "memberships": [{ "courseKey": "test-course-a-local", "role": "learner" }]
+  },
+  {
+    "key": "memberCourseB",
+    "label": "Member · course B",
+    "description": "Has active learner access to test course B only.",
+    "email": "learner-b@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000006",
+    "identityId": "51000000-0000-0000-0000-000000000006",
+    "providerId": "90000006",
+    "profileLabel": "Ainoa · Course B",
+    "memberships": [{ "courseKey": "test-course-b-local", "role": "learner" }]
+  },
+  {
+    "key": "memberBothCourses",
+    "label": "Member · both courses",
+    "description": "Has active learner access to test courses A and B.",
+    "email": "learner-both@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000007",
+    "identityId": "51000000-0000-0000-0000-000000000007",
+    "providerId": "90000007",
+    "profileLabel": "Ainoa · Both Courses",
+    "memberships": [
+      { "courseKey": "test-course-a-local", "role": "learner" },
+      { "courseKey": "test-course-b-local", "role": "learner" }
+    ]
+  },
+  {
+    "key": "instructor",
+    "label": "Instructor",
+    "description": "Has instructor access to test course A.",
+    "email": "instructor@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000005",
+    "identityId": "51000000-0000-0000-0000-000000000005",
+    "providerId": "90000005",
+    "profileLabel": "Course Instructor",
+    "memberships": [{ "courseKey": "test-course-a-local", "role": "instructor" }]
+  },
+  {
+    "key": "owner",
+    "label": "Course owner",
+    "description": "Owns the seeded test courses and can review requests.",
+    "email": "owner@local.ainigma",
+    "userId": "50000000-0000-0000-0000-000000000001",
+    "identityId": "51000000-0000-0000-0000-000000000001",
+    "providerId": "90000001",
+    "profileLabel": "Course Owner",
+    "memberships": []
+  }
+]

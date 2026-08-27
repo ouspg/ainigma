@@ -3,99 +3,96 @@ import type { CourseDefinition } from "./types";
 
 export const COURSE_DEFINITIONS = [
   {
-    slug: "software-hardware-security",
-    definitionKey: "software-hardware-security",
-    code: "IC00AJ74",
-    navMark: "CS3",
-    startDate: "2026-09-02",
-    endDate: "2026-12-13",
-    title: "Cyber Security III: Software and Hardware Security",
-    summary:
-      "A practical, hands-on course exploring software and hardware security through fuzzing, vulnerability analysis, reverse-engineering, and hardware-based attacks.",
-    catalogUrl: "https://opas.peppi.oulu.fi/en/course/IC00AJ74/34706?period=2026-2027",
-    catalogOrder: 1,
-    tone: "orange",
-    draft: false,
-    weeks: [
+    "slug": "software-hardware-security",
+    "definitionKey": "software-hardware-security",
+    "code": "IC00AJ74",
+    "navMark": "CS3",
+    "startDate": "2026-09-02",
+    "endDate": "2026-12-13",
+    "title": "Cyber Security III: Software and Hardware Security",
+    "summary": "A practical, hands-on course exploring software and hardware security through fuzzing, vulnerability analysis, reverse-engineering, and hardware-based attacks.",
+    "catalogUrl": "https://opas.peppi.oulu.fi/en/course/IC00AJ74/34706?period=2026-2027",
+    "catalogOrder": 1,
+    "tone": "orange",
+    "draft": false,
+    "weeks": [
       {
-        slug: "week-03",
-        number: 3,
-        title: "Network layers",
-        summary: "Review the layers that shape how network traffic moves through a system.",
-        tasks: [],
-      },
+        "slug": "week-03",
+        "number": 3,
+        "title": "Network layers",
+        "summary": "Review the layers that shape how network traffic moves through a system.",
+        "tasks": []
+      }
     ],
-    pages: [],
-    taskCount: 0,
+    "pages": [],
+    "taskCount": 0
   },
   {
-    slug: "test-course-a",
-    definitionKey: "test-course-a",
-    code: "IC00AAAA",
-    navMark: "SPR",
-    startDate: "2026-08-24",
-    endDate: "2026-12-13",
-    title: "Test course A:  Secure programming",
-    summary: "Build software with security properties that hold under real-world pressure.",
-    catalogUrl: null,
-    catalogOrder: 3,
-    tone: "teal",
-    draft: false,
-    weeks: [
+    "slug": "test-course-a",
+    "definitionKey": "test-course-a",
+    "code": "IC00AAAA",
+    "navMark": "SPR",
+    "startDate": "2026-08-24",
+    "endDate": "2026-12-13",
+    "title": "Test course A:  Secure programming",
+    "summary": "Build software with security properties that hold under real-world pressure.",
+    "catalogUrl": null,
+    "catalogOrder": 3,
+    "tone": "teal",
+    "draft": false,
+    "weeks": [
       {
-        slug: "week-01",
-        number: 1,
-        title: "Network forensics",
-        summary:
-          "Learn to separate observable network evidence from the explanations we build around it.",
-        tasks: [
+        "slug": "week-01",
+        "number": 1,
+        "title": "Network forensics",
+        "summary": "Learn to separate observable network evidence from the explanations we build around it.",
+        "tasks": [
           {
-            slug: "packet-traces",
-            title: "Packet traces",
-            summary:
-              "Read a short capture, isolate an anomaly, and document the evidence behind your conclusion.",
-            estimatedMinutes: 35,
-            points: 6,
-          },
-        ],
+            "slug": "packet-traces",
+            "title": "Packet traces",
+            "summary": "Read a short capture, isolate an anomaly, and document the evidence behind your conclusion.",
+            "estimatedMinutes": 35,
+            "points": 6
+          }
+        ]
       },
       {
-        slug: "week-02",
-        number: 2,
-        title: "Web protocols",
-        summary: "Prepare for the next set of exercises on HTTP semantics and proxy behavior.",
-        tasks: [],
-      },
+        "slug": "week-02",
+        "number": 2,
+        "title": "Web protocols",
+        "summary": "Prepare for the next set of exercises on HTTP semantics and proxy behavior.",
+        "tasks": []
+      }
     ],
-    pages: [
+    "pages": [
       {
-        page: "announcements",
-        title: "Announcements",
-        label: "Announcements",
+        "page": "announcements",
+        "title": "Announcements",
+        "label": "Announcements"
       },
       {
-        page: "materials",
-        title: "Reading materials",
-        label: "Reading materials",
-      },
+        "page": "materials",
+        "title": "Reading materials",
+        "label": "Reading materials"
+      }
     ],
-    taskCount: 1,
+    "taskCount": 1
   },
   {
-    slug: "test-course-b",
-    definitionKey: "test-course-b",
-    code: "IC00BBBB",
-    navMark: "ACR",
-    startDate: "2026-08-24",
-    endDate: "2026-12-13",
-    title: "Test course B: Applied cryptography",
-    summary: "A practical course in cryptographic protocols and secure systems.",
-    catalogUrl: null,
-    catalogOrder: 3,
-    tone: "blue",
-    draft: false,
-    weeks: [],
-    pages: [],
-    taskCount: 0,
-  },
+    "slug": "test-course-b",
+    "definitionKey": "test-course-b",
+    "code": "IC00BBBB",
+    "navMark": "ACR",
+    "startDate": "2026-08-24",
+    "endDate": "2026-12-13",
+    "title": "Test course B: Applied cryptography",
+    "summary": "A practical course in cryptographic protocols and secure systems.",
+    "catalogUrl": null,
+    "catalogOrder": 3,
+    "tone": "blue",
+    "draft": false,
+    "weeks": [],
+    "pages": [],
+    "taskCount": 0
+  }
 ] as const satisfies readonly CourseDefinition[];

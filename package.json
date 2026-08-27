@@ -11,10 +11,12 @@
     "build:web": "npm --workspace apps/web run build",
     "infra:typecheck": "npm --workspace infra/pulumi run typecheck",
     "supabase:start": "supabase start",
-    "supabase:reset": "supabase db reset",
+    "supabase:reset": "npm run supabase:fixtures && supabase db reset --local --yes",
+    "supabase:fixtures": "node apps/web/scripts/build-dev-auth-fixtures.mjs",
     "supabase:types": "supabase gen types typescript --local --schema public > apps/web/src/lib/supabase/database.types.ts"
   },
   "devDependencies": {
+    "js-yaml": "4.3.1",
     "supabase": "^2.115.0",
     "vite-plus": "0.3.0"
   },

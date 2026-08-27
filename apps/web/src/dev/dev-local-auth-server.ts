@@ -1,31 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabasePublicConfig } from "../lib/supabase/config";
 import type { Database } from "../lib/supabase/database.types";
-import { isLocalAuthPersona, type LocalAuthPersona } from "./dev-local-auth";
-
-interface LocalAuthPersonaRecord {
-  email: string;
-  userId: string;
-}
-
-const localAuthPersonaRecords: Record<LocalAuthPersona, LocalAuthPersonaRecord> = {
-  emptyLearner: {
-    email: "empty-learner@local.ainigma",
-    userId: "50000000-0000-0000-0000-000000000003",
-  },
-  pendingLearner: {
-    email: "pending-learner@local.ainigma",
-    userId: "50000000-0000-0000-0000-000000000004",
-  },
-  memberLearner: {
-    email: "learner@local.ainigma",
-    userId: "50000000-0000-0000-0000-000000000002",
-  },
-  owner: {
-    email: "owner@local.ainigma",
-    userId: "50000000-0000-0000-0000-000000000001",
-  },
-};
+import { isLocalAuthPersona } from "./dev-local-auth";
+import { localAuthPersonaRecords, type LocalAuthPersonaRecord } from "./dev-local-auth.generated";
 
 export function getLocalAuthPersona(value: string | null): LocalAuthPersonaRecord | null {
   return isLocalAuthPersona(value) ? localAuthPersonaRecords[value] : null;

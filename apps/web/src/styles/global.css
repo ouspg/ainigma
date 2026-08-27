@@ -973,6 +973,12 @@ a {
 
 .login-panel {
   width: min(100%, 27rem);
+  container-type: inline-size;
+}
+
+.login-title {
+  white-space: nowrap;
+  font-size: min(var(--text-heading-1-size), 7cqw) !important;
 }
 
 .login-auth-error {
@@ -984,8 +990,7 @@ html[data-appearance-theme="terminal"] .login-panel {
 }
 
 html[data-appearance-theme="terminal"] .login-title {
-  white-space: nowrap;
-  font-size: var(--font-size-2xl) !important;
+  font-size: min(var(--font-size-2xl), 5.5cqw) !important;
 }
 
 .login-center {
@@ -1038,6 +1043,10 @@ html[data-appearance-theme="terminal"] .login-title {
   }
 
   .public-page {
+    padding-inline: var(--spacing-6);
+  }
+
+  .public-footer-frame {
     padding-inline: var(--spacing-6);
   }
 
@@ -1115,10 +1124,6 @@ html[data-appearance-theme="terminal"] .login-title {
 }
 
 @media (max-width: 35rem) {
-  html[data-appearance-theme="terminal"] .login-title {
-    font-size: var(--font-size-xl) !important;
-  }
-
   .account-label {
     display: none;
   }
@@ -1128,6 +1133,10 @@ html[data-appearance-theme="terminal"] .login-title {
   }
 
   .public-page {
+    padding-inline: var(--spacing-4);
+  }
+
+  .public-footer-frame {
     padding-inline: var(--spacing-4);
   }
 
@@ -1154,6 +1163,10 @@ html[data-appearance-theme="terminal"] .login-title {
 
   .public-intro-grid {
     padding: var(--spacing-4) 0;
+  }
+
+  .public-intro-copy {
+    padding-inline: var(--spacing-2);
   }
 
   .public-alpha-note {

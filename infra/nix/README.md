@@ -65,6 +65,12 @@ To rotate encrypted values, update the live `.env`, rerun the import script, and
 
 The database data, Deno cache, storage, and Studio snippets remain under `/var/lib/ainigma/supabase` on the Cinder volume and are not written to the Nix store. Supabase's small image-managed PostgreSQL configuration uses its original Podman named volume so first-run defaults are initialized correctly. Ports `8000`, `5432`, and `6543` are temporarily exposed for setup; restrict `supabaseCidr` in Pulumi and add HTTPS before production use.
 
+The self-hosted PostgREST instance is configured with `PGRST_DB_SCHEMAS=public`; the application
+schema remains reachable only through explicitly granted RPCs and RLS policies. Database
+migrations are not run automatically by `supabase.service`: apply the repository migrations from
+a trusted administration machine over a protected PostgreSQL connection, for example with
+`supabase db push --db-url ... --include-roles`. Do not expose the database ports publicly.
+
 Automatic host deployment reads `infra/nix/flake.nix` from the repository's default GitHub branch. Merge this configuration there before relying on `nixos-upgrade.service`.
 
 ## Updating Supabase

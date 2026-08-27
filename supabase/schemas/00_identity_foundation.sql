@@ -11,19 +11,19 @@ revoke all on schema private from public, anon, authenticated;
 
 -- Application objects are private unless a migration grants access explicitly.
 alter default privileges for role postgres in schema public
-  revoke select, insert, update, delete, truncate, references, trigger on tables
-  from public, anon, authenticated;
+  revoke select, insert, update, delete, truncate, references, trigger, maintain on tables
+  from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
-  revoke usage, select, update on sequences from public, anon, authenticated;
+  revoke usage, select, update on sequences from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated;
+  revoke execute on functions from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema private
-  revoke select, insert, update, delete, truncate, references, trigger on tables
-  from public, anon, authenticated;
+  revoke select, insert, update, delete, truncate, references, trigger, maintain on tables
+  from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema private
-  revoke usage, select, update on sequences from public, anon, authenticated;
+  revoke usage, select, update on sequences from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema private
-  revoke execute on functions from public, anon, authenticated;
+  revoke execute on functions from public, anon, authenticated, service_role;
 
 do $roles$
 declare

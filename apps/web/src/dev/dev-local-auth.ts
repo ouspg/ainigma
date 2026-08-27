@@ -1,28 +1,10 @@
-export const localAuthPersonas = [
-  {
-    key: "emptyLearner",
-    label: "Empty learner",
-    description: "Signed in with no course membership or access request.",
-  },
-  {
-    key: "pendingLearner",
-    label: "Pending learner",
-    description: "Has requested access to the seeded course.",
-  },
-  {
-    key: "memberLearner",
-    label: "Member learner",
-    description: "Has active access to the seeded course.",
-  },
-  {
-    key: "owner",
-    label: "Course owner",
-    description: "Owns the seeded course and can review requests.",
-  },
-] as const;
+import {
+  localAuthPersonas,
+  type LocalAuthPersona,
+  type LocalAuthPersonaOption,
+} from "./dev-local-auth.generated";
 
-export type LocalAuthPersona = (typeof localAuthPersonas)[number]["key"];
-export type LocalAuthPersonaOption = (typeof localAuthPersonas)[number];
+export { localAuthPersonas, type LocalAuthPersona, type LocalAuthPersonaOption };
 
 export function isLocalAuthEnabled(): boolean {
   return import.meta.env.DEV && import.meta.env.PUBLIC_AUTH_MODE === "local";

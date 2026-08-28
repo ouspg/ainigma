@@ -132,6 +132,10 @@ export type Database = {
         Args: { p_offering_key: string; p_request_ids?: string[] }
         Returns: number
       }
+      get_my_course_repository: {
+        Args: { p_offering_key: string }
+        Returns: Json
+      }
       get_my_profile: {
         Args: never
         Returns: {
@@ -194,6 +198,10 @@ export type Database = {
       }
       request_course_access: {
         Args: { p_offering_key: string; p_reason?: string }
+        Returns: Json
+      }
+      request_my_course_repository: {
+        Args: { p_offering_key: string }
         Returns: Json
       }
       update_my_profile: {

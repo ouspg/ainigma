@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(30);
+select extensions.plan(34);
 
 select extensions.has_table('public', 'profiles', 'profiles table exists');
 select extensions.has_table('private', 'auth_user_links', 'Auth link table exists');
@@ -294,6 +294,22 @@ select extensions.ok(
   'anonymous users cannot call the profile RPC'
 );
 select extensions.ok(
+  has_function_privilege('authenticated', 'public.get_my_course_repository(text)', 'EXECUTE'),
+  'authenticated users can inspect their course repository request'
+);
+select extensions.ok(
+  not has_function_privilege('anon', 'public.get_my_course_repository(text)', 'EXECUTE'),
+  'anonymous users cannot inspect course repository requests'
+);
+select extensions.ok(
+  has_function_privilege('authenticated', 'public.request_my_course_repository(text)', 'EXECUTE'),
+  'authenticated users can request their course repository'
+);
+select extensions.ok(
+  not has_function_privilege('anon', 'public.request_my_course_repository(text)', 'EXECUTE'),
+  'anonymous users cannot request course repositories'
+);
+select extensions.ok(
   not exists (
     select 1
     from pg_proc as function_row
@@ -304,7 +320,9 @@ select extensions.ok(
         'get_my_profile',
         'update_my_profile',
         'list_my_courses',
-        'list_course_roster'
+        'list_course_roster',
+        'get_my_course_repository',
+        'request_my_course_repository'
       )
       and pg_catalog.oidvectortypes(function_row.proargtypes) like '%uuid%'
   ),

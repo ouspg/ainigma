@@ -13,7 +13,7 @@ interface Props {
 
 export default function CourseUpdatesList({ announcements, courses, locale }: Props) {
   const copy = getMessages(locale).dashboard;
-  const courseBySlug = new Map(courses.map((course) => [course.slug, course]));
+  const courseByOfferingKey = new Map(courses.map((course) => [course.offeringKey, course]));
 
   return (
     <List
@@ -22,7 +22,7 @@ export default function CourseUpdatesList({ announcements, courses, locale }: Pr
       header={<Text className="visually-hidden">{copy.courseUpdates}</Text>}
     >
       {announcements.map((announcement) => {
-        const course = courseBySlug.get(announcement.courseSlug);
+        const course = courseByOfferingKey.get(announcement.offeringKey);
         return (
           <ListItem
             description={

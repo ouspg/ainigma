@@ -2,9 +2,14 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(38);
+select extensions.plan(45);
 
 select extensions.has_table('public', 'courses', 'courses table exists');
+select extensions.has_table(
+  'private',
+  'course_definition_releases',
+  'course definition releases table exists'
+);
 select extensions.has_table('public', 'course_memberships', 'course membership table exists');
 select extensions.has_table('private', 'course_membership_events', 'membership audit table exists');
 select extensions.ok(
@@ -83,24 +88,117 @@ select set_config(
 );
 
 grant ainigma_maintenance to postgres;
+insert into private.course_definition_github_organizations (
+  course_definition_key,
+  github_org_id,
+  github_org_slug
+)
+values
+  ('security-fundamentals', 88000001, 'security-test-org'),
+  ('unrelated-course', 88000002, 'unrelated-test-org');
 set role ainigma_maintenance;
-select private.create_course_with_initial_owner(
+select set_config(
+  'ainigma_test.security_release_id',
+  private.register_course_definition_release(
+    'security-fundamentals',
+    '1111111111111111111111111111111111111111',
+    '1111111111111111111111111111111111111111111111111111111111111111',
+    'test:security-fundamentals:release-1'
+  )::text,
+  true
+);
+select set_config(
+  'ainigma_test.unrelated_release_id',
+  private.register_course_definition_release(
+    'unrelated-course',
+    '2222222222222222222222222222222222222222',
+    '2222222222222222222222222222222222222222222222222222222222222222',
+    'test:unrelated-course:release-1'
+  )::text,
+  true
+);
+select private.branch_course_offering(
   'security-fundamentals-2026-test',
-  'security-fundamentals',
+  current_setting('ainigma_test.security_release_id')::uuid,
   'SEC-TEST',
   current_setting('ainigma_test.owner_profile_id')::uuid
 );
-select private.create_course_with_initial_owner(
+select private.branch_course_offering(
   'unrelated-course-2026-test',
-  'unrelated-course',
+  current_setting('ainigma_test.unrelated_release_id')::uuid,
   'OTHER',
+  current_setting('ainigma_test.outsider_profile_id')::uuid
+);
+select private.branch_course_offering(
+  'security-fundamentals-2027-test',
+  current_setting('ainigma_test.security_release_id')::uuid,
+  'SEC-NEXT',
   current_setting('ainigma_test.outsider_profile_id')::uuid
 );
 reset role;
 
+select extensions.is(
+  (
+    select count(*)::bigint
+    from public.courses
+    where course_definition_key = 'security-fundamentals'
+  ),
+  2::bigint,
+  'multiple course offerings may share one authored course definition'
+);
+
+update public.courses
+set status = 'archived'
+where offering_key = 'security-fundamentals-2027-test';
+
+set role ainigma_maintenance;
+select set_config(
+  'ainigma_test.next_security_release_id',
+  private.register_course_definition_release(
+    'security-fundamentals',
+    '3333333333333333333333333333333333333333',
+    '3333333333333333333333333333333333333333333333333333333333333333',
+    'test:security-fundamentals:release-2'
+  )::text,
+  true
+);
+select set_config(
+  'ainigma_test.advanced_offering_count',
+  private.advance_open_course_offerings_to_release(
+    current_setting('ainigma_test.next_security_release_id')::uuid
+  )::text,
+  true
+);
+reset role;
+
+select extensions.is(
+  current_setting('ainigma_test.advanced_offering_count')::integer,
+  1,
+  'the compiler advances only the open offering of a course definition'
+);
+
+select extensions.is(
+  (
+    select course_definition_release_id
+    from public.courses
+    where offering_key = 'security-fundamentals-2026-test'
+  ),
+  current_setting('ainigma_test.next_security_release_id')::uuid,
+  'an open offering follows the newly published definition release'
+);
+select extensions.is(
+  (
+    select course_definition_release_id
+    from public.courses
+    where offering_key = 'security-fundamentals-2027-test'
+  ),
+  current_setting('ainigma_test.security_release_id')::uuid,
+  'an archived offering retains the release from which it branched'
+);
+
 select set_config(
   'ainigma_test.course_id',
-  (select id::text from public.courses where course_key = 'security-fundamentals-2026-test'),
+  (select id::text from public.courses where offering_key = 'security-fundamentals-2026-test'),
   true
 );
 
@@ -159,7 +257,7 @@ select extensions.ok(
 reset role;
 update public.courses
 set status = 'published'
-where course_key = 'security-fundamentals-2026-test';
+where offering_key = 'security-fundamentals-2026-test';
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
@@ -194,10 +292,21 @@ select extensions.is(
   (
     select count(*)::bigint
     from jsonb_array_elements(public.list_my_courses()->'courses') as course
-    where course->>'course_key' = 'security-fundamentals-2026-test'
+    where course->>'offering_key' = 'security-fundamentals-2026-test'
   ),
   0::bigint,
   'a member of another course cannot see this course'
+);
+select extensions.is(
+  (
+    select count(*)::bigint
+    from jsonb_array_elements(public.list_my_courses()->'courses') as course
+    where course->>'offering_key' = 'security-fundamentals-2027-test'
+      and course->>'course_definition_release_id' =
+        current_setting('ainigma_test.security_release_id')
+  ),
+  1::bigint,
+  'a member retains access to an archived offering at its retained release'
 );
 
 reset role;
@@ -422,6 +531,12 @@ select extensions.throws_ok(
   '55000',
   null,
   'membership audit events are immutable'
+);
+select extensions.throws_ok(
+  $$update private.course_definition_releases set artifact_ref = 'tampered'$$,
+  '55000',
+  null,
+  'course definition releases are immutable'
 );
 select extensions.ok(
   not has_table_privilege('authenticated', 'public.courses', 'SELECT'),

@@ -36,7 +36,9 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const activeCourseKey = courses.find((course) => currentPath.startsWith(course.href))?.slug;
+  const activeCourseKey = courses.find((course) =>
+    currentPath.startsWith(course.href),
+  )?.offeringKey;
   const [expandedCourseKey, setExpandedCourseKey] = useState<string | undefined>(activeCourseKey);
 
   useEffect(() => {
@@ -45,7 +47,10 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
 
   const activeWeekKey = courses
     .flatMap((course) =>
-      course.weeks.map((week) => ({ key: `${course.slug}/${week.slug}`, href: week.href })),
+      course.weeks.map((week) => ({
+        key: `${course.offeringKey}/${week.slug}`,
+        href: week.href,
+      })),
     )
     .find(({ href }) => currentPath.startsWith(href))?.key;
   const [expandedWeekKey, setExpandedWeekKey] = useState<string | undefined>(activeWeekKey);
@@ -96,9 +101,9 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
         {...(hasChildren
           ? {
               collapsible: {
-                isCollapsed: expandedCourseKey !== course.slug,
+                isCollapsed: expandedCourseKey !== course.offeringKey,
                 onCollapsedChange: (isCollapsed) =>
-                  setExpandedCourseKey(isCollapsed ? undefined : course.slug),
+                  setExpandedCourseKey(isCollapsed ? undefined : course.offeringKey),
               },
             }
           : {})}
@@ -116,9 +121,9 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
           />
         }
         isSelected={currentPath === course.href}
-        key={course.slug}
+        key={course.offeringKey}
         label={course.title}
-        onClick={() => setExpandedCourseKey(course.slug)}
+        onClick={() => setExpandedCourseKey(course.offeringKey)}
       >
         {hasChildren ? (
           <>
@@ -136,10 +141,10 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
                 {...(week.tasks.length > 0
                   ? {
                       collapsible: {
-                        isCollapsed: expandedWeekKey !== `${course.slug}/${week.slug}`,
+                        isCollapsed: expandedWeekKey !== `${course.offeringKey}/${week.slug}`,
                         onCollapsedChange: (isCollapsed) =>
                           setExpandedWeekKey(
-                            isCollapsed ? undefined : `${course.slug}/${week.slug}`,
+                            isCollapsed ? undefined : `${course.offeringKey}/${week.slug}`,
                           ),
                       },
                     }

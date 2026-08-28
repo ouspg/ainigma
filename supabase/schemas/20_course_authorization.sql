@@ -91,6 +91,10 @@ $function$;
 create trigger course_membership_events_reject_mutation
 before update or delete on private.course_membership_events
 for each row execute function private.reject_mutation();
+
+create trigger course_definition_releases_reject_mutation
+before update or delete on private.course_definition_releases
+for each row execute function private.reject_mutation();
 create table private.course_access_requests (
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references public.courses (id) on delete restrict,
@@ -117,7 +121,9 @@ create table private.course_access_requests (
     (status in ('pending', 'cancelled') and decided_at is null and decided_by is null)
     or (status = 'approved' and decided_at is not null and (decided_by is not null or decision_source = 'allowlist'))
     or (status = 'rejected' and decided_at is not null and decided_by is not null and decision_source = 'owner')
-  )
+  ),
+  constraint course_access_requests_id_course_profile_unique
+    unique (id, course_id, requester_profile_id)
 );
 
 create unique index course_access_requests_pending_uidx
@@ -192,7 +198,7 @@ create index course_roster_allowlist_course_idx
 create table private.github_course_access (
   course_id uuid not null references public.courses (id) on delete restrict,
   profile_id uuid not null references public.profiles (id) on delete restrict,
-  access_request_id uuid not null references private.course_access_requests (id) on delete restrict,
+  access_request_id uuid not null,
   github_org_id bigint,
   github_org_slug text,
   github_user_id text not null,
@@ -218,7 +224,16 @@ create table private.github_course_access (
   ),
   constraint github_course_access_failure_check check (
     failure_code is null or (failure_code = btrim(failure_code) and char_length(failure_code) between 1 and 255)
-  )
+  ),
+  constraint github_course_access_request_course_profile_fk foreign key (
+    access_request_id,
+    course_id,
+    profile_id
+  ) references private.course_access_requests (
+    id,
+    course_id,
+    requester_profile_id
+  ) on delete restrict
 );
 
 create unique index github_course_access_request_uidx
@@ -304,9 +319,94 @@ begin
 end
 $function$;
 
-create function private.create_course_with_initial_owner(
-  p_course_key text,
-  p_definition_key text,
+create function private.register_course_definition_release(
+  p_course_definition_key text,
+  p_source_commit_sha text,
+  p_course_release_digest text,
+  p_artifact_ref text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_release private.course_definition_releases%rowtype;
+begin
+  insert into private.course_definition_releases (
+    course_definition_key,
+    source_commit_sha,
+    course_release_digest,
+    artifact_ref
+  )
+  values (
+    p_course_definition_key,
+    p_source_commit_sha,
+    p_course_release_digest,
+    p_artifact_ref
+  )
+  on conflict (course_definition_key, course_release_digest) do nothing
+  returning * into v_release;
+
+  if v_release.id is null then
+    select release.*
+    into strict v_release
+    from private.course_definition_releases as release
+    where release.course_definition_key = p_course_definition_key
+      and release.course_release_digest = p_course_release_digest;
+
+    if v_release.source_commit_sha <> p_source_commit_sha
+      or v_release.artifact_ref <> p_artifact_ref
+    then
+      raise exception using
+        errcode = '23505',
+        message = 'course_definition_release_metadata_mismatch';
+    end if;
+  end if;
+
+  return v_release.id;
+end
+$function$;
+
+-- The Ainigma compiler calls this after admitting and deploying a release. Ended offerings are
+-- represented by the archived status and deliberately retain their existing release pointer.
+create function private.advance_open_course_offerings_to_release(
+  p_course_definition_release_id uuid
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_course_definition_key text;
+  v_updated_count integer;
+begin
+  select release.course_definition_key
+  into v_course_definition_key
+  from private.course_definition_releases as release
+  where release.id = p_course_definition_release_id;
+
+  if v_course_definition_key is null then
+    raise exception using errcode = '23503', message = 'course_definition_release_not_found';
+  end if;
+
+  update public.courses as course
+  set course_definition_release_id = p_course_definition_release_id
+  where course.course_definition_key = v_course_definition_key
+    and course.status <> 'archived'
+    and course.course_definition_release_id <> p_course_definition_release_id;
+
+  get diagnostics v_updated_count = row_count;
+  return v_updated_count;
+end
+$function$;
+
+-- Branching is a compiler/control-plane operation. It creates a new operational space and owner
+-- membership from an exact existing definition release; it never copies the source directory.
+create function private.branch_course_offering(
+  p_offering_key text,
+  p_course_definition_release_id uuid,
   p_code text,
   p_owner_profile_id uuid,
   p_starts_at timestamptz default null,
@@ -320,7 +420,17 @@ set search_path = ''
 as $function$
 declare
   v_course_id uuid;
+  v_course_definition_key text;
 begin
+  select release.course_definition_key
+  into v_course_definition_key
+  from private.course_definition_releases as release
+  where release.id = p_course_definition_release_id;
+
+  if v_course_definition_key is null then
+    raise exception using errcode = '23503', message = 'course_definition_release_not_found';
+  end if;
+
   if not exists (
     select 1 from public.profiles as profile where profile.id = p_owner_profile_id
   ) then
@@ -328,16 +438,18 @@ begin
   end if;
 
   insert into public.courses (
-    course_key,
-    definition_key,
+    offering_key,
+    course_definition_key,
+    course_definition_release_id,
     code,
     starts_at,
     ends_at,
     external_url
   )
   values (
-    p_course_key,
-    p_definition_key,
+    p_offering_key,
+    v_course_definition_key,
+    p_course_definition_release_id,
     p_code,
     p_starts_at,
     p_ends_at,
@@ -701,8 +813,9 @@ begin
       (
         select jsonb_agg(
           jsonb_build_object(
-            'course_key', course.course_key,
-            'definition_key', course.definition_key,
+            'offering_key', course.offering_key,
+            'course_definition_key', course.course_definition_key,
+            'course_definition_release_id', course.course_definition_release_id,
             'code', course.code,
             'course_status', course.status,
             'membership_role', membership.role,
@@ -713,7 +826,7 @@ begin
             'created_at', course.created_at,
             'updated_at', course.updated_at
           )
-          order by course.course_key
+          order by course.offering_key
         )
         from public.courses as course
         join public.course_memberships as membership
@@ -721,7 +834,7 @@ begin
         where membership.profile_id = v_profile_id
           and membership.status = 'active'
           and (
-            course.status = 'published'
+            course.status in ('published', 'archived')
             or (
               course.status = 'draft'
               and membership.role in ('owner', 'instructor')
@@ -734,7 +847,8 @@ begin
       (
         select jsonb_agg(
           jsonb_build_object(
-            'course_key', course.course_key,
+            'offering_key', course.offering_key,
+            'course_definition_release_id', course.course_definition_release_id,
             'course_status', course.status,
             'membership_role', membership.role,
             'membership_status', membership.status,
@@ -742,7 +856,7 @@ begin
             'suspended_at', membership.suspended_at,
             'revoked_at', membership.revoked_at
           )
-          order by course.course_key
+          order by course.offering_key
         )
         from public.courses as course
         join public.course_memberships as membership
@@ -751,7 +865,7 @@ begin
           and not (
             membership.status = 'active'
             and (
-              course.status = 'published'
+              course.status in ('published', 'archived')
               or (
                 course.status = 'draft'
                 and membership.role in ('owner', 'instructor')
@@ -765,7 +879,7 @@ begin
 end
 $function$;
 
-create function public.list_course_roster(p_course_key text)
+create function public.list_course_roster(p_offering_key text)
 returns table (
   display_name text,
   role text,
@@ -785,7 +899,7 @@ begin
   select course.id
   into v_course_id
   from public.courses as course
-  where course.course_key = p_course_key;
+  where course.offering_key = p_offering_key;
 
   -- Use one response for missing and unauthorized courses to avoid revealing
   -- whether an offering exists through the RPC.
@@ -810,7 +924,7 @@ begin
   order by membership.created_at, profile.id;
 end
 $function$;
-create function public.request_course_access(p_course_key text, p_reason text default null)
+create function public.request_course_access(p_offering_key text, p_reason text default null)
 returns jsonb
 language plpgsql
 security definer
@@ -831,7 +945,7 @@ begin
   select course.id, course.enrollment_mode
   into v_course_id, v_enrollment_mode
   from public.courses as course
-  where course.course_key = p_course_key
+  where course.offering_key = p_offering_key
     and course.status = 'published';
 
   if v_course_id is null then
@@ -849,7 +963,7 @@ begin
     and membership.profile_id = v_profile_id;
 
   if found and v_membership.status = 'active' then
-    return jsonb_build_object('state', 'active', 'course_key', p_course_key);
+    return jsonb_build_object('state', 'active', 'offering_key', p_offering_key);
   end if;
 
   select request_row.*
@@ -863,7 +977,7 @@ begin
   if found and v_request.status in ('pending', 'approved') then
     return jsonb_build_object(
       'state', case when v_request.status = 'approved' then 'awaiting_github_access' else 'pending' end,
-      'course_key', p_course_key,
+      'offering_key', p_offering_key,
       'request_id', v_request.id
     );
   end if;
@@ -930,14 +1044,14 @@ begin
 
     return jsonb_build_object(
       'state', 'awaiting_github_access',
-      'course_key', p_course_key,
+      'offering_key', p_offering_key,
       'request_id', v_request.id
     );
   end if;
 
   return jsonb_build_object(
     'state', 'pending',
-    'course_key', p_course_key,
+    'offering_key', p_offering_key,
     'request_id', v_request.id
   );
 end
@@ -945,7 +1059,7 @@ $function$;
 
 create function public.list_my_course_access_requests()
 returns table (
-  course_key text,
+  offering_key text,
   request_id uuid,
   status text,
   reason text,
@@ -959,7 +1073,7 @@ security definer
 set search_path = ''
 as $function$
   select
-    course.course_key,
+    course.offering_key,
     request_row.id,
     request_row.status,
     request_row.reason,
@@ -975,13 +1089,13 @@ as $function$
 $function$;
 
 create function public.list_course_access_requests(
-  p_course_key text,
+  p_offering_key text,
   p_status text default 'pending',
   p_authorization_filter text default null
 )
 returns table (
   request_id uuid,
-  course_key text,
+  offering_key text,
   display_name text,
   github_username text,
   verified_email text,
@@ -1003,7 +1117,7 @@ declare
 begin
   select course.id into v_course_id
   from public.courses as course
-  where course.course_key = p_course_key;
+  where course.offering_key = p_offering_key;
 
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
@@ -1012,7 +1126,7 @@ begin
   return query
   select
     request_row.id,
-    course.course_key,
+    course.offering_key,
     profile.display_name,
     (
       select identifier.normalized_value
@@ -1093,7 +1207,7 @@ end
 $function$;
 
 create function public.approve_course_access_requests(
-  p_course_key text,
+  p_offering_key text,
   p_request_ids uuid[] default null
 )
 returns integer
@@ -1106,7 +1220,9 @@ declare
   v_actor_profile_id uuid := private.current_profile_id();
   v_count integer;
 begin
-  select course.id into v_course_id from public.courses as course where course.course_key = p_course_key;
+  select course.id into v_course_id
+  from public.courses as course
+  where course.offering_key = p_offering_key;
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -1165,7 +1281,7 @@ end
 $function$;
 
 create function public.reject_course_access_requests(
-  p_course_key text,
+  p_offering_key text,
   p_request_ids uuid[] default null,
   p_decision_reason text default null
 )
@@ -1179,7 +1295,9 @@ declare
   v_actor_profile_id uuid := private.current_profile_id();
   v_count integer;
 begin
-  select course.id into v_course_id from public.courses as course where course.course_key = p_course_key;
+  select course.id into v_course_id
+  from public.courses as course
+  where course.offering_key = p_offering_key;
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -1213,6 +1331,7 @@ as $function$
 declare
   v_access private.github_course_access%rowtype;
   v_request private.course_access_requests%rowtype;
+  v_expected_github_org_id bigint;
 begin
   select access_row.* into v_access
   from private.github_course_access as access_row
@@ -1225,6 +1344,16 @@ begin
   from private.course_access_requests as request_row
   where request_row.id = v_access.access_request_id and request_row.status = 'approved';
   if not found then raise exception using errcode = '42501', message = 'course_access_not_approved'; end if;
+
+  select organization.github_org_id into v_expected_github_org_id
+  from public.courses as course
+  join private.course_definition_github_organizations as organization
+    on organization.course_definition_key = course.course_definition_key
+  where course.id = p_course_id;
+
+  if not found or p_github_org_id is distinct from v_expected_github_org_id then
+    raise exception using errcode = '42501', message = 'github_organization_mismatch';
+  end if;
 
   if not exists (
     select 1 from private.profile_identifiers as identifier
@@ -1271,7 +1400,8 @@ end
 $function$;
 -- The function owner receives only the relation access needed by the
 -- security-definer functions. It cannot authenticate directly.
-grant usage on schema public, private to ainigma_function_owner;
+grant select, insert on private.course_definition_releases to ainigma_function_owner;
+grant select on private.course_definition_github_organizations to ainigma_function_owner;
 grant select, insert, update on public.courses to ainigma_function_owner;
 grant select, insert, update on public.course_memberships to ainigma_function_owner;
 grant select, insert on private.course_membership_events to ainigma_function_owner;
@@ -1279,11 +1409,12 @@ grant usage, select on sequence private.course_membership_events_id_seq to ainig
 grant select, insert, update on private.course_access_requests to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.course_roster_allowlist to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.github_course_access to ainigma_function_owner, ainigma_maintenance;
-grant create on schema public, private to ainigma_function_owner;
 
 alter function private.has_course_role(uuid, text[]) owner to ainigma_function_owner;
 alter function private.can_view_profile(uuid) owner to ainigma_function_owner;
-alter function private.create_course_with_initial_owner(text, text, text, uuid, timestamptz, timestamptz, text) owner to ainigma_function_owner;
+alter function private.register_course_definition_release(text, text, text, text) owner to ainigma_function_owner;
+alter function private.advance_open_course_offerings_to_release(uuid) owner to ainigma_function_owner;
+alter function private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text) owner to ainigma_function_owner;
 alter function private.add_course_membership(uuid, uuid, text, uuid, text) owner to ainigma_function_owner;
 alter function private.transition_course_membership(uuid, uuid, text, text, uuid, text) owner to ainigma_function_owner;
 alter function private.transfer_course_ownership(uuid, uuid, uuid, text) owner to ainigma_function_owner;
@@ -1295,13 +1426,14 @@ alter function public.list_my_course_access_requests() owner to ainigma_function
 alter function public.list_course_access_requests(text, text, text) owner to ainigma_function_owner;
 alter function public.approve_course_access_requests(text, uuid[]) owner to ainigma_function_owner;
 alter function public.reject_course_access_requests(text, uuid[], text) owner to ainigma_function_owner;
-revoke create on schema public, private from ainigma_function_owner;
 
 revoke all on function
   private.reject_mutation(),
   private.has_course_role(uuid, text[]),
   private.can_view_profile(uuid),
-  private.create_course_with_initial_owner(text, text, text, uuid, timestamptz, timestamptz, text),
+  private.register_course_definition_release(text, text, text, text),
+  private.advance_open_course_offerings_to_release(uuid),
+  private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text),
   private.add_course_membership(uuid, uuid, text, uuid, text),
   private.transition_course_membership(uuid, uuid, text, text, uuid, text),
   private.transfer_course_ownership(uuid, uuid, uuid, text),
@@ -1325,7 +1457,9 @@ grant execute on function private.sync_auth_identity(uuid) to ainigma_maintenanc
 grant execute on function private.reconcile_auth_users() to ainigma_maintenance;
 grant execute on function private.reconcile_auth_identities() to ainigma_maintenance;
 grant execute on function private.report_identity_anomalies() to ainigma_maintenance;
-grant execute on function private.create_course_with_initial_owner(text, text, text, uuid, timestamptz, timestamptz, text) to ainigma_maintenance;
+grant execute on function private.register_course_definition_release(text, text, text, text) to ainigma_maintenance;
+grant execute on function private.advance_open_course_offerings_to_release(uuid) to ainigma_maintenance;
+grant execute on function private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text) to ainigma_maintenance;
 grant execute on function private.add_course_membership(uuid, uuid, text, uuid, text) to ainigma_maintenance;
 grant execute on function private.transition_course_membership(uuid, uuid, text, text, uuid, text) to ainigma_maintenance;
 grant execute on function private.transfer_course_ownership(uuid, uuid, uuid, text) to ainigma_maintenance;

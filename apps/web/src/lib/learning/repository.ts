@@ -1,27 +1,42 @@
 import { z } from "astro/zod";
 import rawLearning from "../../data/learning.json";
-import { isCourseDefinitionKey, type CourseDefinitionKey } from "./identifiers";
+import {
+  isCourseDefinitionKey,
+  isCourseDefinitionReleaseId,
+  isCourseOfferingKey,
+  type CourseDefinitionKey,
+  type CourseDefinitionReleaseId,
+  type CourseOfferingKey,
+} from "./identifiers";
 
 const statusSchema = z.enum(["not-started", "in-progress", "completed"]);
 const courseDefinitionKeySchema = z
   .string()
   .refine(isCourseDefinitionKey, "Invalid course definition key")
   .transform((value): CourseDefinitionKey => value);
+const courseOfferingKeySchema = z
+  .string()
+  .refine(isCourseOfferingKey, "Invalid course offering key")
+  .transform((value): CourseOfferingKey => value);
+const courseDefinitionReleaseIdSchema = z
+  .string()
+  .refine(isCourseDefinitionReleaseId, "Invalid course definition release ID")
+  .transform((value): CourseDefinitionReleaseId => value);
 const courseRouteTargetSchema = z.discriminatedUnion("route", [
-  z.object({ route: z.literal("course"), course: courseDefinitionKeySchema }),
+  z.object({ route: z.literal("course"), offeringKey: courseOfferingKeySchema }),
   z.object({
     route: z.literal("coursePage"),
-    course: courseDefinitionKeySchema,
+    offeringKey: courseOfferingKeySchema,
     page: z.enum(["announcements", "materials"]),
   }),
   z.object({
     route: z.literal("courseWeek"),
-    course: courseDefinitionKeySchema,
+    offeringKey: courseOfferingKeySchema,
     week: z.string().min(1),
   }),
   z.object({
     route: z.literal("courseTask"),
-    course: courseDefinitionKeySchema,
+    offeringKey: courseOfferingKeySchema,
     week: z.string().min(1),
     task: z.string().min(1),
   }),
@@ -39,7 +54,7 @@ const nextActivitySchema = z.object({
 });
 
 const linkedCourseItemSchema = {
-  courseDefinitionKey: courseDefinitionKeySchema,
+  offeringKey: courseOfferingKeySchema,
   target: courseRouteTargetSchema,
 };
 
@@ -52,10 +67,13 @@ const learningSchema = z.object({
     completedActivities: z.number().int().nonnegative(),
     totalActivities: z.number().int().positive(),
   }),
-  courses: z.record(
-    courseDefinitionKeySchema,
+  courseOfferings: z.record(
+    courseOfferingKeySchema,
     z.object({
-      courseKey: z.string().min(1),
+      courseDefinitionKey: courseDefinitionKeySchema,
+      courseDefinitionReleaseId: courseDefinitionReleaseIdSchema,
+      startDate: z.string().date(),
+      endDate: z.string().date(),
       progress: z.number().min(0).max(100),
       status: statusSchema,
       earnedPoints: z.number().nonnegative(),
@@ -99,11 +117,13 @@ const learningSchema = z.object({
 });
 
 export type LearningSnapshot = z.infer<typeof learningSchema>;
-type CourseSnapshot = LearningSnapshot["courses"][CourseDefinitionKey];
+type CourseOfferingSnapshot = LearningSnapshot["courseOfferings"][CourseOfferingKey];
 
 export interface LearningRepository {
   getSnapshot(): Promise<LearningSnapshot>;
-  getCourseSnapshot(definitionKey: CourseDefinitionKey): Promise<CourseSnapshot | undefined>;
+  getCourseOfferingSnapshot(
+    offeringKey: CourseOfferingKey,
+  ): Promise<CourseOfferingSnapshot | undefined>;
 }
 
 const learningSnapshot = learningSchema.parse(rawLearning);
@@ -115,14 +135,15 @@ export const learningRepository: LearningRepository = {
     return learningSnapshot;
   },
 
-  async getCourseSnapshot(definitionKey) {
-    return learningSnapshot.courses[definitionKey];
+  async getCourseOfferingSnapshot(offeringKey) {
+    return learningSnapshot.courseOfferings[offeringKey];
   },
 };
 
 export const getLearningSnapshot = (): Promise<LearningSnapshot> =>
   learningRepository.getSnapshot();
 
-export const getCourseSnapshot = (
-  definitionKey: CourseDefinitionKey,
-): Promise<CourseSnapshot | undefined> => learningRepository.getCourseSnapshot(definitionKey);
+export const getCourseOfferingSnapshot = (
+  offeringKey: CourseOfferingKey,
+): Promise<CourseOfferingSnapshot | undefined> =>
+  learningRepository.getCourseOfferingSnapshot(offeringKey);

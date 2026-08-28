@@ -30,6 +30,6 @@ export function CourseMark({ href, isCollapsed, mark }: CourseMarkProps) {
   );
 }
 
-export function getCourseIcon(_slug: string) {
+export function getCourseIcon(_courseDefinitionSlug: string) {
   return GraduationCap;
 }

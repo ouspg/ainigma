@@ -16,7 +16,6 @@ select extensions.ok(
   not (select rolbypassrls from pg_roles where rolname = 'ainigma_function_owner'),
   'function owner does not bypass RLS'
 );
-
 insert into auth.users (
   id,
   aud,

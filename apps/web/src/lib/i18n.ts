@@ -50,7 +50,7 @@ export interface AppMessages {
     accessSectionLabel: string;
     access: string;
     accessText: string;
-    viewCourse: string;
+    openLearningDesk: string;
     peppi: string;
     peppiCourse: string;
     opensInNewTab: string;
@@ -243,7 +243,7 @@ const en: AppMessages = {
     access: "Access",
     accessText:
       "Use the GitHub account linked to your university email. To access courses, authenticate through the University of Oulu GitHub Enterprise SSO. If an expected course is missing, contact the course staff.",
-    viewCourse: "View course",
+    openLearningDesk: "Open learning desk",
     peppi: "Peppi study guide",
     peppiCourse: "Peppi",
     opensInNewTab: "(opens in a new tab)",
@@ -450,7 +450,7 @@ const fi: AppMessages = {
     access: "Käyttöoikeus",
     accessText:
       "Opiskelijat kirjautuvat kurssilleen ilmoittautumiseen liitetyllä GitHub-tunnuksella. Jos odottamasi kurssi ei ole käytettävissä, ota yhteyttä kurssin henkilökuntaan.",
-    viewCourse: "Näytä kurssi",
+    openLearningDesk: "Avaa oppimisnäkymä",
     peppi: "Peppi-opas",
     peppiCourse: "Peppi",
     opensInNewTab: "(avautuu uuteen välilehteen)",

@@ -8,6 +8,7 @@ export default defineConfig({
       "**/.codex/**",
       "**/dist/**",
       "**/*.generated.css",
+      "**/*.generated.ts",
       "**/database.types.ts",
     ],
   },

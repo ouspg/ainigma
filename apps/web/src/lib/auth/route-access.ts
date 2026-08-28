@@ -1,10 +1,9 @@
 import type { APIContext } from "astro";
 import { getLocale } from "../i18n";
-import { parseCourseDefinitionKey } from "../learning/identifiers";
 import { COURSE_DEFINITIONS } from "../learning/course-manifest.generated";
 import { routes, type AppRouteMatch } from "../routes";
 import { createServerSupabaseClient } from "../supabase/server";
-import { hasCourseAccess } from "./course-access";
+import { findAuthorizedCourseOffering } from "./course-access";
 import { routeRequiresPrivateResponse } from "./private-response";
 import { loadStudentProfile } from "./profile";
 import { safeNextPath, signInPath } from "./redirects";
@@ -66,17 +65,8 @@ export async function authorizeRouteRequest(
 
   if (route.access !== "courseMember") return null;
 
-  const courseSlug = route.params.course;
-  if (!courseSlug) {
-    return rewriteToStatus(context, 404);
-  }
-  const courseDefinition = COURSE_DEFINITIONS.find(
-    (definition) => definition.slug === courseSlug && !definition.draft,
-  );
-  const courseDefinitionKey = courseDefinition
-    ? parseCourseDefinitionKey(courseDefinition.definitionKey)
-    : null;
-  if (!courseDefinitionKey) {
+  const offeringKey = route.params.offeringKey;
+  if (!offeringKey) {
     return rewriteToStatus(context, 404);
   }
 
@@ -90,5 +80,20 @@ export async function authorizeRouteRequest(
     return rewriteToStatus(context, 503);
   }
 
-  return hasCourseAccess(courseAccess, courseDefinitionKey) ? null : rewriteToStatus(context, 403);
+  const authorizedOffering = findAuthorizedCourseOffering(courseAccess, offeringKey);
+  if (!authorizedOffering) {
+    return rewriteToStatus(context, 403);
+  }
+
+  const courseDefinition = COURSE_DEFINITIONS.find(
+    (definition) =>
+      definition.courseDefinitionKey === authorizedOffering.courseDefinitionKey &&
+      !definition.draft,
+  );
+  if (!courseDefinition) {
+    return rewriteToStatus(context, 404);
+  }
+
+  context.locals.authorizedCourseOffering = authorizedOffering;
+  return null;
 }

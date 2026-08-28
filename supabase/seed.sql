@@ -31,7 +31,7 @@ select set_config(
     "memberships": [],
     "accessRequests": [
       {
-        "courseKey": "test-course-a-local",
+        "offeringKey": "test-course-a-local",
         "reason": "development seed pending request"
       }
     ]
@@ -47,7 +47,7 @@ select set_config(
     "profileLabel": "Ainoa · Course A",
     "memberships": [
       {
-        "courseKey": "test-course-a-local",
+        "offeringKey": "test-course-a-local",
         "role": "learner"
       }
     ]
@@ -63,7 +63,7 @@ select set_config(
     "profileLabel": "Ainoa · Course B",
     "memberships": [
       {
-        "courseKey": "test-course-b-local",
+        "offeringKey": "test-course-b-local",
         "role": "learner"
       }
     ]
@@ -79,11 +79,11 @@ select set_config(
     "profileLabel": "Ainoa · Both Courses",
     "memberships": [
       {
-        "courseKey": "test-course-a-local",
+        "offeringKey": "test-course-a-local",
         "role": "learner"
       },
       {
-        "courseKey": "test-course-b-local",
+        "offeringKey": "test-course-b-local",
         "role": "learner"
       }
     ]
@@ -99,7 +99,7 @@ select set_config(
     "profileLabel": "Course Instructor",
     "memberships": [
       {
-        "courseKey": "test-course-a-local",
+        "offeringKey": "test-course-a-local",
         "role": "instructor"
       }
     ]
@@ -209,29 +209,61 @@ select private.sync_auth_identity((persona ->> 'identityId')::uuid)
 from jsonb_array_elements(current_setting('ainigma_seed.personas')::jsonb) as data(persona);
 reset role;
 
-select private.create_course_with_initial_owner(
+insert into private.course_definition_github_organizations (
+  course_definition_key,
+  github_org_id,
+  github_org_slug
+)
+values
+  ('test-course-a', 88000001, 'ainigma-dev-course-org'),
+  ('test-course-b', 88000001, 'ainigma-dev-course-org');
+
+insert into private.course_definition_releases (
+  id,
+  course_definition_key,
+  source_commit_sha,
+  course_release_digest,
+  artifact_ref
+)
+values
+  (
+    '60000000-0000-0000-0000-000000000001',
+    'test-course-a',
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'ainigma-dev:test-course-a:release-1'
+  ),
+  (
+    '60000000-0000-0000-0000-000000000002',
+    'test-course-b',
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    'ainigma-dev:test-course-b:release-1'
+  );
+
+select private.branch_course_offering(
   'test-course-a-local',
-  'test-course-a',
+  '60000000-0000-0000-0000-000000000001',
   'TEST-A',
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> 'owner')::uuid
 );
-select private.create_course_with_initial_owner(
+select private.branch_course_offering(
   'test-course-b-local',
-  'test-course-b',
+  '60000000-0000-0000-0000-000000000002',
   'TEST-B',
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> 'owner')::uuid
 );
 
 update public.courses
 set status = 'published'
-where course_key in ('test-course-a-local', 'test-course-b-local');
+where offering_key in ('test-course-a-local', 'test-course-b-local');
 
 select set_config(
-  'ainigma_seed.course_ids',
+  'ainigma_seed.offering_ids',
   (
-    select jsonb_object_agg(replace(course_key, '-', '_'), id::text)::text
+    select jsonb_object_agg(replace(offering_key, '-', '_'), id::text)::text
     from public.courses
-    where course_key in ('test-course-a-local', 'test-course-b-local')
+    where offering_key in ('test-course-a-local', 'test-course-b-local')
   ),
   false
 );
@@ -239,7 +271,7 @@ select set_config(
 set role ainigma_maintenance;
 
 select private.add_course_membership(
-  (current_setting('ainigma_seed.course_ids')::jsonb ->> replace(membership ->> 'courseKey', '-', '_'))::uuid,
+  (current_setting('ainigma_seed.offering_ids')::jsonb ->> replace(membership ->> 'offeringKey', '-', '_'))::uuid,
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> (persona ->> 'key'))::uuid,
   membership ->> 'role',
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> 'owner')::uuid,
@@ -250,9 +282,9 @@ cross join lateral jsonb_array_elements(coalesce(persona -> 'memberships', '[]':
 
 with requests as (
   select
-    row_number() over (order by persona ->> 'key', request ->> 'courseKey') as request_number,
+    row_number() over (order by persona ->> 'key', request ->> 'offeringKey') as request_number,
     persona ->> 'key' as persona_key,
-    request ->> 'courseKey' as course_key,
+    request ->> 'offeringKey' as offering_key,
     request ->> 'reason' as reason
   from jsonb_array_elements(current_setting('ainigma_seed.personas')::jsonb) as people(persona)
   cross join lateral jsonb_array_elements(coalesce(persona -> 'accessRequests', '[]'::jsonb)) as access(request)
@@ -267,7 +299,7 @@ insert into private.course_access_requests (
 )
 select
   ('52000000-0000-0000-0000-' || lpad(request_number::text, 12, '0'))::uuid,
-  (current_setting('ainigma_seed.course_ids')::jsonb ->> replace(course_key, '-', '_'))::uuid,
+  (current_setting('ainigma_seed.offering_ids')::jsonb ->> replace(offering_key, '-', '_'))::uuid,
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> persona_key)::uuid,
   reason,
   'pending',

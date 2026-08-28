@@ -3,12 +3,10 @@ import type { CourseDefinition } from "./types";
 
 export const COURSE_DEFINITIONS = [
   {
-    "slug": "software-hardware-security",
-    "definitionKey": "software-hardware-security",
+    "courseDefinitionSlug": "software-hardware-security",
+    "courseDefinitionKey": "software-hardware-security",
     "code": "IC00AJ74",
     "navMark": "CS3",
-    "startDate": "2026-09-02",
-    "endDate": "2026-12-13",
     "title": "Cyber Security III: Software and Hardware Security",
     "summary": "A practical, hands-on course exploring software and hardware security through fuzzing, vulnerability analysis, reverse-engineering, and hardware-based attacks.",
     "catalogUrl": "https://opas.peppi.oulu.fi/en/course/IC00AJ74/34706?period=2026-2027",
@@ -28,12 +26,10 @@ export const COURSE_DEFINITIONS = [
     "taskCount": 0
   },
   {
-    "slug": "test-course-a",
-    "definitionKey": "test-course-a",
+    "courseDefinitionSlug": "test-course-a",
+    "courseDefinitionKey": "test-course-a",
     "code": "IC00AAAA",
     "navMark": "SPR",
-    "startDate": "2026-08-24",
-    "endDate": "2026-12-13",
     "title": "Test course A:  Secure programming",
     "summary": "Build software with security properties that hold under real-world pressure.",
     "catalogUrl": null,
@@ -79,12 +75,10 @@ export const COURSE_DEFINITIONS = [
     "taskCount": 1
   },
   {
-    "slug": "test-course-b",
-    "definitionKey": "test-course-b",
+    "courseDefinitionSlug": "test-course-b",
+    "courseDefinitionKey": "test-course-b",
     "code": "IC00BBBB",
     "navMark": "ACR",
-    "startDate": "2026-08-24",
-    "endDate": "2026-12-13",
     "title": "Test course B: Applied cryptography",
     "summary": "A practical course in cryptographic protocols and secure systems.",
     "catalogUrl": null,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { parseCourseSlug } from "./learning/identifiers";
+import { parseCourseOfferingKey } from "./learning/identifiers";
 import {
   canonicalPath,
   courseRouteTargetPath,
@@ -10,19 +10,24 @@ import {
   routes,
 } from "./routes";
 
-const course = parseCourseSlug("security-fundamentals");
+const offeringKey = parseCourseOfferingKey("security-fundamentals-2026-spring");
 
 describe("application routes", () => {
   it("generates canonical and localized course paths", () => {
-    expect(routes.course.path({ course })).toBe("/courses/security-fundamentals/");
-    expect(routes.courseWeek.path({ course, week: "week 04" })).toBe(
-      "/courses/security-fundamentals/week%2004/",
+    expect(routes.course.path({ offeringKey })).toBe("/courses/security-fundamentals-2026-spring/");
+    expect(routes.courseWeek.path({ offeringKey, week: "week 04" })).toBe(
+      "/courses/security-fundamentals-2026-spring/week%2004/",
     );
     expect(
-      courseRouteTargetPath({ route: "courseTask", course, week: "week-04", task: "lab/part 1" }),
-    ).toBe("/courses/security-fundamentals/week-04/lab/part%201/");
-    expect(localizedPath("fi", routes.course.path({ course }))).toBe(
-      "/fi/courses/security-fundamentals/",
+      courseRouteTargetPath({
+        route: "courseTask",
+        offeringKey,
+        week: "week-04",
+        task: "lab/part 1",
+      }),
+    ).toBe("/courses/security-fundamentals-2026-spring/week-04/lab/part%201/");
+    expect(localizedPath("fi", routes.course.path({ offeringKey }))).toBe(
+      "/fi/courses/security-fundamentals-2026-spring/",
     );
   });
 
@@ -37,10 +42,12 @@ describe("application routes", () => {
     expect(matchAppRoute("/auth/callback")?.access).toBe("protocol");
     expect(matchAppRoute("/auth/local")?.access).toBe("protocol");
     expect(matchAppRoute("/fi/desk/")?.access).toBe("authenticated");
-    expect(matchAppRoute("/courses/security-fundamentals/week-04/task/")).toMatchObject({
-      access: "courseMember",
-      params: { course, task: "task", week: "week-04" },
-    });
+    expect(matchAppRoute("/courses/security-fundamentals-2026-spring/week-04/task/")).toMatchObject(
+      {
+        access: "courseMember",
+        params: { offeringKey, task: "task", week: "week-04" },
+      },
+    );
   });
 
   it("keeps the route access review exhaustive and duplicate-free", () => {
@@ -51,7 +58,7 @@ describe("application routes", () => {
 
   it("classifies learner-shell routes independently from access policy", () => {
     expect(routeUsesLearnerShell("/announcements/")).toBe(true);
-    expect(routeUsesLearnerShell("/fi/courses/security-fundamentals/")).toBe(true);
+    expect(routeUsesLearnerShell("/fi/courses/security-fundamentals-2026-spring/")).toBe(true);
     expect(routeUsesLearnerShell("/login/")).toBe(false);
   });
 });

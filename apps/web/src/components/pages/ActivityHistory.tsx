@@ -22,7 +22,7 @@ const activityIcons = {
 
 export default function ActivityHistory({ activities, courses, locale }: Props) {
   const copy = getMessages(locale).activity;
-  const courseBySlug = new Map(courses.map((course) => [course.slug, course]));
+  const courseByOfferingKey = new Map(courses.map((course) => [course.offeringKey, course]));
 
   return (
     <HistoryPageLayout title={copy.historyTitle} description={copy.historyDescription}>
@@ -34,7 +34,7 @@ export default function ActivityHistory({ activities, courses, locale }: Props) 
       >
         {activities.map((activity) => {
           const ActivityIcon = activityIcons[activity.kind];
-          const course = courseBySlug.get(activity.courseSlug);
+          const course = courseByOfferingKey.get(activity.offeringKey);
           return (
             <ListItem
               description={

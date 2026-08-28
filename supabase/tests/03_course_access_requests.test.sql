@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(17);
+select extensions.plan(19);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
@@ -65,38 +65,56 @@ select set_config(
 
 -- Create a separate published course owned by the seeded owner.
 grant ainigma_maintenance to postgres;
+insert into private.course_definition_github_organizations (
+  course_definition_key,
+  github_org_id,
+  github_org_slug
+)
+values
+  ('access-gate-course', 88000001, 'access-gate-course-test-org'),
+  ('access-gate-auto-course', 88000002, 'access-gate-auto-course-test-org');
 set role ainigma_maintenance;
 select private.sync_auth_identity('71000000-0000-0000-0000-000000000001');
-select private.create_course_with_initial_owner(
+select private.branch_course_offering(
   'access-gate-course-test',
-  'access-gate-course',
+  private.register_course_definition_release(
+    'access-gate-course',
+    '4444444444444444444444444444444444444444',
+    '4444444444444444444444444444444444444444444444444444444444444444',
+    'test:access-gate-course:release-1'
+  ),
   'ACCESS-TEST',
   current_setting('ainigma_access_test.owner_profile_id')::uuid
 );
 reset role;
 update public.courses
 set status = 'published'
-where course_key = 'access-gate-course-test';
+where offering_key = 'access-gate-course-test';
 select set_config(
   'ainigma_access_test.course_id',
-  (select id::text from public.courses where course_key = 'access-gate-course-test'),
+  (select id::text from public.courses where offering_key = 'access-gate-course-test'),
   true
 );
 
 set role ainigma_maintenance;
-select private.create_course_with_initial_owner(
+select private.branch_course_offering(
   'access-gate-auto-course-test',
-  'access-gate-auto-course',
+  private.register_course_definition_release(
+    'access-gate-auto-course',
+    '5555555555555555555555555555555555555555',
+    '5555555555555555555555555555555555555555555555555555555555555555',
+    'test:access-gate-auto-course:release-1'
+  ),
   'ACCESS-AUTO-TEST',
   current_setting('ainigma_access_test.owner_profile_id')::uuid
 );
 reset role;
 update public.courses
 set status = 'published', enrollment_mode = 'allowlist_auto'
-where course_key = 'access-gate-auto-course-test';
+where offering_key = 'access-gate-auto-course-test';
 select set_config(
   'ainigma_access_test.auto_course_id',
-  (select id::text from public.courses where course_key = 'access-gate-auto-course-test'),
+  (select id::text from public.courses where offering_key = 'access-gate-auto-course-test'),
   true
 );
 
@@ -193,6 +211,18 @@ select extensions.throws_ok(
   'github_identity_mismatch',
   'a mismatched GitHub identity cannot activate course access'
 );
+select extensions.throws_ok(
+  $$select private.confirm_github_course_access(
+    current_setting('ainigma_access_test.course_id')::uuid,
+    current_setting('ainigma_access_test.requester_profile_id')::uuid,
+    88000002,
+    'access-gate-auto-course-test-org',
+    '97000001'
+  )$$,
+  '42501',
+  'github_organization_mismatch',
+  'a GitHub organization configured for another course cannot activate this offering'
+);
 set role ainigma_maintenance;
 select private.confirm_github_course_access(
   current_setting('ainigma_access_test.course_id')::uuid,
@@ -244,6 +274,42 @@ select extensions.is(
   (select jsonb_array_length(public.list_my_courses()->'courses')),
   2,
   'GitHub confirmation activates the automatically approved course'
+);
+
+reset role;
+with mismatched_request as (
+  insert into private.course_access_requests (
+    course_id,
+    requester_profile_id,
+    status,
+    decision_source,
+    decided_at
+  )
+  values (
+    current_setting('ainigma_access_test.auto_course_id')::uuid,
+    current_setting('ainigma_access_test.requester_profile_id')::uuid,
+    'approved',
+    'allowlist',
+    clock_timestamp()
+  )
+  returning id
+)
+select set_config(
+  'ainigma_access_test.mismatched_request_id',
+  (select id::text from mismatched_request),
+  true
+);
+
+select extensions.throws_ok(
+  $$
+    update private.github_course_access as access_row
+    set access_request_id = current_setting('ainigma_access_test.mismatched_request_id')::uuid
+    where access_row.course_id = current_setting('ainigma_access_test.course_id')::uuid
+      and access_row.profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid
+  $$,
+  '23503',
+  null,
+  'GitHub access cannot reference a request for another course'
 );
 
 select extensions.finish();

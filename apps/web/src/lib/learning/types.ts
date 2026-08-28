@@ -1,6 +1,11 @@
 import type { ExternalUrl } from "../external-links";
 import type { AppPath } from "../routes";
-import type { CourseDefinitionKey, CourseSlug } from "./identifiers";
+import type {
+  CourseDefinitionKey,
+  CourseDefinitionReleaseId,
+  CourseDefinitionSlug,
+  CourseOfferingKey,
+} from "./identifiers";
 
 export type CourseStatus = "not-started" | "in-progress" | "completed";
 export type AgendaStatus = "todo" | "in-progress" | "completed";
@@ -15,8 +20,8 @@ interface CourseOverviewFields {
 }
 
 export interface PublicCourseInfo extends CourseOverviewFields {
-  slug: CourseSlug;
-  definitionKey: CourseDefinitionKey;
+  courseDefinitionSlug: CourseDefinitionSlug;
+  courseDefinitionKey: CourseDefinitionKey;
   catalogUrl?: ExternalUrl;
 }
 
@@ -51,9 +56,9 @@ interface PageDefinition {
   label: string;
 }
 
-export interface CourseDefinition extends CourseOverviewFields, CourseSchedule {
-  slug: string;
-  definitionKey: string;
+export interface CourseDefinition extends CourseOverviewFields {
+  courseDefinitionSlug: string;
+  courseDefinitionKey: string;
   navMark: string;
   catalogUrl: ExternalUrl | null;
   catalogOrder: number;
@@ -85,9 +90,10 @@ export interface NextActivity {
 }
 
 export interface CourseInfo extends CourseOverviewFields, CourseSchedule {
-  slug: CourseSlug;
-  definitionKey: CourseDefinitionKey;
-  courseKey: string;
+  offeringKey: CourseOfferingKey;
+  courseDefinitionSlug: CourseDefinitionSlug;
+  courseDefinitionKey: CourseDefinitionKey;
+  courseDefinitionReleaseId: CourseDefinitionReleaseId;
   navMark: string;
   href: AppPath;
   catalogUrl?: ExternalUrl;
@@ -104,7 +110,7 @@ export interface CourseInfo extends CourseOverviewFields, CourseSchedule {
 
 export interface AgendaItem {
   id: string;
-  courseSlug: CourseSlug;
+  offeringKey: CourseOfferingKey;
   type: "lab" | "reading" | "setup";
   title: string;
   supporting: string;
@@ -115,7 +121,7 @@ export interface AgendaItem {
 
 export interface Announcement {
   id: string;
-  courseSlug: CourseSlug;
+  offeringKey: CourseOfferingKey;
   title: string;
   timeLabel: string;
   href: AppPath;
@@ -123,7 +129,7 @@ export interface Announcement {
 
 export interface LearnerActivity {
   id: string;
-  courseSlug: CourseSlug;
+  offeringKey: CourseOfferingKey;
   kind: ActivityKind;
   title: string;
   description: string;

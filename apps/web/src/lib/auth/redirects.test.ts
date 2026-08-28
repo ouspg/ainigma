@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { parseCourseDefinitionKey } from "../learning/identifiers";
-import { hasCourseAccess } from "./course-access";
+import { parseCourseOfferingKey } from "../learning/identifiers";
+import { findAuthorizedCourseOffering } from "./course-access";
 import { safeNextPath, signInPath } from "./redirects";
 
 describe("authentication redirects", () => {
@@ -23,13 +23,30 @@ describe("authentication redirects", () => {
   });
 
   it("accepts only a matching course returned by the authorization RPC", () => {
-    const course = parseCourseDefinitionKey("security-fundamentals");
+    const spring = parseCourseOfferingKey("security-fundamentals-2026-spring");
     const access = {
-      courses: [{ definition_key: "security-fundamentals" }],
+      courses: [
+        {
+          offering_key: "security-fundamentals-2026-spring",
+          course_definition_key: "security-fundamentals",
+          course_definition_release_id: "60000000-0000-0000-0000-000000000001",
+        },
+        {
+          offering_key: "security-fundamentals-2026-autumn",
+          course_definition_key: "security-fundamentals",
+          course_definition_release_id: "60000000-0000-0000-0000-000000000002",
+        },
+      ],
     };
 
-    expect(hasCourseAccess(access, course)).toBe(true);
-    expect(hasCourseAccess(access, parseCourseDefinitionKey("secure-programming"))).toBe(false);
-    expect(hasCourseAccess({ courses: "invalid" }, course)).toBe(false);
+    expect(findAuthorizedCourseOffering(access, spring)).toEqual({
+      offeringKey: spring,
+      courseDefinitionKey: "security-fundamentals",
+      courseDefinitionReleaseId: "60000000-0000-0000-0000-000000000001",
+    });
+    expect(
+      findAuthorizedCourseOffering(access, parseCourseOfferingKey("security-fundamentals-2025")),
+    ).toBeNull();
+    expect(findAuthorizedCourseOffering({ courses: "invalid" }, spring)).toBeNull();
   });
 });

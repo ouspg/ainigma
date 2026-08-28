@@ -44,8 +44,8 @@ function readDismissedIds(): Set<string> {
 export default function ActivityCenter({ activities, courses, locale }: Props) {
   const copy = getMessages(locale).activity;
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const courseBySlug = useMemo(
-    () => new Map(courses.map((course) => [course.slug, course])),
+  const courseByOfferingKey = useMemo(
+    () => new Map(courses.map((course) => [course.offeringKey, course])),
     [courses],
   );
 
@@ -112,7 +112,7 @@ export default function ActivityCenter({ activities, courses, locale }: Props) {
             >
               {recentActivities.map((activity) => {
                 const ActivityIcon = activityIcons[activity.kind];
-                const course = courseBySlug.get(activity.courseSlug);
+                const course = courseByOfferingKey.get(activity.offeringKey);
                 return (
                   <ListItem
                     description={

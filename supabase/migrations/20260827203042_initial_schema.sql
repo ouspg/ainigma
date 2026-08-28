@@ -4,17 +4,13 @@ alter default privileges for role "postgres" in schema "public" revoke all on se
 
 alter default privileges for role "postgres" in schema "public" revoke all on sequences from "authenticated";
 
+alter default privileges for role "postgres" in schema "public" revoke all on sequences from "service_role";
+
 alter default privileges for role "postgres" in schema "public" revoke all on tables from "anon";
 
 alter default privileges for role "postgres" in schema "public" revoke all on tables from "authenticated";
 
-create schema "private";
-
--- pg-delta does not emit the temporary schema CREATE privilege needed while
--- transferring function ownership to the dedicated function-owner role.
-revoke create on schema "public" from public, anon, authenticated;
-revoke all on schema "private" from public, anon, authenticated;
-grant usage, create on schema "public", "private" to "ainigma_function_owner";
+alter default privileges for role "postgres" in schema "public" revoke all on tables from "service_role";
 
 create table "private"."auth_user_links" (
   "auth_user_id" uuid                     not null,
@@ -51,6 +47,23 @@ alter table "private"."course_access_requests"
 
 alter table "private"."course_access_requests"
   force row level security;
+
+create table "private"."course_definition_releases" (
+  "id"                    uuid                     not null default gen_random_uuid(),
+  "course_definition_key" text                     not null,
+  "source_commit_sha"     text                     not null,
+  "course_release_digest" text                     not null,
+  "artifact_ref"          text                     not null,
+  "created_at"            timestamp with time zone not null default clock_timestamp(),
+  constraint "course_definition_releases_artifact_ref_check"
+    check (((artifact_ref = btrim(artifact_ref)) AND ((char_length(artifact_ref) >= 1) AND (char_length(artifact_ref) <= 2048)))),
+  constraint "course_definition_releases_definition_digest_unique" unique (course_definition_key, course_release_digest),
+  constraint "course_definition_releases_definition_key_check" check ((course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'::text)),
+  constraint "course_definition_releases_digest_check" check ((course_release_digest ~ '^[0-9a-f]{64}$'::text)),
+  constraint "course_definition_releases_id_definition_key_unique" unique (id, course_definition_key),
+  constraint "course_definition_releases_pkey" primary key (id),
+  constraint "course_definition_releases_source_commit_sha_check" check ((source_commit_sha ~ '^[0-9a-f]{40}([0-9a-f]{24})?$'::text))
+);
 
 create table "private"."course_membership_events" (
   "id"               bigint                   generated always as identity not null,
@@ -177,6 +190,7 @@ create table "public"."course_memberships" (
   "suspended_at"                   timestamp with time zone,
   "revoked_at"                     timestamp with time zone,
   "created_from_access_request_id" uuid,
+  constraint "course_memberships_owner_status_check" check (((role <> 'owner'::text) OR (status = 'active'::text))),
   constraint "course_memberships_pkey" primary key (course_id, profile_id),
   constraint "course_memberships_role_check" check ((role = ANY (ARRAY['owner'::text, 'instructor'::text, 'learner'::text]))),
   constraint "course_memberships_status_check" check ((status = ANY (ARRAY['active'::text, 'suspended'::text, 'revoked'::text]))),
@@ -192,23 +206,24 @@ alter table "public"."course_memberships"
   force row level security;
 
 create table "public"."courses" (
-  "id"              uuid                     not null default gen_random_uuid(),
-  "course_key"      text                     not null,
-  "definition_key"  text                     not null,
-  "code"            text                     not null,
-  "status"          text                     not null default 'draft'::text,
-  "starts_at"       timestamp with time zone,
-  "ends_at"         timestamp with time zone,
-  "external_url"    text,
-  "created_at"      timestamp with time zone not null default clock_timestamp(),
-  "updated_at"      timestamp with time zone not null default clock_timestamp(),
-  "enrollment_mode" text                     not null default 'approval_required'::text,
+  "id"                           uuid                     not null default gen_random_uuid(),
+  "offering_key"                 text                     not null,
+  "course_definition_key"        text                     not null,
+  "course_definition_release_id" uuid                     not null,
+  "code"                         text                     not null,
+  "status"                       text                     not null default 'draft'::text,
+  "starts_at"                    timestamp with time zone,
+  "ends_at"                      timestamp with time zone,
+  "external_url"                 text,
+  "created_at"                   timestamp with time zone not null default clock_timestamp(),
+  "updated_at"                   timestamp with time zone not null default clock_timestamp(),
+  "enrollment_mode"              text                     not null default 'approval_required'::text,
   constraint "courses_code_check" check (((code = btrim(code)) AND ((char_length(code) >= 1) AND (char_length(code) <= 32)))),
-  constraint "courses_course_key_check" check ((course_key ~ '^[a-z][a-z0-9-]{2,127}$'::text)),
-  constraint "courses_course_key_key" unique (course_key),
-  constraint "courses_definition_key_check" check ((definition_key ~ '^[a-z][a-z0-9-]{2,63}$'::text)),
+  constraint "courses_course_definition_key_check" check ((course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'::text)),
   constraint "courses_enrollment_mode_check" check ((enrollment_mode = ANY (ARRAY['approval_required'::text, 'allowlist_auto'::text, 'closed'::text]))),
   constraint "courses_external_url_check" check (((external_url IS NULL) OR ((char_length(external_url) <= 2048) AND (external_url ~ '^https?://'::text)))),
+  constraint "courses_offering_key_check" check ((offering_key ~ '^[a-z][a-z0-9-]{2,127}$'::text)),
+  constraint "courses_offering_key_key" unique (offering_key),
   constraint "courses_pkey" primary key (id),
   constraint "courses_status_check" check ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text]))),
   constraint "courses_time_window_check" check (((ends_at IS NULL) OR (starts_at IS NULL) OR (ends_at > starts_at)))
@@ -222,7 +237,7 @@ alter table "public"."courses"
 
 create table "public"."profiles" (
   "id"           uuid                     not null default gen_random_uuid(),
-  "display_name" text,
+  "display_name" text                     not null default 'Learner'::text,
   "created_at"   timestamp with time zone not null default clock_timestamp(),
   "updated_at"   timestamp with time zone not null default clock_timestamp(),
   constraint "profiles_display_name_check"
@@ -251,6 +266,13 @@ create or replace function private.add_course_membership (
 declare
   v_actor_role text;
 begin
+  if p_role is null or p_role not in ('instructor', 'learner') then
+    if p_role = 'owner' then
+      raise exception using errcode = '42501', message = 'course_owner_transfer_required';
+    end if;
+    raise exception using errcode = '22023', message = 'invalid_course_membership_role';
+  end if;
+
   perform 1 from public.courses as course where course.id = p_course_id for update;
   if not found then
     raise exception using errcode = '23503', message = 'course_not_found';
@@ -296,6 +318,121 @@ end
 $function$;
 
 alter function "private"."add_course_membership"(uuid, uuid, text, uuid, text) owner to "ainigma_function_owner";
+
+create or replace function private.advance_open_course_offerings_to_release (
+  p_course_definition_release_id uuid
+)
+  returns integer
+  language plpgsql
+  security definer
+  set search_path to ''
+  AS $function$
+declare
+  v_course_definition_key text;
+  v_updated_count integer;
+begin
+  select release.course_definition_key
+  into v_course_definition_key
+  from private.course_definition_releases as release
+  where release.id = p_course_definition_release_id;
+
+  if v_course_definition_key is null then
+    raise exception using errcode = '23503', message = 'course_definition_release_not_found';
+  end if;
+
+  update public.courses as course
+  set course_definition_release_id = p_course_definition_release_id
+  where course.course_definition_key = v_course_definition_key
+    and course.status <> 'archived'
+    and course.course_definition_release_id <> p_course_definition_release_id;
+
+  get diagnostics v_updated_count = row_count;
+  return v_updated_count;
+end
+$function$;
+
+alter function "private"."advance_open_course_offerings_to_release"(uuid) owner to "ainigma_function_owner";
+
+create or replace function private.branch_course_offering (
+  p_offering_key                 text,
+  p_course_definition_release_id uuid,
+  p_code                         text,
+  p_owner_profile_id             uuid,
+  p_starts_at                    timestamp with time zone default null::timestamp with time zone,
+  p_ends_at                      timestamp with time zone default null::timestamp with time zone,
+  p_external_url                 text                     default null::text
+)
+  returns uuid
+  language plpgsql
+  security definer
+  set search_path to ''
+  AS $function$
+declare
+  v_course_id uuid;
+  v_course_definition_key text;
+begin
+  select release.course_definition_key
+  into v_course_definition_key
+  from private.course_definition_releases as release
+  where release.id = p_course_definition_release_id;
+
+  if v_course_definition_key is null then
+    raise exception using errcode = '23503', message = 'course_definition_release_not_found';
+  end if;
+
+  if not exists (
+    select 1 from public.profiles as profile where profile.id = p_owner_profile_id
+  ) then
+    raise exception using errcode = '23503', message = 'owner_profile_not_found';
+  end if;
+
+  insert into public.courses (
+    offering_key,
+    course_definition_key,
+    course_definition_release_id,
+    code,
+    starts_at,
+    ends_at,
+    external_url
+  )
+  values (
+    p_offering_key,
+    v_course_definition_key,
+    p_course_definition_release_id,
+    p_code,
+    p_starts_at,
+    p_ends_at,
+    p_external_url
+  )
+  returning id into v_course_id;
+
+  insert into public.course_memberships (course_id, profile_id, role, status)
+  values (v_course_id, p_owner_profile_id, 'owner', 'active');
+
+  insert into private.course_membership_events (
+    course_id,
+    profile_id,
+    event_kind,
+    new_role,
+    new_status,
+    actor_profile_id,
+    reason
+  )
+  values (
+    v_course_id,
+    p_owner_profile_id,
+    'created',
+    'owner',
+    'active',
+    p_owner_profile_id,
+    'initial course owner'
+  );
+
+  return v_course_id;
+end
+$function$;
+
+alter function "private"."branch_course_offering"(text, uuid, text, uuid, timestamp with time zone, timestamp with time zone, text) owner to "ainigma_function_owner";
 
 create or replace function private.can_view_profile (
   p_profile_id uuid
@@ -407,75 +544,6 @@ end
 $function$;
 
 alter function "private"."confirm_github_course_access"(uuid, uuid, bigint, text, text) owner to "ainigma_function_owner";
-
-create or replace function private.create_course_with_initial_owner (
-  p_course_key       text,
-  p_definition_key   text,
-  p_code             text,
-  p_owner_profile_id uuid,
-  p_starts_at        timestamp with time zone default null::timestamp with time zone,
-  p_ends_at          timestamp with time zone default null::timestamp with time zone,
-  p_external_url     text                     default null::text
-)
-  returns uuid
-  language plpgsql
-  security definer
-  set search_path to ''
-  AS $function$
-declare
-  v_course_id uuid;
-begin
-  if not exists (
-    select 1 from public.profiles as profile where profile.id = p_owner_profile_id
-  ) then
-    raise exception using errcode = '23503', message = 'owner_profile_not_found';
-  end if;
-
-  insert into public.courses (
-    course_key,
-    definition_key,
-    code,
-    starts_at,
-    ends_at,
-    external_url
-  )
-  values (
-    p_course_key,
-    p_definition_key,
-    p_code,
-    p_starts_at,
-    p_ends_at,
-    p_external_url
-  )
-  returning id into v_course_id;
-
-  insert into public.course_memberships (course_id, profile_id, role, status)
-  values (v_course_id, p_owner_profile_id, 'owner', 'active');
-
-  insert into private.course_membership_events (
-    course_id,
-    profile_id,
-    event_kind,
-    new_role,
-    new_status,
-    actor_profile_id,
-    reason
-  )
-  values (
-    v_course_id,
-    p_owner_profile_id,
-    'created',
-    'owner',
-    'active',
-    p_owner_profile_id,
-    'initial course owner'
-  );
-
-  return v_course_id;
-end
-$function$;
-
-alter function "private"."create_course_with_initial_owner"(text, text, text, uuid, timestamp with time zone, timestamp with time zone, text) owner to "ainigma_function_owner";
 
 create or replace function private.current_profile_id()
   returns uuid
@@ -670,6 +738,57 @@ $function$;
 
 alter function "private"."reconcile_auth_users"() owner to "ainigma_function_owner";
 
+create or replace function private.register_course_definition_release (
+  p_course_definition_key text,
+  p_source_commit_sha     text,
+  p_course_release_digest text,
+  p_artifact_ref          text
+)
+  returns uuid
+  language plpgsql
+  security definer
+  set search_path to ''
+  AS $function$
+declare
+  v_release private.course_definition_releases%rowtype;
+begin
+  insert into private.course_definition_releases (
+    course_definition_key,
+    source_commit_sha,
+    course_release_digest,
+    artifact_ref
+  )
+  values (
+    p_course_definition_key,
+    p_source_commit_sha,
+    p_course_release_digest,
+    p_artifact_ref
+  )
+  on conflict (course_definition_key, course_release_digest) do nothing
+  returning * into v_release;
+
+  if v_release.id is null then
+    select release.*
+    into strict v_release
+    from private.course_definition_releases as release
+    where release.course_definition_key = p_course_definition_key
+      and release.course_release_digest = p_course_release_digest;
+
+    if v_release.source_commit_sha <> p_source_commit_sha
+      or v_release.artifact_ref <> p_artifact_ref
+    then
+      raise exception using
+        errcode = '23505',
+        message = 'course_definition_release_metadata_mismatch';
+    end if;
+  end if;
+
+  return v_release.id;
+end
+$function$;
+
+alter function "private"."register_course_definition_release"(text, text, text, text) owner to "ainigma_function_owner";
+
 create or replace function private.reject_mutation()
   returns trigger
   language plpgsql
@@ -857,6 +976,138 @@ $function$;
 
 alter function "private"."sync_auth_identity"(uuid) owner to "ainigma_function_owner";
 
+create or replace function private.transfer_course_ownership (
+  p_course_id            uuid,
+  p_new_owner_profile_id uuid,
+  p_actor_profile_id     uuid,
+  p_reason               text
+)
+  returns void
+  language plpgsql
+  security definer
+  set search_path to ''
+  AS $function$
+declare
+  v_current_owner_profile_id uuid;
+  v_target_membership public.course_memberships%rowtype;
+begin
+  if p_course_id is null or p_new_owner_profile_id is null or p_actor_profile_id is null then
+    raise exception using errcode = '22004', message = 'course_ownership_transfer_arguments_required';
+  end if;
+
+  if p_reason is null or p_reason <> btrim(p_reason) or char_length(p_reason) not between 1 and 2000 then
+    raise exception using errcode = '22023', message = 'invalid_course_membership_reason';
+  end if;
+
+  -- All membership mutations lock the course row, so ownership changes are
+  -- serialized with staff and learner membership changes.
+  perform 1
+  from public.courses as course
+  where course.id = p_course_id
+  for update;
+
+  if not found then
+    raise exception using errcode = '23503', message = 'course_not_found';
+  end if;
+
+  select membership.profile_id
+  into v_current_owner_profile_id
+  from public.course_memberships as membership
+  where membership.course_id = p_course_id
+    and membership.role = 'owner'
+    and membership.status = 'active'
+  for update;
+
+  if not found then
+    raise exception using errcode = '23514', message = 'course_requires_active_owner';
+  end if;
+
+  if p_actor_profile_id <> v_current_owner_profile_id then
+    raise exception using errcode = '42501', message = 'course_owner_required';
+  end if;
+
+  if p_new_owner_profile_id = v_current_owner_profile_id then
+    return;
+  end if;
+
+  select membership.*
+  into v_target_membership
+  from public.course_memberships as membership
+  where membership.course_id = p_course_id
+    and membership.profile_id = p_new_owner_profile_id
+    and membership.status = 'active'
+  for update;
+
+  if not found then
+    raise exception using errcode = '23503', message = 'course_owner_target_membership_not_found';
+  end if;
+
+  if v_target_membership.role <> 'instructor' then
+    raise exception using errcode = '42501', message = 'course_owner_target_must_be_instructor';
+  end if;
+
+  -- Demote first so the partial unique index can enforce one active owner
+  -- throughout the transaction, then promote the selected instructor.
+  update public.course_memberships
+  set role = 'instructor'
+  where course_id = p_course_id
+    and profile_id = v_current_owner_profile_id;
+
+  insert into private.course_membership_events (
+    course_id,
+    profile_id,
+    event_kind,
+    previous_role,
+    previous_status,
+    new_role,
+    new_status,
+    actor_profile_id,
+    reason
+  )
+  values (
+    p_course_id,
+    v_current_owner_profile_id,
+    'transitioned',
+    'owner',
+    'active',
+    'instructor',
+    'active',
+    p_actor_profile_id,
+    p_reason
+  );
+
+  update public.course_memberships
+  set role = 'owner'
+  where course_id = p_course_id
+    and profile_id = p_new_owner_profile_id;
+
+  insert into private.course_membership_events (
+    course_id,
+    profile_id,
+    event_kind,
+    previous_role,
+    previous_status,
+    new_role,
+    new_status,
+    actor_profile_id,
+    reason
+  )
+  values (
+    p_course_id,
+    v_target_membership.profile_id,
+    'transitioned',
+    v_target_membership.role,
+    v_target_membership.status,
+    'owner',
+    'active',
+    p_actor_profile_id,
+    p_reason
+  );
+end
+$function$;
+
+alter function "private"."transfer_course_ownership"(uuid, uuid, uuid, text) owner to "ainigma_function_owner";
+
 create or replace function private.transition_course_membership (
   p_course_id        uuid,
   p_profile_id       uuid,
@@ -875,6 +1126,14 @@ declare
   v_actor_role text;
   v_active_owner_count integer;
 begin
+  if p_new_role is null or p_new_role not in ('owner', 'instructor', 'learner') then
+    raise exception using errcode = '22023', message = 'invalid_course_membership_role';
+  end if;
+
+  if p_new_role = 'owner' then
+    raise exception using errcode = '42501', message = 'course_owner_transfer_required';
+  end if;
+
   perform 1 from public.courses as course where course.id = p_course_id for update;
   if not found then
     raise exception using errcode = '23503', message = 'course_not_found';
@@ -910,6 +1169,10 @@ begin
 
   if not found then
     raise exception using errcode = '23503', message = 'course_membership_not_found';
+  end if;
+
+  if v_actor_role = 'instructor' and v_membership.role <> 'learner' then
+    raise exception using errcode = '42501', message = 'course_staff_admin_required';
   end if;
 
   if v_membership.role = p_new_role and v_membership.status = p_new_status then
@@ -1041,8 +1304,8 @@ $function$;
 alter function "private"."upsert_verified_identifier"(uuid, text, text, integer, text, timestamp with time zone, uuid, text) owner to "ainigma_function_owner";
 
 create or replace function public.approve_course_access_requests (
-  p_course_key  text,
-  p_request_ids uuid[] default null::uuid[]
+  p_offering_key text,
+  p_request_ids  uuid[] default null::uuid[]
 )
   returns integer
   language plpgsql
@@ -1054,7 +1317,9 @@ declare
   v_actor_profile_id uuid := private.current_profile_id();
   v_count integer;
 begin
-  select course.id into v_course_id from public.courses as course where course.course_key = p_course_key;
+  select course.id into v_course_id
+  from public.courses as course
+  where course.offering_key = p_offering_key;
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -1138,13 +1403,13 @@ $function$;
 alter function "public"."get_my_profile"() owner to "ainigma_function_owner";
 
 create or replace function public.list_course_access_requests (
-  p_course_key           text,
+  p_offering_key         text,
   p_status               text default 'pending'::text,
   p_authorization_filter text default null::text
 )
   returns table (
     request_id           uuid,
-    course_key           text,
+    offering_key         text,
     display_name         text,
     github_username      text,
     verified_email       text,
@@ -1161,12 +1426,12 @@ create or replace function public.list_course_access_requests (
   set search_path to ''
   AS $function$
 declare
-  v_course_id uuid;
   v_profile_id uuid := private.current_profile_id();
+  v_course_id uuid;
 begin
   select course.id into v_course_id
   from public.courses as course
-  where course.course_key = p_course_key;
+  where course.offering_key = p_offering_key;
 
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
@@ -1175,7 +1440,7 @@ begin
   return query
   select
     request_row.id,
-    course.course_key,
+    course.offering_key,
     profile.display_name,
     (
       select identifier.normalized_value
@@ -1258,7 +1523,7 @@ $function$;
 alter function "public"."list_course_access_requests"(text, text, text) owner to "ainigma_function_owner";
 
 create or replace function public.list_course_roster (
-  p_course_key text
+  p_offering_key text
 )
   returns table (
     display_name text,
@@ -1279,7 +1544,7 @@ begin
   select course.id
   into v_course_id
   from public.courses as course
-  where course.course_key = p_course_key;
+  where course.offering_key = p_offering_key;
 
   -- Use one response for missing and unauthorized courses to avoid revealing
   -- whether an offering exists through the RPC.
@@ -1309,7 +1574,7 @@ alter function "public"."list_course_roster"(text) owner to "ainigma_function_ow
 
 create or replace function public.list_my_course_access_requests()
   returns table (
-    course_key          text,
+    offering_key        text,
     request_id          uuid,
     status              text,
     reason              text,
@@ -1323,7 +1588,7 @@ create or replace function public.list_my_course_access_requests()
   set search_path to ''
   AS $function$
   select
-    course.course_key,
+    course.offering_key,
     request_row.id,
     request_row.status,
     request_row.reason,
@@ -1355,8 +1620,9 @@ begin
       (
         select jsonb_agg(
           jsonb_build_object(
-            'course_key', course.course_key,
-            'definition_key', course.definition_key,
+            'offering_key', course.offering_key,
+            'course_definition_key', course.course_definition_key,
+            'course_definition_release_id', course.course_definition_release_id,
             'code', course.code,
             'course_status', course.status,
             'membership_role', membership.role,
@@ -1367,7 +1633,7 @@ begin
             'created_at', course.created_at,
             'updated_at', course.updated_at
           )
-          order by course.course_key
+          order by course.offering_key
         )
         from public.courses as course
         join public.course_memberships as membership
@@ -1375,7 +1641,7 @@ begin
         where membership.profile_id = v_profile_id
           and membership.status = 'active'
           and (
-            course.status = 'published'
+            course.status in ('published', 'archived')
             or (
               course.status = 'draft'
               and membership.role in ('owner', 'instructor')
@@ -1388,7 +1654,8 @@ begin
       (
         select jsonb_agg(
           jsonb_build_object(
-            'course_key', course.course_key,
+            'offering_key', course.offering_key,
+            'course_definition_release_id', course.course_definition_release_id,
             'course_status', course.status,
             'membership_role', membership.role,
             'membership_status', membership.status,
@@ -1396,7 +1663,7 @@ begin
             'suspended_at', membership.suspended_at,
             'revoked_at', membership.revoked_at
           )
-          order by course.course_key
+          order by course.offering_key
         )
         from public.courses as course
         join public.course_memberships as membership
@@ -1405,7 +1672,7 @@ begin
           and not (
             membership.status = 'active'
             and (
-              course.status = 'published'
+              course.status in ('published', 'archived')
               or (
                 course.status = 'draft'
                 and membership.role in ('owner', 'instructor')
@@ -1422,7 +1689,7 @@ $function$;
 alter function "public"."list_my_courses"() owner to "ainigma_function_owner";
 
 create or replace function public.reject_course_access_requests (
-  p_course_key      text,
+  p_offering_key    text,
   p_request_ids     uuid[] default null::uuid[],
   p_decision_reason text   default null::text
 )
@@ -1436,7 +1703,9 @@ declare
   v_actor_profile_id uuid := private.current_profile_id();
   v_count integer;
 begin
-  select course.id into v_course_id from public.courses as course where course.course_key = p_course_key;
+  select course.id into v_course_id
+  from public.courses as course
+  where course.offering_key = p_offering_key;
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -1456,8 +1725,8 @@ $function$;
 alter function "public"."reject_course_access_requests"(text, uuid[], text) owner to "ainigma_function_owner";
 
 create or replace function public.request_course_access (
-  p_course_key text,
-  p_reason     text default null::text
+  p_offering_key text,
+  p_reason       text default null::text
 )
   returns jsonb
   language plpgsql
@@ -1479,7 +1748,7 @@ begin
   select course.id, course.enrollment_mode
   into v_course_id, v_enrollment_mode
   from public.courses as course
-  where course.course_key = p_course_key
+  where course.offering_key = p_offering_key
     and course.status = 'published';
 
   if v_course_id is null then
@@ -1497,7 +1766,7 @@ begin
     and membership.profile_id = v_profile_id;
 
   if found and v_membership.status = 'active' then
-    return jsonb_build_object('state', 'active', 'course_key', p_course_key);
+    return jsonb_build_object('state', 'active', 'offering_key', p_offering_key);
   end if;
 
   select request_row.*
@@ -1511,7 +1780,7 @@ begin
   if found and v_request.status in ('pending', 'approved') then
     return jsonb_build_object(
       'state', case when v_request.status = 'approved' then 'awaiting_github_access' else 'pending' end,
-      'course_key', p_course_key,
+      'offering_key', p_offering_key,
       'request_id', v_request.id
     );
   end if;
@@ -1578,14 +1847,14 @@ begin
 
     return jsonb_build_object(
       'state', 'awaiting_github_access',
-      'course_key', p_course_key,
+      'offering_key', p_offering_key,
       'request_id', v_request.id
     );
   end if;
 
   return jsonb_build_object(
     'state', 'pending',
-    'course_key', p_course_key,
+    'offering_key', p_offering_key,
     'request_id', v_request.id
   );
 end
@@ -1629,6 +1898,10 @@ alter table "private"."profile_identifiers"
 
 alter table "public"."course_memberships"
   add constraint "course_memberships_access_request_fk" foreign key (created_from_access_request_id) references private.course_access_requests(id) on delete restrict;
+
+alter table "public"."courses"
+  add constraint "courses_course_definition_release_fkey" foreign key (course_definition_release_id, course_definition_key)
+    references private.course_definition_releases(id, course_definition_key) on delete restrict;
 
 alter table "private"."course_access_requests"
   add constraint "course_access_requests_course_id_fkey" foreign key (course_id) references public.courses(id) on delete restrict;
@@ -1693,6 +1966,8 @@ create index course_access_requests_course_status_idx on private.course_access_r
 create unique index course_access_requests_pending_uidx on private.course_access_requests using btree (course_id, requester_profile_id)
   where (status = 'pending'::text);
 
+create index course_definition_releases_latest_idx on private.course_definition_releases using btree (course_definition_key, created_at desc, id);
+
 create index course_membership_events_course_created_idx on private.course_membership_events using btree (course_id, created_at desc);
 
 create index course_membership_events_profile_created_idx on private.course_membership_events using btree (profile_id, created_at desc);
@@ -1719,9 +1994,14 @@ create unique index course_memberships_access_request_uidx on public.course_memb
 
 create index course_memberships_course_role_status_idx on public.course_memberships using btree (course_id, role, status);
 
+create unique index course_memberships_one_active_owner_uidx on public.course_memberships using btree (course_id)
+  where ((role = 'owner'::text) AND (status = 'active'::text));
+
 create index course_memberships_profile_status_role_idx on public.course_memberships using btree (profile_id, status, role, course_id);
 
-create index courses_definition_key_idx on public.courses using btree (definition_key);
+create index courses_course_definition_key_idx on public.courses using btree (course_definition_key);
+
+create index courses_course_definition_release_id_idx on public.courses using btree (course_definition_release_id);
 
 create index courses_status_window_idx on public.courses using btree (status, starts_at, ends_at);
 
@@ -1729,6 +2009,11 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row
   execute function private.handle_auth_user_created();
+
+create trigger course_definition_releases_reject_mutation
+  before delete or update on private.course_definition_releases
+  for each row
+  execute function private.reject_mutation();
 
 create trigger course_membership_events_reject_mutation
   before delete or update on private.course_membership_events
@@ -1811,6 +2096,16 @@ create policy "profiles_update_own_display_name" on "public"."profiles"
   using ((id = ( select private.current_profile_id() as current_profile_id)))
   with check ((id = ( SELECT private.current_profile_id() AS current_profile_id)));
 
+comment on column "private"."course_definition_releases"."artifact_ref" is 'Immutable deployable artifact reference resolved by the compiler and deployment system.';
+
+comment on column "public"."courses"."course_definition_key" is 'Immutable key of the reusable Git-authored course definition rendered for this offering.';
+
+comment on column "public"."courses"."course_definition_release_id" is 'Exact compiler release currently rendered for this offering; ended offerings stop advancing.';
+
+comment on column "public"."courses"."offering_key" is 'Globally unique immutable key for one term, cohort, or operational course space.';
+
+comment on table "private"."course_definition_releases" is 'Immutable Ainigma compiler outputs for reusable course definitions.';
+
 comment on table "public"."courses" is 'Operational course offerings. Titles, navigation, and authored content remain in Git.';
 
 comment on table "public"."profiles" is 'Provider-neutral application identities. Authorization claims remain private.';
@@ -1819,6 +2114,14 @@ revoke all on function "private"."add_course_membership"(uuid, uuid, text, uuid,
 
 grant execute on function "private"."add_course_membership"(uuid, uuid, text, uuid, text) to "ainigma_maintenance";
 
+revoke all on function "private"."advance_open_course_offerings_to_release"(uuid) from public;
+
+grant execute on function "private"."advance_open_course_offerings_to_release"(uuid) to "ainigma_maintenance";
+
+revoke all on function "private"."branch_course_offering"(text, uuid, text, uuid, timestamp with time zone, timestamp with time zone, text) from public;
+
+grant execute on function "private"."branch_course_offering"(text, uuid, text, uuid, timestamp with time zone, timestamp with time zone, text) to "ainigma_maintenance";
+
 revoke all on function "private"."can_view_profile"(uuid) from public;
 
 grant execute on function "private"."can_view_profile"(uuid) to "authenticated";
@@ -1826,10 +2129,6 @@ grant execute on function "private"."can_view_profile"(uuid) to "authenticated";
 revoke all on function "private"."confirm_github_course_access"(uuid, uuid, bigint, text, text) from public;
 
 grant execute on function "private"."confirm_github_course_access"(uuid, uuid, bigint, text, text) to "ainigma_maintenance";
-
-revoke all on function "private"."create_course_with_initial_owner"(text, text, text, uuid, timestamp with time zone, timestamp with time zone, text) from public;
-
-grant execute on function "private"."create_course_with_initial_owner"(text, text, text, uuid, timestamp with time zone, timestamp with time zone, text) to "ainigma_maintenance";
 
 revoke all on function "private"."current_profile_id"() from public;
 
@@ -1853,6 +2152,10 @@ revoke all on function "private"."reconcile_auth_users"() from public;
 
 grant execute on function "private"."reconcile_auth_users"() to "ainigma_maintenance";
 
+revoke all on function "private"."register_course_definition_release"(text, text, text, text) from public;
+
+grant execute on function "private"."register_course_definition_release"(text, text, text, text) to "ainigma_maintenance";
+
 revoke all on function "private"."reject_mutation"() from public;
 
 grant execute on function "private"."reject_mutation"() to "postgres";
@@ -1872,6 +2175,10 @@ grant execute on function "private"."set_updated_at"() to "postgres";
 revoke all on function "private"."sync_auth_identity"(uuid) from public;
 
 grant execute on function "private"."sync_auth_identity"(uuid) to "ainigma_maintenance";
+
+revoke all on function "private"."transfer_course_ownership"(uuid, uuid, uuid, text) from public;
+
+grant execute on function "private"."transfer_course_ownership"(uuid, uuid, uuid, text) to "ainigma_maintenance";
 
 revoke all on function "private"."transition_course_membership"(uuid, uuid, text, text, uuid, text) from public;
 
@@ -1951,15 +2258,9 @@ grant execute on function "public"."update_my_profile"(text) to "ainigma_functio
 
 grant execute on function "public"."update_my_profile"(text) to "authenticated";
 
-grant usage on schema "private" to "ainigma_function_owner", "ainigma_maintenance";
+revoke all on schema "private" from "ainigma_maintenance";
 
-grant create, usage on schema "private" to "postgres";
-
-revoke create on schema "public", "private" from "ainigma_function_owner";
-
-revoke all on schema "public" from "ainigma_function_owner";
-
-grant usage on schema "public" to "ainigma_function_owner";
+grant usage on schema "private" to "ainigma_maintenance";
 
 grant insert, select on table "private"."auth_user_links" to "ainigma_function_owner";
 
@@ -1968,6 +2269,10 @@ grant delete, insert, maintain, references, select, trigger, truncate, update on
 grant insert, select, update on table "private"."course_access_requests" to "ainigma_function_owner", "ainigma_maintenance";
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_access_requests" to "postgres";
+
+grant insert, select on table "private"."course_definition_releases" to "ainigma_function_owner";
+
+grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_definition_releases" to "postgres";
 
 grant insert, select on table "private"."course_membership_events" to "ainigma_function_owner";
 
@@ -2004,13 +2309,3 @@ grant delete, insert, maintain, references, select, trigger, truncate, update on
 grant select on table "private"."auth_users" to "ainigma_function_owner";
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."auth_users" to "postgres";
-
-revoke all on table "public"."course_memberships" from "service_role";
-
-revoke all on table "public"."courses" from "service_role";
-
-revoke all on table "public"."profiles" from "service_role";
-
-alter default privileges for role "postgres" in schema "public" grant maintain on tables to "anon";
-
-alter default privileges for role "postgres" in schema "public" grant maintain on tables to "authenticated";

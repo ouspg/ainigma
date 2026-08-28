@@ -75,8 +75,8 @@ function formatCourseDate(value: string, locale: Locale): string {
 
 function DashboardContent({ workspace, locale }: Props) {
   const [filter, setFilter] = useState<AgendaFilter>("upcoming");
-  const courseBySlug = useMemo(
-    () => new Map(workspace.courses.map((course) => [course.slug, course])),
+  const courseByOfferingKey = useMemo(
+    () => new Map(workspace.courses.map((course) => [course.offeringKey, course])),
     [workspace.courses],
   );
   const visibleAgenda = filterAgenda(workspace.agenda, filter);
@@ -244,7 +244,7 @@ function DashboardContent({ workspace, locale }: Props) {
                 header={<Text className="visually-hidden">{copy.weeklyActivities}</Text>}
               >
                 {visibleAgenda.map((item) => {
-                  const course = courseBySlug.get(item.courseSlug);
+                  const course = courseByOfferingKey.get(item.offeringKey);
                   const AgendaIcon = agendaIcons[item.type];
                   const isCompleted = item.status === "completed";
                   return (
@@ -306,7 +306,7 @@ function DashboardContent({ workspace, locale }: Props) {
                 header={<Text className="visually-hidden">{copy.enrolledCourses}</Text>}
               >
                 {workspace.courses.map((course) => {
-                  const CourseIcon = getCourseIcon(course.slug);
+                  const CourseIcon = getCourseIcon(course.courseDefinitionSlug);
 
                   return (
                     <ListItem
@@ -351,7 +351,7 @@ function DashboardContent({ workspace, locale }: Props) {
                         </VStack>
                       }
                       href={localizedPath(locale, course.href)}
-                      key={course.slug}
+                      key={course.offeringKey}
                       label={
                         <Text type="large" weight="semibold">
                           {course.title}

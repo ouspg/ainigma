@@ -9,23 +9,31 @@ import {
 } from "../../../lib/learning/catalog";
 import { getPublishedCourseEntry } from "../../../lib/learning/content-entry";
 import { getLocale } from "../../../lib/i18n";
-import { courseSlugFromParam } from "../../../lib/learning/identifiers";
+import { courseOfferingKeyFromParam } from "../../../lib/learning/identifiers";
 import { routes } from "../../../lib/routes";
 
 export const prerender = false;
 
-const courseSlug = courseSlugFromParam(Astro.params.course);
-if (!courseSlug) {
+const offeringKey = courseOfferingKeyFromParam(Astro.params.offering);
+const authorizedCourseDefinitionKey = Astro.locals.authorizedCourseOffering?.courseDefinitionKey;
+const authorizedCourseDefinitionReleaseId =
+  Astro.locals.authorizedCourseOffering?.courseDefinitionReleaseId;
+if (!offeringKey || !authorizedCourseDefinitionKey || !authorizedCourseDefinitionReleaseId) {
   return new Response("Not found", { status: 404 });
 }
-const entry = await getPublishedCourseEntry(`${courseSlug}/announcements`);
+const { course, workspace } = await getLearningPageData(
+  Astro.locals.profile!,
+  offeringKey,
+  authorizedCourseDefinitionKey,
+  authorizedCourseDefinitionReleaseId,
+);
+const entry = await getPublishedCourseEntry(`${course.courseDefinitionSlug}/announcements`);
 if (!entry || entry.data.kind !== "course-page" || entry.data.page !== "announcements") {
   return new Response("Not found", { status: 404 });
 }
 const { Content, headings, remarkPluginFrontmatter } = await render(entry);
-const { course, workspace } = await getLearningPageData(Astro.locals.profile!, courseSlug);
 const outline = buildOutlineSections(headings, remarkPluginFrontmatter.activityOutline);
-const currentPath = routes.coursePage.path({ course: course.slug, page: "announcements" });
+const currentPath = routes.coursePage.path({ offeringKey: course.offeringKey, page: "announcements" });
 const locale = getLocale(Astro.currentLocale);
 ---
 

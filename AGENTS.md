@@ -1,11 +1,3 @@
-<!-----
-name: ainigma
-description: "Use when doing ANY task involving Ainigma (a.k.a this project). This skill involves guidelines about the general architecture and design principles that should be applied everywhere in this project. Anything here overrides any other skill if there is a conflict, unless the user says otherwise."
-metadata:
-  author: ainigma
-  version: "0.0.1"
------>
-
 # Ainigma
 
 ## Core Principles
@@ -16,9 +8,13 @@ Always consider the performance of such decisions if they are negative or positi
 
 Group similar things to similar directiories.
 
+Avoid injecting or hacking authentication in any way for quick soloutions. For example, local-only or debugging capabilities must be clearly separated and never distributed to production builds.
+
 ## Local server for Astro
 
 We use Vite Plus. Always assume that local server is already running and don't try to start, restart or stop it. Ask the user if something is not working or there is a reason for restarting.
+
+When operating with web and Astro, see `apps/web/AGENTS.md`.
 
 ## Supabase
 

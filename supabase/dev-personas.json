@@ -20,7 +20,9 @@
     "providerId": "90000004",
     "profileLabel": "Pending Learner",
     "memberships": [],
-    "accessRequests": [{ "courseKey": "test-course-a-local", "reason": "development seed pending request" }]
+    "accessRequests": [
+      { "offeringKey": "test-course-a-local", "reason": "development seed pending request" }
+    ]
   },
   {
     "key": "memberCourseA",
@@ -31,7 +33,7 @@
     "identityId": "51000000-0000-0000-0000-000000000002",
     "providerId": "90000002",
     "profileLabel": "Ainoa · Course A",
-    "memberships": [{ "courseKey": "test-course-a-local", "role": "learner" }]
+    "memberships": [{ "offeringKey": "test-course-a-local", "role": "learner" }]
   },
   {
     "key": "memberCourseB",
@@ -42,7 +44,7 @@
     "identityId": "51000000-0000-0000-0000-000000000006",
     "providerId": "90000006",
     "profileLabel": "Ainoa · Course B",
-    "memberships": [{ "courseKey": "test-course-b-local", "role": "learner" }]
+    "memberships": [{ "offeringKey": "test-course-b-local", "role": "learner" }]
   },
   {
     "key": "memberBothCourses",
@@ -54,8 +56,8 @@
     "providerId": "90000007",
     "profileLabel": "Ainoa · Both Courses",
     "memberships": [
-      { "courseKey": "test-course-a-local", "role": "learner" },
-      { "courseKey": "test-course-b-local", "role": "learner" }
+      { "offeringKey": "test-course-a-local", "role": "learner" },
+      { "offeringKey": "test-course-b-local", "role": "learner" }
     ]
   },
   {
@@ -67,7 +69,7 @@
     "identityId": "51000000-0000-0000-0000-000000000005",
     "providerId": "90000005",
     "profileLabel": "Course Instructor",
-    "memberships": [{ "courseKey": "test-course-a-local", "role": "instructor" }]
+    "memberships": [{ "offeringKey": "test-course-a-local", "role": "instructor" }]
   },
   {
     "key": "owner",

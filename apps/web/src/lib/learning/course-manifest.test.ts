@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { parseCourseSlug } from "./identifiers";
+import { parseCourseDefinitionSlug } from "./identifiers";
 import { getCourseDefinitionKey, type CourseEntry } from "./course-manifest";
 
 describe("course manifest identity", () => {
@@ -9,13 +9,13 @@ describe("course manifest identity", () => {
         id: "renamed-course-directory/index",
         data: {
           kind: "course",
-          definitionKey: "stable-course-definition",
+          courseDefinitionKey: "stable-course-definition",
         },
       },
     ] as unknown as CourseEntry[];
 
-    expect(getCourseDefinitionKey(entries, parseCourseSlug("renamed-course-directory"))).toBe(
-      "stable-course-definition",
-    );
+    expect(
+      getCourseDefinitionKey(entries, parseCourseDefinitionSlug("renamed-course-directory")),
+    ).toBe("stable-course-definition");
   });
 });

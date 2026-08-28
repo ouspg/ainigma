@@ -30,12 +30,16 @@ vp check
   uses design tokens.
 - Course titles, public directory metadata, and authored material come from the repository-level
   `courses/` collection. Adding a `kind: course` overview file adds it to the front-page directory.
-- Every course overview declares an immutable `definitionKey`. The top-level directory name is only
-  its mutable URL slug: renaming a directory must leave `definitionKey` unchanged. Database
-  memberships reference the offering UUID, while the route guard resolves URL slug → authored
-  `definitionKey` → the authorized offering returned by `list_my_courses()`.
-- Course offering dates are authored as `startDate` and `endDate` in each course overview frontmatter
-  and are shown in the learning desk's Course progress list.
+- Every course overview declares an immutable `courseDefinitionKey`. The top-level directory name
+  is only its mutable definition slug: renaming a directory must leave `courseDefinitionKey`
+  unchanged.
+- Protected course URLs carry the immutable `offeringKey`. The route guard authorizes that exact
+  offering through `list_my_courses()`, then uses its `course_definition_key` to select the shared
+  MDX definition and its `course_definition_release_id` to verify the exact compiler release.
+  Multiple offerings can therefore render one definition without sharing members or release
+  pointers.
+- Offering dates live in operational learner/offering data, not in MDX frontmatter, and are shown in
+  the learning desk's Course progress list.
 - `src/data/learning.json` is typed prototype state for enrollments, agenda items, and progress. It is
   deliberately separate from Git-authored content so a Supabase-backed repository can replace it.
 - Challenge rendering receives public definitions from `lib/challenges/repository.ts`; evaluation is
@@ -49,10 +53,10 @@ vp check
 - `/about/` and `/privacy/` — public service-information placeholders linked from the home-page footer
 - `/desk/` — cross-course learning desk shown after sign-in
 - `/activity/` — persistent learner history for announcements, generated artifacts, and lab events
-- `/courses/[course]/` — course progress and course map
-- `/courses/[course]/[week]/` — week overview
-- `/courses/[course]/[week]/[task]/` — reading and interactive activity workspace
-- `/courses/[course]/announcements/` and `/materials/` — course resources
+- `/courses/[offering-key]/` — one offering's progress and course map
+- `/courses/[offering-key]/[week]/` — week overview for that offering
+- `/courses/[offering-key]/[week]/[task]/` — reading and interactive activity workspace
+- `/courses/[offering-key]/announcements/` and `/materials/` — offering resources
 - `/login/` — Supabase GitHub OAuth entry point
 
 The shared public footer is intentionally rendered only on the signed-out `/` surface. The About
@@ -69,7 +73,7 @@ switches.
 Supabase GitHub OAuth uses a browser client to begin sign-in and an on-demand Astro callback to
 exchange the PKCE code into a cookie-backed session. Middleware validates the token claims before
 serving `/desk/`, `/activity/`, `/announcements/`, or `/courses/` routes. Course routes additionally
-require the matching `definition_key` from the database's `list_my_courses()` authorization RPC.
+require the matching `offering_key` from the database's `list_my_courses()` authorization RPC.
 The MDX collection is still compiled at build time; protected pages render those compiled modules
 only after authentication and course authorization. Database authorization also remains enforced
 by RLS. The public front page deliberately reads no learner progress data.
@@ -92,10 +96,10 @@ and Auth Admin/service-role secrets must never use Astro's `PUBLIC_` prefix.
 `src/lib/routes.ts` is the review surface for application routes. It owns canonical path builders,
 locale handling, route matching, the exhaustive `routeAccessGroups` policy, and the independent
 `learnerShellRouteIds` list. Components and data adapters must use `routes.*.path()` instead of
-constructing internal URLs. Prototype data in `src/data/learning.json` stores typed course route
-targets keyed by stable course `definitionKey` values rather than URLs;
-`lib/learning/course-manifest.ts` maps those identities to the current directory slugs before the
-same route builders generate links.
+constructing internal URLs. Prototype data in `src/data/learning.json` stores course offerings and
+route targets keyed by stable `offeringKey` values. Each offering carries a
+`courseDefinitionKey` and `courseDefinitionReleaseId`; the catalog maps that authored identity to
+the current definition-directory slug and rejects release mismatches before loading MDX.
 
 `src/middleware.ts` only dispatches the matched policy. All session and course-membership checks
 live in `lib/auth/route-access.ts`, so there is one function to review for page-level access. This

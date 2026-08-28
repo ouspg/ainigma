@@ -55,9 +55,9 @@ begin
 end
 $roles$;
 
--- The function owner cannot log in. Its table access is constrained by
--- explicit grants and dedicated internal RLS policies below.
-
+-- This durable privilege is bootstrapped in roles.sql before migrations run.
+-- The role cannot log in; postgres remains the owner of both schemas.
+grant usage, create on schema public, private to ainigma_function_owner;
 
 -- These private, application-owned views are the only bridge through Auth's RLS.
 -- They expose the minimum trusted columns needed by reconciliation functions
@@ -587,14 +587,12 @@ $function$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function private.handle_auth_user_created();
--- The function owner cannot log in. Its table access is constrained by
--- explicit grants; browser access is granted by the authorization schema.
-grant usage on schema public, private to ainigma_function_owner;
+-- The function owner's table access is constrained by explicit grants;
+-- browser access is granted by the authorization schema.
 grant select on private.auth_users, private.auth_identities to ainigma_function_owner;
 grant select, insert, update on public.profiles to ainigma_function_owner;
 grant select, insert on private.auth_user_links to ainigma_function_owner;
 grant select, insert, update on private.profile_identifiers to ainigma_function_owner;
-grant create on schema public, private to ainigma_function_owner;
 
 alter function private.ensure_auth_user_profile(uuid) owner to ainigma_function_owner;
 alter function private.handle_auth_user_created() owner to ainigma_function_owner;
@@ -606,7 +604,6 @@ alter function private.report_identity_anomalies() owner to ainigma_function_own
 alter function private.current_profile_id() owner to ainigma_function_owner;
 alter function public.get_my_profile() owner to ainigma_function_owner;
 alter function public.update_my_profile(text) owner to ainigma_function_owner;
-revoke create on schema public, private from ainigma_function_owner;
 
 -- Maintenance is a NOLOGIN capability role used explicitly by trusted operators
 -- or the future control plane.

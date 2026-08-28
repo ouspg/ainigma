@@ -60,39 +60,42 @@ export type Database = {
       courses: {
         Row: {
           code: string
-          course_key: string
+          course_definition_key: string
+          course_definition_release_id: string
           created_at: string
-          definition_key: string
           ends_at: string | null
           enrollment_mode: string
           external_url: string | null
           id: string
+          offering_key: string
           starts_at: string | null
           status: string
           updated_at: string
         }
         Insert: {
           code: string
-          course_key: string
+          course_definition_key: string
+          course_definition_release_id: string
           created_at?: string
-          definition_key: string
           ends_at?: string | null
           enrollment_mode?: string
           external_url?: string | null
           id?: string
+          offering_key: string
           starts_at?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           code?: string
-          course_key?: string
+          course_definition_key?: string
+          course_definition_release_id?: string
           created_at?: string
-          definition_key?: string
           ends_at?: string | null
           enrollment_mode?: string
           external_url?: string | null
           id?: string
+          offering_key?: string
           starts_at?: string | null
           status?: string
           updated_at?: string
@@ -126,7 +129,7 @@ export type Database = {
     }
     Functions: {
       approve_course_access_requests: {
-        Args: { p_course_key: string; p_request_ids?: string[] }
+        Args: { p_offering_key: string; p_request_ids?: string[] }
         Returns: number
       }
       get_my_profile: {
@@ -140,16 +143,16 @@ export type Database = {
       list_course_access_requests: {
         Args: {
           p_authorization_filter?: string
-          p_course_key: string
+          p_offering_key: string
           p_status?: string
         }
         Returns: {
           authorization_status: string
-          course_key: string
           decided_at: string
           display_name: string
           github_access_state: string
           github_username: string
+          offering_key: string
           reason: string
           request_id: string
           requested_at: string
@@ -158,7 +161,7 @@ export type Database = {
         }[]
       }
       list_course_roster: {
-        Args: { p_course_key: string }
+        Args: { p_offering_key: string }
         Returns: {
           created_at: string
           display_name: string
@@ -171,9 +174,9 @@ export type Database = {
       list_my_course_access_requests: {
         Args: never
         Returns: {
-          course_key: string
           decided_at: string
           github_access_state: string
+          offering_key: string
           reason: string
           request_id: string
           requested_at: string
@@ -183,14 +186,14 @@ export type Database = {
       list_my_courses: { Args: never; Returns: Json }
       reject_course_access_requests: {
         Args: {
-          p_course_key: string
           p_decision_reason?: string
+          p_offering_key: string
           p_request_ids?: string[]
         }
         Returns: number
       }
       request_course_access: {
-        Args: { p_course_key: string; p_reason?: string }
+        Args: { p_offering_key: string; p_reason?: string }
         Returns: Json
       }
       update_my_profile: {

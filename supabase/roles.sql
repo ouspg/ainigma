@@ -14,3 +14,9 @@ $roles$;
 
 grant ainigma_function_owner to postgres;
 grant ainigma_maintenance to postgres;
+
+-- Function ownership transfers in generated migrations require the target role
+-- to have CREATE on the containing schema before any migration is applied.
+-- Keep this bootstrap idempotent and mirror its durable state in schemas/.
+create schema if not exists private;
+grant usage, create on schema public, private to ainigma_function_owner;

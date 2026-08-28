@@ -96,8 +96,8 @@ export default function PublicHomePage({ courses, locale }: Props) {
                   <HStack className="public-course-actions" gap={4} vAlign="center" wrap="wrap">
                     <Button
                       endContent={<ArrowRight size={15} aria-hidden="true" />}
-                      href={localizedPath(locale, routes.course.path({ course: course.slug }))}
-                      label={copy.viewCourse}
+                      href={localizedPath(locale, routes.desk.path())}
+                      label={copy.openLearningDesk}
                       size="sm"
                       variant="primary"
                     />
@@ -113,7 +113,7 @@ export default function PublicHomePage({ courses, locale }: Props) {
                     ) : null}
                   </HStack>
                 }
-                key={course.slug}
+                key={course.courseDefinitionSlug}
                 label={
                   <Text type="large" weight="semibold">
                     {course.title}

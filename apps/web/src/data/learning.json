@@ -7,9 +7,12 @@
     "completedActivities": 12,
     "totalActivities": 38
   },
-  "courses": {
-    "test-course-a": {
-      "courseKey": "test-course-a-local",
+  "courseOfferings": {
+    "test-course-a-local": {
+      "courseDefinitionKey": "test-course-a",
+      "courseDefinitionReleaseId": "60000000-0000-0000-0000-000000000001",
+      "startDate": "2026-08-24",
+      "endDate": "2026-12-13",
       "progress": 42,
       "status": "in-progress",
       "earnedPoints": 12,
@@ -24,7 +27,7 @@
         "description": "Isolate the unusual exchange and document the evidence behind your conclusion.",
         "target": {
           "route": "courseTask",
-          "course": "test-course-a",
+          "offeringKey": "test-course-a-local",
           "week": "week-01",
           "task": "packet-traces"
         },
@@ -38,14 +41,14 @@
   "agenda": [
     {
       "id": "packet-traces",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "type": "lab",
       "title": "Packet traces and protocol clues",
       "supporting": "35 min · 6 points",
       "dueLabel": "Today · 23:59",
       "target": {
         "route": "courseTask",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-01",
         "task": "packet-traces"
       },
@@ -53,34 +56,34 @@
     },
     {
       "id": "protocol-goals",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "type": "reading",
       "title": "Threat models before primitives",
       "supporting": "20 min · Reading",
       "dueLabel": "Wednesday",
-      "target": { "route": "course", "course": "test-course-a" },
+      "target": { "route": "course", "offeringKey": "test-course-a-local" },
       "status": "todo"
     },
     {
       "id": "toolchain",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "type": "setup",
       "title": "Prepare the course toolchain",
       "supporting": "15 min · Setup",
       "dueLabel": "Friday",
-      "target": { "route": "course", "course": "test-course-a" },
+      "target": { "route": "course", "offeringKey": "test-course-a-local" },
       "status": "todo"
     },
     {
       "id": "week-three-recap",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "type": "reading",
       "title": "Review the memory safety recap",
       "supporting": "12 min · Reading",
       "dueLabel": "Completed Sunday",
       "target": {
         "route": "courseWeek",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-02"
       },
       "status": "completed"
@@ -89,7 +92,7 @@
   "activity": [
     {
       "id": "packet-export-ready",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "kind": "artifact",
       "title": "Packet analysis export is ready",
       "description": "The report bundle from your latest task run is available for download.",
@@ -97,7 +100,7 @@
       "occurredAt": "2026-08-24T14:42:00+03:00",
       "target": {
         "route": "courseTask",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-01",
         "task": "packet-traces"
       },
@@ -106,7 +109,7 @@
     },
     {
       "id": "forensics-instance-closed",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "kind": "instance",
       "title": "Forensics lab instance closed",
       "description": "The instance reached its idle limit. You can open a new one from the task.",
@@ -114,7 +117,7 @@
       "occurredAt": "2026-08-24T14:13:00+03:00",
       "target": {
         "route": "courseTask",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-01",
         "task": "packet-traces"
       },
@@ -123,7 +126,7 @@
     },
     {
       "id": "packet-attempt-succeeded",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "kind": "attempt",
       "title": "Packet trace attempt accepted",
       "description": "Your latest answer passed the task checks and was recorded.",
@@ -131,7 +134,7 @@
       "occurredAt": "2026-08-24T13:00:00+03:00",
       "target": {
         "route": "courseTask",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-01",
         "task": "packet-traces"
       },
@@ -140,19 +143,19 @@
     },
     {
       "id": "crypto-instance-opened",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "kind": "instance",
       "title": "Protocol lab instance opened",
       "description": "Your isolated exercise environment is ready.",
       "timeLabel": "Yesterday",
       "occurredAt": "2026-08-23T16:25:00+03:00",
-      "target": { "route": "course", "course": "test-course-a" },
+      "target": { "route": "course", "offeringKey": "test-course-a-local" },
       "isUnread": false,
       "isRecent": false
     },
     {
       "id": "memory-safety-reviewed",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "kind": "grading",
       "title": "Memory safety exercise reviewed",
       "description": "Course staff reviewed your submission and left feedback.",
@@ -160,7 +163,7 @@
       "occurredAt": "2026-08-23T12:10:00+03:00",
       "target": {
         "route": "courseWeek",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-02"
       },
       "isUnread": false,
@@ -168,7 +171,7 @@
     },
     {
       "id": "memory-safety-artifact",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "kind": "artifact",
       "title": "Memory safety evidence archive created",
       "description": "The evidence archive from your completed exercise remains available.",
@@ -176,7 +179,7 @@
       "occurredAt": "2026-08-22T18:05:00+03:00",
       "target": {
         "route": "courseWeek",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "week": "week-02"
       },
       "isUnread": false,
@@ -186,21 +189,21 @@
   "announcements": [
     {
       "id": "lab-maintenance",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "title": "Lab environment maintenance on Tuesday",
       "timeLabel": "2 hours ago",
       "target": {
         "route": "coursePage",
-        "course": "test-course-a",
+        "offeringKey": "test-course-a-local",
         "page": "announcements"
       }
     },
     {
       "id": "office-hours",
-      "courseDefinitionKey": "test-course-a",
+      "offeringKey": "test-course-a-local",
       "title": "This week's office hours move to TS135",
       "timeLabel": "Yesterday",
-      "target": { "route": "course", "course": "test-course-a" }
+      "target": { "route": "course", "offeringKey": "test-course-a-local" }
     }
   ]
 }

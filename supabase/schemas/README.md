@@ -6,8 +6,14 @@ These ordered files are the declarative source of truth for the application data
 - `04_course_definition_github_organizations.sql` — trusted GitHub organization per reusable course definition.
 - `05_course_definition_releases.sql` — immutable compiler-built course-definition releases.
 - `10_course_offerings.sql` — operational course offerings and their lifecycle fields.
-- `20_course_authorization.sql` — memberships, access requests, rosters, GitHub access,
-  repository provisioning, RLS, and RPCs.
+- `20_course_memberships.sql` — offering memberships, immutable audit events, and membership operations.
+- `21_course_access_requests.sql` — learner access requests and trusted roster allowlists.
+- `22_github_course_access.sql` — GitHub invitations, membership reconciliation, and access activation.
+- `23_course_repository_provisioning.sql` — durable, explicitly requested repository jobs.
+- `24_course_offering_operations.sql` — compiler-controlled release and offering lifecycle operations.
+- `25_course_member_api.sql` — authenticated course, roster, access, and repository self-service RPCs.
+- `26_course_staff_api.sql` — authenticated access-request administration RPCs.
+- `99_application_permissions.sql` — final ownership, grants, RLS policies, and table restrictions.
 
 Course identity has four deliberately separate forms:
 

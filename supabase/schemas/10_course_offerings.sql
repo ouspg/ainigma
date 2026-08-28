@@ -1,5 +1,5 @@
 -- Declarative course offerings: operational identity for authored course definitions.
--- Memberships and access policy are declared in the later authorization schema.
+-- Offering identity remains separate from reusable course content and from cohort membership state.
 create table public.courses (
   id uuid primary key default gen_random_uuid(),
   offering_key text not null unique,

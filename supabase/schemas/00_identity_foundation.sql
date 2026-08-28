@@ -1,6 +1,9 @@
 -- Declarative identity foundation: provider-neutral profiles, Auth links, and verified identifiers.
 -- The initial baseline omits one-time Auth reconciliation because this database is fresh;
 -- schema diffs do not capture data changes.
+-- Compiler-detectable PL/pgSQL hazards must fail schema loading rather than survive as warnings.
+set plpgsql.extra_errors = 'all';
+
 create extension if not exists pgcrypto with schema extensions;
 create extension if not exists "uuid-ossp" with schema extensions;
 
@@ -155,6 +158,8 @@ create index profile_identifiers_profile_active_idx
 create index profile_identifiers_source_auth_user_idx
   on private.profile_identifiers (source_auth_user_id)
   where source_auth_user_id is not null;
+
+-- Database-managed timestamps remain reliable for browser, worker, and maintenance writes alike.
 create function private.set_updated_at()
 returns trigger
 language plpgsql
@@ -172,6 +177,8 @@ for each row execute function private.set_updated_at();
 create trigger profile_identifiers_set_updated_at
 before update on private.profile_identifiers
 for each row execute function private.set_updated_at();
+
+-- One Auth user maps to exactly one application profile, even when signup hooks and repair jobs race.
 create function private.ensure_auth_user_profile(p_auth_user_id uuid)
 returns uuid
 language plpgsql
@@ -216,6 +223,7 @@ begin
 end
 $function$;
 
+-- New Auth users receive the same idempotent profile provisioning used by reconciliation.
 create function private.handle_auth_user_created()
 returns trigger
 language plpgsql
@@ -228,6 +236,7 @@ begin
 end
 $function$;
 
+-- A live verified identifier cannot move between profiles; repeated verification only refreshes provenance.
 create function private.upsert_verified_identifier(
   p_profile_id uuid,
   p_kind text,
@@ -299,6 +308,7 @@ begin
 end
 $function$;
 
+-- GitHub's numeric subject is authoritative; username and verified email remain replaceable provider facts.
 create function private.sync_auth_identity(p_identity_id uuid)
 returns uuid
 language plpgsql
@@ -405,6 +415,7 @@ begin
 end
 $function$;
 
+-- This repair path covers Auth rows that predate or outlive the normal signup trigger.
 create function private.reconcile_auth_users()
 returns table (auth_user_id uuid, profile_id uuid, action text)
 language plpgsql
@@ -431,6 +442,7 @@ begin
 end
 $function$;
 
+-- Identity repair isolates provider-data failures so one malformed identity cannot stop the full audit.
 create function private.reconcile_auth_identities()
 returns table (auth_identity_id uuid, status text, detail text)
 language plpgsql
@@ -462,6 +474,7 @@ begin
 end
 $function$;
 
+-- Operators need evidence of broken identity links without granting direct access to Auth internals.
 create function private.report_identity_anomalies()
 returns table (
   anomaly text,
@@ -474,7 +487,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $function$
+begin atomic
   select
     'orphan_profile'::text,
     profile.id,
@@ -502,18 +515,19 @@ as $function$
     from private.auth_user_links as link
     where link.auth_user_id = identity_row.user_id
   );
-$function$;
+end;
 
+-- Keep the request identity lookup unprivileged; authorization helpers add their own controlled access.
 create function private.request_auth_user_id()
 returns uuid
 language sql
 stable
-security definer
 set search_path = ''
-as $function$
+begin atomic
   select auth.uid();
-$function$;
+end;
 
+-- Every browser authorization path resolves through the trusted Auth-user-to-profile link.
 create function private.current_profile_id()
 returns uuid
 language plpgsql
@@ -549,20 +563,15 @@ returns table (
   created_at timestamptz,
   updated_at timestamptz
 )
-language plpgsql
+language sql
 stable
 security definer
 set search_path = ''
-as $function$
-declare
-  v_profile_id uuid := private.current_profile_id();
-begin
-  return query
+begin atomic
   select profile.display_name, profile.created_at, profile.updated_at
   from public.profiles as profile
-  where profile.id = v_profile_id;
-end
-$function$;
+  where profile.id = private.current_profile_id();
+end;
 
 create function public.update_my_profile(p_display_name text)
 returns table (
@@ -570,20 +579,15 @@ returns table (
   created_at timestamptz,
   updated_at timestamptz
 )
-language plpgsql
+language sql
 security definer
 set search_path = ''
-as $function$
-declare
-  v_profile_id uuid := private.current_profile_id();
-begin
-  return query
+begin atomic
   update public.profiles as profile
   set display_name = p_display_name
-  where profile.id = v_profile_id
+  where profile.id = private.current_profile_id()
   returning profile.display_name, profile.created_at, profile.updated_at;
-end
-$function$;
+end;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function private.handle_auth_user_created();

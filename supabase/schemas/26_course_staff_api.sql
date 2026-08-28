@@ -1,5 +1,6 @@
 -- Authenticated course access-request administration RPCs.
 
+-- Staff request review is scoped to one offering and reveals no caller-controlled profile identifiers.
 create function public.list_course_access_requests(
   p_offering_key text,
   p_status text default 'pending',
@@ -117,6 +118,7 @@ begin
 end
 $function$;
 
+-- Approval is owner-controlled and repeat-safe: only still-pending requests can transition.
 create function public.approve_course_access_requests(
   p_offering_key text,
   p_request_ids uuid[] default null
@@ -191,6 +193,7 @@ begin
 end
 $function$;
 
+-- Rejection shares the same owner-only, pending-only transition boundary as approval.
 create function public.reject_course_access_requests(
   p_offering_key text,
   p_request_ids uuid[] default null,
@@ -224,6 +227,5 @@ begin
   return v_count;
 end
 $function$;
-
 
 

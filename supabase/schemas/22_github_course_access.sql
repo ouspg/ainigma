@@ -107,7 +107,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $function$
+begin atomic
   select
     access_row.course_id,
     access_row.profile_id,
@@ -143,7 +143,7 @@ as $function$
   where request_row.status = 'approved'
     and course.status = 'published'
     and access_row.state <> 'revoked';
-$function$;
+end;
 
 -- Record an invitation sent through GitHub. The target must be the currently
 -- verified identifier for this profile; the worker cannot invite an arbitrary
@@ -611,4 +611,3 @@ begin
 
 end
 $function$;
-

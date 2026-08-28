@@ -2,7 +2,13 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(34);
+select extensions.plan(37);
+
+select extensions.is(
+  current_setting('plpgsql.extra_errors'),
+  'all',
+  'PL/pgSQL compiler diagnostics are treated as errors'
+);
 
 select extensions.has_table('public', 'profiles', 'profiles table exists');
 select extensions.has_table('private', 'auth_user_links', 'Auth link table exists');
@@ -276,6 +282,31 @@ select extensions.ok(
     where oid = 'private.current_profile_id()'::regprocedure
   ),
   'authorization helper has an empty search path'
+);
+select extensions.ok(
+  not (
+    select prosecdef
+    from pg_proc
+    where oid = 'private.request_auth_user_id()'::regprocedure
+  ),
+  'Auth UID lookup runs with caller privileges'
+);
+select extensions.is(
+  (
+    select count(*)::integer
+    from pg_proc as function_row
+    join pg_language as language_row on language_row.oid = function_row.prolang
+    where function_row.oid = any (array[
+      'private.report_identity_anomalies()'::regprocedure,
+      'private.request_auth_user_id()'::regprocedure,
+      'public.get_my_profile()'::regprocedure,
+      'public.update_my_profile(text)'::regprocedure
+    ])
+      and language_row.lanname = 'sql'
+      and function_row.prosqlbody is not null
+  ),
+  4,
+  'pure identity functions use parsed SQL-standard bodies'
 );
 select extensions.ok(
   not has_function_privilege('anon', 'private.current_profile_id()', 'EXECUTE'),

@@ -1,5 +1,6 @@
 -- Compiler-controlled course release and offering lifecycle operations.
 
+-- A release digest is immutable: replay may reuse it only when commit and artifact metadata still match.
 create function private.register_course_definition_release(
   p_course_definition_key text,
   p_source_commit_sha text,
@@ -163,5 +164,4 @@ begin
   return v_course_id;
 end
 $function$;
-
 

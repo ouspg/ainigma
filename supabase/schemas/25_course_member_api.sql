@@ -1,16 +1,14 @@
 -- Authenticated course discovery, roster, access, and repository self-service RPCs.
 
+-- Learners see published or archived memberships; draft offerings remain visible only to active staff.
 create function public.list_my_courses()
 returns jsonb
-language plpgsql
+language sql
 stable
 security definer
 set search_path = ''
-as $function$
-declare
-  v_profile_id uuid := private.current_profile_id();
-begin
-  return jsonb_build_object(
+begin atomic
+  select jsonb_build_object(
     'courses', coalesce(
       (
         select jsonb_agg(
@@ -33,7 +31,7 @@ begin
         from public.courses as course
         join public.course_memberships as membership
           on membership.course_id = course.id
-        where membership.profile_id = v_profile_id
+        where membership.profile_id = private.current_profile_id()
           and membership.status = 'active'
           and (
             course.status in ('published', 'archived')
@@ -63,7 +61,7 @@ begin
         from public.courses as course
         join public.course_memberships as membership
           on membership.course_id = course.id
-        where membership.profile_id = v_profile_id
+        where membership.profile_id = private.current_profile_id()
           and not (
             membership.status = 'active'
             and (
@@ -78,9 +76,9 @@ begin
       '[]'::jsonb
     )
   );
-end
-$function$;
+end;
 
+-- Roster access intentionally hides whether an unknown or unauthorized offering exists.
 create function public.list_course_roster(p_offering_key text)
 returns table (
   display_name text,
@@ -103,8 +101,6 @@ begin
   from public.courses as course
   where course.offering_key = p_offering_key;
 
-  -- Use one response for missing and unauthorized courses to avoid revealing
-  -- whether an offering exists through the RPC.
   if v_course_id is null
     or not private.has_course_role(v_course_id, array['owner', 'instructor']::text[])
   then
@@ -126,6 +122,8 @@ begin
   order by membership.created_at, profile.id;
 end
 $function$;
+
+-- An access request is offering-specific and may auto-approve only from a currently verified allowlist fact.
 create function public.request_course_access(p_offering_key text, p_reason text default null)
 returns jsonb
 language plpgsql
@@ -386,6 +384,7 @@ begin
 end
 $function$;
 
+-- Reading request history never exposes another profile's application or GitHub state.
 create function public.list_my_course_access_requests()
 returns table (
   offering_key text,
@@ -400,7 +399,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $function$
+begin atomic
   select
     course.offering_key,
     request_row.id,
@@ -415,6 +414,4 @@ as $function$
     on access_row.access_request_id = request_row.id
   where request_row.requester_profile_id = private.current_profile_id()
   order by request_row.requested_at desc;
-$function$;
-
-
+end;

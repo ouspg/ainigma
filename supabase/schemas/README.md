@@ -15,6 +15,17 @@ These ordered files are the declarative source of truth for the application data
 - `26_course_staff_api.sql` — authenticated access-request administration RPCs.
 - `99_application_permissions.sql` — final ownership, grants, RLS policies, and table restrictions.
 
+`roles.sql` and the first schema file enable `plpgsql.extra_errors = 'all'`. This makes ambiguous
+names, mismatched strict assignments, and similar compiler-detectable PL/pgSQL hazards fail both
+migration sessions and declarative schema loading.
+
+Pure query and update functions use `LANGUAGE SQL` with parsed `BEGIN ATOMIC` bodies. PL/pgSQL is
+reserved for triggers, ordered validation, row locking, domain errors, audit sequencing, bounded
+retries, and per-row exception isolation. The nullable authorization predicates also remain
+PL/pgSQL because their early returns must avoid resolving an authenticated profile. Expressing that
+branch with `CASE` in `BEGIN ATOMIC` currently triggers a known
+[Supabase CLI migration-parser limitation](https://github.com/supabase/cli/issues/3474).
+
 Course identity has four deliberately separate forms:
 
 - `courses.id` is the internal UUID used by foreign keys.

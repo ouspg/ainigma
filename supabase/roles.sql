@@ -1,5 +1,8 @@
 -- Custom non-login roles used by the application-owned database functions.
 -- Keep this file idempotent: local resets and deployments may run it more than once.
+-- Migration sessions must reject compiler-detectable PL/pgSQL hazards, not merely log warnings.
+alter role postgres set plpgsql.extra_errors = 'all';
+
 do $roles$
 begin
   if not exists (select 1 from pg_roles where rolname = 'ainigma_function_owner') then

@@ -2,12 +2,28 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(48);
+select extensions.plan(49);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
 select extensions.has_table('private', 'github_course_access', 'GitHub access table exists');
 select extensions.has_table('private', 'course_repository_provisioning', 'repository provisioning table exists');
+select extensions.is(
+  (
+    select count(*)::integer
+    from pg_proc as function_row
+    join pg_language as language_row on language_row.oid = function_row.prolang
+    where function_row.oid = any (array[
+      'private.list_github_course_access_to_reconcile()'::regprocedure,
+      'public.list_my_courses()'::regprocedure,
+      'public.list_my_course_access_requests()'::regprocedure
+    ])
+      and language_row.lanname = 'sql'
+      and function_row.prosqlbody is not null
+  ),
+  3,
+  'pure course functions use parsed SQL-standard bodies'
+);
 select extensions.ok(
   not has_table_privilege('authenticated', 'private.course_access_requests', 'SELECT'),
   'browser users cannot select access requests directly'

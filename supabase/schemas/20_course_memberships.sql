@@ -77,6 +77,8 @@ create index course_membership_events_course_created_idx
 
 create index course_membership_events_profile_created_idx
   on private.course_membership_events (profile_id, created_at desc);
+
+-- Membership history is evidence: corrections append a new event instead of rewriting the past.
 create function private.reject_mutation()
 returns trigger
 language plpgsql
@@ -96,6 +98,7 @@ create trigger course_definition_releases_reject_mutation
 before update or delete on private.course_definition_releases
 for each row execute function private.reject_mutation();
 
+-- Role checks derive the caller internally; null filters deny without requiring an authenticated identity.
 create function private.has_course_role(p_course_id uuid, p_roles text[])
 returns boolean
 language plpgsql
@@ -123,6 +126,8 @@ begin
 end
 $function$;
 
+-- Profiles are private unless they are the caller or share a course where the caller is active staff;
+-- null targets deny without invoking the authenticated-profile resolver.
 create function private.can_view_profile(p_profile_id uuid)
 returns boolean
 language plpgsql
@@ -157,6 +162,7 @@ end
 $function$;
 
 
+-- Staff authority is asymmetric: instructors may admit learners, while only owners may add staff.
 create function private.add_course_membership(
   p_course_id uuid,
   p_profile_id uuid,
@@ -223,6 +229,7 @@ begin
 end
 $function$;
 
+-- Every state change is serialized per course and records the previous and resulting membership state.
 create function private.transition_course_membership(
   p_course_id uuid,
   p_profile_id uuid,
@@ -343,6 +350,7 @@ begin
 end
 $function$;
 
+-- Ownership transfer preserves exactly one active owner and accepts only an active instructor as successor.
 create function private.transfer_course_ownership(
   p_course_id uuid,
   p_new_owner_profile_id uuid,
@@ -472,5 +480,3 @@ begin
   );
 end
 $function$;
-
-

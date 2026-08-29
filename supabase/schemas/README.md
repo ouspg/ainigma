@@ -11,7 +11,7 @@ These ordered files are the declarative source of truth for the application data
 - `22_github_course_access.sql` — GitHub invitations, membership reconciliation, and access activation.
 - `23_course_repository_provisioning.sql` — durable, explicitly requested repository jobs.
 - `24_course_offering_operations.sql` — compiler-controlled release and offering lifecycle operations.
-- `25_course_member_api.sql` — authenticated course, roster, access, and repository self-service RPCs.
+- `25_course_member_api.sql` — published-course discovery plus authenticated course, roster, access, and repository self-service RPCs.
 - `26_course_staff_api.sql` — authenticated access-request administration RPCs.
 - `99_application_permissions.sql` — final ownership, grants, RLS policies, and table restrictions.
 
@@ -67,3 +67,8 @@ failures preserve confirmed access, and three consecutive complete snapshots mus
 before the database revokes offering membership. Repository names become immutable when first
 claimed, retries use bounded exponential backoff, and permanent or exhausted failures become
 `blocked` for operator review.
+
+The `public.list_available_courses()` RPC is the learner discovery endpoint. It returns metadata
+for published offerings only, including the `offering_key` needed by
+`public.request_course_access()`. It grants no membership and does not expose direct table access;
+the small published catalog is also safe for signed-out course discovery.

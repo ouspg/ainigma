@@ -1,5 +1,39 @@
 -- Authenticated course discovery, roster, access, and repository self-service RPCs.
 
+-- Published offering metadata is safe to discover before enrollment. This
+-- endpoint does not expose membership, repository, or authored content state;
+-- the caller still has to request access for the selected offering.
+-- Keep this as a SQL function; its quoted body also remains executable when
+-- the Supabase CLI generates a migration for a newly created function.
+create function public.list_available_courses()
+returns table (
+  offering_key text,
+  course_definition_key text,
+  course_definition_release_id uuid,
+  code text,
+  enrollment_mode text,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  external_url text
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select
+    course.offering_key,
+    course.course_definition_key,
+    course.course_definition_release_id,
+    course.code,
+    course.enrollment_mode,
+    course.starts_at,
+    course.ends_at,
+    course.external_url
+  from public.courses as course
+  where course.status = 'published';
+$function$;
+
 -- Learners see published or archived memberships; draft offerings remain visible only to active staff.
 create function public.list_my_courses()
 returns jsonb

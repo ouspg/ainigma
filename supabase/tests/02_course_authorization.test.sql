@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(45);
+select extensions.plan(47);
 
 select extensions.has_table('public', 'courses', 'courses table exists');
 select extensions.has_table(
@@ -297,6 +297,12 @@ select extensions.is(
   0::bigint,
   'a member of another course cannot see this course'
 );
+select extensions.throws_ok(
+  $$select * from public.list_course_roster('security-fundamentals-2026-test')$$,
+  'PT404',
+  'course_not_found',
+  'an unrelated authenticated user cannot inspect a course roster'
+);
 select extensions.is(
   (
     select count(*)::bigint
@@ -319,6 +325,12 @@ select extensions.is(
   ),
   3::bigint,
   'an active instructor sees their course roster profiles'
+);
+select extensions.throws_ok(
+  $$select count(*) from public.list_course_access_requests('security-fundamentals-2026-test', 'pending', null)$$,
+  'PT404',
+  'course_not_found',
+  'an instructor cannot administer the owner-only access-request queue'
 );
 
 reset role;

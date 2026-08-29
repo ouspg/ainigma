@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(37);
+select extensions.plan(45);
 
 select extensions.is(
   current_setting('plpgsql.extra_errors'),
@@ -243,8 +243,16 @@ select extensions.ok(
   'anonymous users cannot select profiles'
 );
 select extensions.ok(
+  not has_table_privilege('anon', 'public.courses', 'SELECT'),
+  'anonymous users cannot select courses directly'
+);
+select extensions.ok(
   not has_table_privilege('authenticated', 'public.profiles', 'SELECT'),
   'authenticated users cannot read profiles directly'
+);
+select extensions.ok(
+  not has_table_privilege('authenticated', 'public.courses', 'SELECT'),
+  'authenticated users cannot read courses directly'
 );
 select extensions.ok(
   not has_table_privilege('authenticated', 'public.profiles', 'INSERT'),
@@ -321,6 +329,14 @@ select extensions.ok(
   'authenticated users can call the profile RPC'
 );
 select extensions.ok(
+  has_function_privilege('anon', 'public.list_available_courses()', 'EXECUTE'),
+  'anonymous users can discover published course offerings'
+);
+select extensions.ok(
+  has_function_privilege('authenticated', 'public.list_available_courses()', 'EXECUTE'),
+  'authenticated users can discover published course offerings'
+);
+select extensions.ok(
   not has_function_privilege('anon', 'public.get_my_profile()', 'EXECUTE'),
   'anonymous users cannot call the profile RPC'
 );
@@ -358,6 +374,72 @@ select extensions.ok(
       and pg_catalog.oidvectortypes(function_row.proargtypes) like '%uuid%'
   ),
   'public browser RPCs accept no UUID arguments'
+);
+
+select extensions.is(
+  (
+    with expected(function_oid, anonymous_allowed) as (
+      values
+        ('public.get_my_profile()'::regprocedure, false),
+        ('public.update_my_profile(text)'::regprocedure, false),
+        ('public.list_available_courses()'::regprocedure, true),
+        ('public.list_my_courses()'::regprocedure, false),
+        ('public.list_course_roster(text)'::regprocedure, false),
+        ('public.request_course_access(text, text)'::regprocedure, false),
+        ('public.get_my_course_repository(text)'::regprocedure, false),
+        ('public.request_my_course_repository(text)'::regprocedure, false),
+        ('public.list_my_course_access_requests()'::regprocedure, false),
+        ('public.list_course_access_requests(text, text, text)'::regprocedure, false),
+        ('public.approve_course_access_requests(text, uuid[])'::regprocedure, false),
+        ('public.reject_course_access_requests(text, uuid[], text)'::regprocedure, false)
+    )
+    select count(*)::integer
+    from expected
+    where has_function_privilege('anon', function_oid::oid, 'EXECUTE') is distinct from anonymous_allowed
+  ),
+  0,
+  'anonymous access is limited to the published course catalog RPC'
+);
+select extensions.is(
+  (
+    with expected(function_oid) as (
+      values
+        ('public.get_my_profile()'::regprocedure),
+        ('public.update_my_profile(text)'::regprocedure),
+        ('public.list_available_courses()'::regprocedure),
+        ('public.list_my_courses()'::regprocedure),
+        ('public.list_course_roster(text)'::regprocedure),
+        ('public.request_course_access(text, text)'::regprocedure),
+        ('public.get_my_course_repository(text)'::regprocedure),
+        ('public.request_my_course_repository(text)'::regprocedure),
+        ('public.list_my_course_access_requests()'::regprocedure),
+        ('public.list_course_access_requests(text, text, text)'::regprocedure),
+        ('public.approve_course_access_requests(text, uuid[])'::regprocedure),
+        ('public.reject_course_access_requests(text, uuid[], text)'::regprocedure)
+    )
+    select count(*)::integer
+    from expected
+    where not has_function_privilege('authenticated', function_oid::oid, 'EXECUTE')
+  ),
+  0,
+  'authenticated access is explicitly granted to every public application RPC'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', null, true);
+select extensions.throws_ok(
+  $$select * from public.get_my_profile()$$,
+  'PT401',
+  'authentication_required',
+  'an authenticated database role without a JWT cannot access profile data'
+);
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000099', true);
+select extensions.throws_ok(
+  $$select * from public.get_my_profile()$$,
+  'PT403',
+  'profile_not_provisioned',
+  'a JWT for an unknown Auth user cannot access profile data'
 );
 
 select * from extensions.finish();

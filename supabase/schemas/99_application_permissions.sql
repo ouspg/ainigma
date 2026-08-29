@@ -58,6 +58,7 @@ alter function private.record_github_course_access_membership_absence(uuid, uuid
 alter function private.claim_course_repository_provisioning(integer, uuid, uuid) owner to ainigma_function_owner;
 alter function private.complete_course_repository_provisioning(uuid, uuid, uuid, bigint, text, text) owner to ainigma_function_owner;
 alter function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) owner to ainigma_function_owner;
+alter function public.list_available_courses() owner to ainigma_function_owner;
 alter function public.list_my_courses() owner to ainigma_function_owner;
 alter function public.list_course_roster(text) owner to ainigma_function_owner;
 alter function private.confirm_github_course_access(uuid, uuid, bigint, text, bigint, text, text) owner to ainigma_function_owner;
@@ -87,6 +88,7 @@ revoke all on function
   private.claim_course_repository_provisioning(integer, uuid, uuid),
   private.complete_course_repository_provisioning(uuid, uuid, uuid, bigint, text, text),
   private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean),
+  public.list_available_courses(),
   public.get_my_profile(),
   public.update_my_profile(text),
   public.list_my_courses(),
@@ -128,6 +130,7 @@ grant execute on function private.confirm_github_course_access(uuid, uuid, bigin
 grant execute on function
   public.get_my_profile(),
   public.update_my_profile(text),
+  public.list_available_courses(),
   public.list_my_courses(),
   public.list_course_roster(text),
   public.request_course_access(text, text),
@@ -135,6 +138,7 @@ grant execute on function
   public.request_my_course_repository(text),
   public.list_my_course_access_requests()
 to authenticated;
+grant execute on function public.list_available_courses() to anon;
 grant execute on function
   public.list_course_access_requests(text, text, text),
   public.approve_course_access_requests(text, uuid[]),
@@ -224,5 +228,3 @@ revoke all on private.auth_users,
   from public, anon, authenticated, service_role;
 revoke all on sequence private.course_membership_events_id_seq
   from public, anon, authenticated, service_role;
-
-

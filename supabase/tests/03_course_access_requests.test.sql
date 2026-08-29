@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(49);
+select extensions.plan(56);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
@@ -166,6 +166,53 @@ revoke ainigma_maintenance from postgres;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000001', true);
 
+reset role;
+set local role anon;
+select extensions.is(
+  (select count(*)::bigint
+   from public.list_available_courses()
+   where offering_key = 'access-gate-course-test'),
+  1::bigint,
+  'anonymous users can discover a published offering through the catalog RPC'
+);
+reset role;
+update public.courses
+set status = 'draft'
+where offering_key = 'access-gate-auto-course-test';
+set local role authenticated;
+select extensions.is(
+  (select count(*)::bigint
+   from public.list_available_courses()
+   where offering_key = 'access-gate-course-test'),
+  1::bigint,
+  'the course catalog includes published offerings'
+);
+select extensions.is(
+  (select count(*)::bigint
+   from public.list_available_courses()
+   where offering_key = 'access-gate-auto-course-test'),
+  0::bigint,
+  'the course catalog excludes draft offerings'
+);
+reset role;
+update public.courses
+set status = 'archived'
+where offering_key = 'access-gate-auto-course-test';
+set local role authenticated;
+select extensions.is(
+  (select count(*)::bigint
+   from public.list_available_courses()
+   where offering_key = 'access-gate-auto-course-test'),
+  0::bigint,
+  'the course catalog excludes archived offerings'
+);
+reset role;
+update public.courses
+set status = 'published'
+where offering_key = 'access-gate-auto-course-test';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000001', true);
+
 select extensions.is(
   (select public.request_course_access('access-gate-course-test', 'I am enrolled in the university course.')->>'state'),
   'pending',
@@ -180,6 +227,24 @@ select extensions.is(
   (select count(*)::bigint from public.list_my_course_access_requests() where status = 'pending'),
   1::bigint,
   'the learner sees their pending request'
+);
+select extensions.throws_ok(
+  $$select count(*) from public.list_course_access_requests('access-gate-course-test', 'pending', 'all')$$,
+  'PT404',
+  'course_not_found',
+  'a learner cannot inspect the staff access-request queue'
+);
+select extensions.throws_ok(
+  $$select public.approve_course_access_requests('access-gate-course-test')$$,
+  'PT404',
+  'course_not_found',
+  'a learner cannot approve access requests'
+);
+select extensions.throws_ok(
+  $$select public.reject_course_access_requests('access-gate-course-test')$$,
+  'PT404',
+  'course_not_found',
+  'a learner cannot reject access requests'
 );
 
 reset role;

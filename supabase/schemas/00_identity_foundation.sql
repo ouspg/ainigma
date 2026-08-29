@@ -127,7 +127,7 @@ create table private.profile_identifiers (
   created_at timestamptz not null default clock_timestamp(),
   updated_at timestamptz not null default clock_timestamp(),
   constraint profile_identifiers_kind_check check (
-    kind in ('email', 'github_user_id', 'github_username', 'student_identifier')
+    kind in ('email', 'external_user_id', 'external_user_handle', 'student_identifier')
   ),
   constraint profile_identifiers_issuer_check check (
     issuer = btrim(issuer) and char_length(issuer) between 1 and 255
@@ -346,7 +346,7 @@ begin
 
   perform private.upsert_verified_identifier(
     v_profile_id,
-    'github_user_id',
+    'external_user_id',
     'github.com',
     1,
     v_identity.provider_id,
@@ -366,7 +366,7 @@ begin
     set revoked_at = clock_timestamp(),
         last_verified_at = clock_timestamp()
     where profile_id = v_profile_id
-      and kind = 'github_username'
+      and kind = 'external_user_handle'
       and issuer = 'github.com'
       and scheme_version = 1
       and normalized_value <> v_username
@@ -374,7 +374,7 @@ begin
 
     perform private.upsert_verified_identifier(
       v_profile_id,
-      'github_username',
+      'external_user_handle',
       'github.com',
       1,
       v_username,

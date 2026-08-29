@@ -4,8 +4,8 @@ alter table private.course_access_requests enable row level security;
 alter table private.course_access_requests force row level security;
 alter table private.course_roster_allowlist enable row level security;
 alter table private.course_roster_allowlist force row level security;
-alter table private.github_course_access enable row level security;
-alter table private.github_course_access force row level security;
+alter table private.external_course_access enable row level security;
+alter table private.external_course_access force row level security;
 alter table private.course_repository_provisioning enable row level security;
 alter table private.course_repository_provisioning force row level security;
 
@@ -19,8 +19,8 @@ on private.course_roster_allowlist
 for all to ainigma_function_owner, ainigma_maintenance
 using (true) with check (true);
 
-create policy github_course_access_function_access
-on private.github_course_access
+create policy external_course_access_function_access
+on private.external_course_access
 for all to ainigma_function_owner, ainigma_maintenance
 using (true) with check (true);
 create policy course_repository_provisioning_function_access
@@ -32,14 +32,14 @@ using (true) with check (true);
 -- The function owner receives only the relation access needed by the
 -- security-definer functions. It cannot authenticate directly.
 grant select, insert on private.course_definition_releases to ainigma_function_owner;
-grant select on private.course_definition_github_organizations to ainigma_function_owner;
+grant select on private.course_definition_external_groups to ainigma_function_owner;
 grant select, insert, update on public.courses to ainigma_function_owner;
 grant select, insert, update on public.course_memberships to ainigma_function_owner;
 grant select, insert on private.course_membership_events to ainigma_function_owner;
 grant usage, select on sequence private.course_membership_events_id_seq to ainigma_function_owner;
 grant select, insert, update on private.course_access_requests to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.course_roster_allowlist to ainigma_function_owner, ainigma_maintenance;
-grant select, insert, update on private.github_course_access to ainigma_function_owner, ainigma_maintenance;
+grant select, insert, update on private.external_course_access to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.course_repository_provisioning to ainigma_function_owner;
 
 alter function private.has_course_role(uuid, text[]) owner to ainigma_function_owner;
@@ -50,18 +50,18 @@ alter function private.branch_course_offering(text, uuid, text, uuid, timestampt
 alter function private.add_course_membership(uuid, uuid, text, uuid, text) owner to ainigma_function_owner;
 alter function private.transition_course_membership(uuid, uuid, text, text, uuid, text) owner to ainigma_function_owner;
 alter function private.transfer_course_ownership(uuid, uuid, uuid, text) owner to ainigma_function_owner;
-alter function private.list_github_course_access_to_reconcile() owner to ainigma_function_owner;
-alter function private.record_github_course_access_invitation(uuid, uuid, text, text, bigint) owner to ainigma_function_owner;
-alter function private.record_github_course_access_status(uuid, uuid, text, text) owner to ainigma_function_owner;
-alter function private.record_github_course_access_check_failure(uuid, uuid, text) owner to ainigma_function_owner;
-alter function private.record_github_course_access_membership_absence(uuid, uuid) owner to ainigma_function_owner;
+alter function private.list_external_course_access_to_reconcile() owner to ainigma_function_owner;
+alter function private.record_external_course_access_invitation(uuid, uuid, text, text, text) owner to ainigma_function_owner;
+alter function private.record_external_course_access_status(uuid, uuid, text, text) owner to ainigma_function_owner;
+alter function private.record_external_course_access_check_failure(uuid, uuid, text) owner to ainigma_function_owner;
+alter function private.record_external_course_access_membership_absence(uuid, uuid) owner to ainigma_function_owner;
 alter function private.claim_course_repository_provisioning(integer, uuid, uuid) owner to ainigma_function_owner;
-alter function private.complete_course_repository_provisioning(uuid, uuid, uuid, bigint, text, text) owner to ainigma_function_owner;
+alter function private.complete_course_repository_provisioning(uuid, uuid, uuid, text, text, text) owner to ainigma_function_owner;
 alter function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) owner to ainigma_function_owner;
 alter function public.list_available_courses() owner to ainigma_function_owner;
 alter function public.list_my_courses() owner to ainigma_function_owner;
 alter function public.list_course_roster(text) owner to ainigma_function_owner;
-alter function private.confirm_github_course_access(uuid, uuid, bigint, text, bigint, text, text) owner to ainigma_function_owner;
+alter function private.confirm_external_course_access(uuid, uuid, text, text, text, text, text) owner to ainigma_function_owner;
 alter function public.request_course_access(text, text) owner to ainigma_function_owner;
 alter function public.get_my_course_repository(text) owner to ainigma_function_owner;
 alter function public.request_my_course_repository(text) owner to ainigma_function_owner;
@@ -80,20 +80,20 @@ revoke all on function
   private.add_course_membership(uuid, uuid, text, uuid, text),
   private.transition_course_membership(uuid, uuid, text, text, uuid, text),
   private.transfer_course_ownership(uuid, uuid, uuid, text),
-  private.list_github_course_access_to_reconcile(),
-  private.record_github_course_access_invitation(uuid, uuid, text, text, bigint),
-  private.record_github_course_access_status(uuid, uuid, text, text),
-  private.record_github_course_access_check_failure(uuid, uuid, text),
-  private.record_github_course_access_membership_absence(uuid, uuid),
+  private.list_external_course_access_to_reconcile(),
+  private.record_external_course_access_invitation(uuid, uuid, text, text, text),
+  private.record_external_course_access_status(uuid, uuid, text, text),
+  private.record_external_course_access_check_failure(uuid, uuid, text),
+  private.record_external_course_access_membership_absence(uuid, uuid),
   private.claim_course_repository_provisioning(integer, uuid, uuid),
-  private.complete_course_repository_provisioning(uuid, uuid, uuid, bigint, text, text),
+  private.complete_course_repository_provisioning(uuid, uuid, uuid, text, text, text),
   private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean),
   public.list_available_courses(),
   public.get_my_profile(),
   public.update_my_profile(text),
   public.list_my_courses(),
   public.list_course_roster(text),
-  private.confirm_github_course_access(uuid, uuid, bigint, text, bigint, text, text),
+  private.confirm_external_course_access(uuid, uuid, text, text, text, text, text),
   public.request_course_access(text, text),
   public.get_my_course_repository(text),
   public.request_my_course_repository(text),
@@ -117,15 +117,15 @@ grant execute on function private.branch_course_offering(text, uuid, text, uuid,
 grant execute on function private.add_course_membership(uuid, uuid, text, uuid, text) to ainigma_maintenance;
 grant execute on function private.transition_course_membership(uuid, uuid, text, text, uuid, text) to ainigma_maintenance;
 grant execute on function private.transfer_course_ownership(uuid, uuid, uuid, text) to ainigma_maintenance;
-grant execute on function private.list_github_course_access_to_reconcile() to ainigma_maintenance;
-grant execute on function private.record_github_course_access_invitation(uuid, uuid, text, text, bigint) to ainigma_maintenance;
-grant execute on function private.record_github_course_access_status(uuid, uuid, text, text) to ainigma_maintenance;
-grant execute on function private.record_github_course_access_check_failure(uuid, uuid, text) to ainigma_maintenance;
-grant execute on function private.record_github_course_access_membership_absence(uuid, uuid) to ainigma_maintenance;
+grant execute on function private.list_external_course_access_to_reconcile() to ainigma_maintenance;
+grant execute on function private.record_external_course_access_invitation(uuid, uuid, text, text, text) to ainigma_maintenance;
+grant execute on function private.record_external_course_access_status(uuid, uuid, text, text) to ainigma_maintenance;
+grant execute on function private.record_external_course_access_check_failure(uuid, uuid, text) to ainigma_maintenance;
+grant execute on function private.record_external_course_access_membership_absence(uuid, uuid) to ainigma_maintenance;
 grant execute on function private.claim_course_repository_provisioning(integer, uuid, uuid) to ainigma_maintenance;
-grant execute on function private.complete_course_repository_provisioning(uuid, uuid, uuid, bigint, text, text) to ainigma_maintenance;
+grant execute on function private.complete_course_repository_provisioning(uuid, uuid, uuid, text, text, text) to ainigma_maintenance;
 grant execute on function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) to ainigma_maintenance;
-grant execute on function private.confirm_github_course_access(uuid, uuid, bigint, text, bigint, text, text) to ainigma_maintenance;
+grant execute on function private.confirm_external_course_access(uuid, uuid, text, text, text, text, text) to ainigma_maintenance;
 
 grant execute on function
   public.get_my_profile(),
@@ -223,7 +223,7 @@ revoke all on private.auth_users,
   private.course_membership_events,
   private.course_access_requests,
   private.course_roster_allowlist,
-  private.github_course_access,
+  private.external_course_access,
   private.course_repository_provisioning
   from public, anon, authenticated, service_role;
 revoke all on sequence private.course_membership_events_id_seq

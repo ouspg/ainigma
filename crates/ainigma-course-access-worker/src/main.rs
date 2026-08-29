@@ -1,6 +1,7 @@
 mod database;
 mod github;
 mod invitations;
+mod platform;
 mod reconciliation;
 mod repositories;
 
@@ -12,8 +13,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "ainigma-github-poller",
-    about = "Reconcile manual GitHub course invitations"
+    name = "ainigma-course-access-worker",
+    about = "Start external course invitations and reconcile course access"
 )]
 struct Arguments {
     #[command(subcommand)]
@@ -70,17 +71,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             profile_id,
             by,
         } => {
-            let github_api_url = github::api_url();
-            let github = github::client(&required_env("GITHUB_TOKEN")?)?;
-            invitations::invite_one(
-                &database,
-                &github,
-                &github_api_url,
-                course_id,
-                profile_id,
-                by,
-            )
-            .await?;
+            let github = github::GithubPlatform::from_token(&required_env("GITHUB_TOKEN")?)?;
+            invitations::invite_one(&database, &github, course_id, profile_id, by).await?;
             println!(
                 "processed GitHub {by:?} invitation for course {course_id}, profile {profile_id}"
             );
@@ -90,17 +82,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             profile_id,
             by,
         } => {
-            let github_api_url = github::api_url();
-            let github = github::client(&required_env("GITHUB_TOKEN")?)?;
-            invitations::mark_invited(
-                &database,
-                &github,
-                &github_api_url,
-                course_id,
-                profile_id,
-                by,
-            )
-            .await?;
+            let github = github::GithubPlatform::from_token(&required_env("GITHUB_TOKEN")?)?;
+            invitations::mark_invited(&database, &github, course_id, profile_id, by).await?;
             println!(
                 "marked GitHub invitation pending for course {course_id}, profile {profile_id}"
             );
@@ -111,30 +94,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
             course_id,
             profile_id,
         } => {
-            let github_api_url = github::api_url();
-            let github = github::client(&required_env("GITHUB_TOKEN")?)?;
+            let github = github::GithubPlatform::from_token(&required_env("GITHUB_TOKEN")?)?;
             loop {
-                let count = reconciliation::poll_once(
-                    &database,
-                    &github,
-                    &github_api_url,
-                    course_id,
-                    profile_id,
-                )
-                .await?;
-                let repository_summary = repositories::provision_repositories(
-                    &database,
-                    &github,
-                    &github_api_url,
-                    course_id,
-                    profile_id,
-                )
-                .await?;
+                let invitation_summary =
+                    invitations::invite_pending(&database, &github, course_id, profile_id).await?;
+                let count =
+                    reconciliation::poll_once(&database, &github, course_id, profile_id).await?;
+                let repository_summary =
+                    repositories::provision_repositories(&database, &github, course_id, profile_id)
+                        .await?;
 
                 if !watch {
                     println!(
-                        "reconciled {count} GitHub access record(s); {} requested repository job(s) became ready and {} recorded a failure",
-                        repository_summary.ready, repository_summary.failed
+                        "processed {} invitation(s), recorded {} invitation failure(s), reconciled {count} GitHub access record(s); {} requested repository job(s) became ready and {} recorded a failure",
+                        invitation_summary.started,
+                        invitation_summary.failed,
+                        repository_summary.ready,
+                        repository_summary.failed
                     );
                     break;
                 }

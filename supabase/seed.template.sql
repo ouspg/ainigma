@@ -100,14 +100,14 @@ select private.sync_auth_identity((persona ->> 'identityId')::uuid)
 from jsonb_array_elements(current_setting('ainigma_seed.personas')::jsonb) as data(persona);
 reset role;
 
-insert into private.course_definition_github_organizations (
+insert into private.course_definition_external_groups (
   course_definition_key,
-  github_org_id,
-  github_org_slug
+  external_group_id,
+  external_group_handle
 )
 values
-  ('test-course-a', 88000001, 'ainigma-dev-course-org'),
-  ('test-course-b', 88000001, 'ainigma-dev-course-org');
+  ('test-course-a', '88000001', 'ainigma-dev-course-org'),
+  ('test-course-b', '88000001', 'ainigma-dev-course-org');
 
 insert into private.course_definition_releases (
   id,

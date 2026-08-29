@@ -1,5 +1,7 @@
-use crate::{database, github};
-use reqwest::Client;
+use crate::{
+    database,
+    platform::{ExternalPlatform, OrganizationSnapshot, SnapshotError},
+};
 use sqlx::PgPool;
 use std::{
     collections::{HashMap, HashSet},
@@ -7,10 +9,9 @@ use std::{
 };
 use uuid::Uuid;
 
-pub async fn poll_once(
+pub async fn poll_once<P: ExternalPlatform>(
     database: &PgPool,
-    github_client: &Client,
-    github_api_url: &str,
+    platform: &P,
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
 ) -> Result<usize, Box<dyn Error>> {
@@ -22,10 +23,33 @@ pub async fn poll_once(
         {
             continue;
         }
+        if access.provider_kind != platform.kind() {
+            let failure_code = "unsupported_external_provider";
+            if access.state == "active" {
+                database::record_check_failure(
+                    database,
+                    access.course_id,
+                    access.profile_id,
+                    failure_code,
+                )
+                .await?;
+            } else {
+                database::record_status(
+                    database,
+                    access.course_id,
+                    access.profile_id,
+                    "failed",
+                    Some(failure_code),
+                )
+                .await?;
+            }
+            continue;
+        }
         records_by_organization
             .entry((
-                access.expected_github_org_id,
-                access.expected_github_org_slug.clone(),
+                access.provider_kind.clone(),
+                access.expected_external_group_id.clone(),
+                access.expected_external_group_handle.clone(),
             ))
             .or_default()
             .push(access);
@@ -33,22 +57,18 @@ pub async fn poll_once(
 
     let mut reconciled = 0;
 
-    for ((expected_org_id, organization), accesses) in records_by_organization {
+    for ((_provider_kind, expected_group_id, organization), accesses) in records_by_organization {
         let unresolved_invitation_ids: HashSet<_> = accesses
             .iter()
             .filter(|access| access.state != "active")
-            .map(|access| access.github_organization_invitation_id)
+            .map(|access| access.external_invitation_id.clone())
             .collect();
-        let snapshot = github::organization_snapshot(
-            github_client,
-            github_api_url,
-            &organization,
-            &unresolved_invitation_ids,
-        )
-        .await;
+        let snapshot = platform
+            .organization_snapshot(&organization, &unresolved_invitation_ids)
+            .await;
 
         for access in accesses {
-            reconcile_one(database, &access, expected_org_id, &snapshot).await?;
+            reconcile_one(database, &access, expected_group_id.clone(), &snapshot).await?;
             reconciled += 1;
         }
     }
@@ -59,39 +79,39 @@ pub async fn poll_once(
 async fn reconcile_one(
     database: &PgPool,
     access: &database::AccessToReconcile,
-    expected_org_id: i64,
-    snapshot: &Result<github::OrganizationSnapshot, github::SnapshotError>,
+    expected_group_id: String,
+    snapshot: &Result<OrganizationSnapshot, SnapshotError>,
 ) -> Result<(), Box<dyn Error>> {
     let snapshot = match snapshot {
         Ok(snapshot) => snapshot,
-        Err(github::SnapshotError::SsoRequired) => {
+        Err(SnapshotError::SingleSignOnRequired) => {
             if access.state == "active" {
-                record_check_failure(database, access, "github_sso_required").await?;
+                record_check_failure(database, access, "external_sso_required").await?;
             } else {
                 record_status(database, access, "sso_required", None).await?;
             }
             return Ok(());
         }
-        Err(github::SnapshotError::Failed(code)) => {
+        Err(SnapshotError::Failed(code)) => {
             record_check_failure(database, access, code).await?;
             return Ok(());
         }
     };
 
-    if snapshot.organization_id != expected_org_id {
+    if snapshot.organization_id() != expected_group_id {
         if access.state == "active" {
-            record_check_failure(database, access, "github_organization_id_mismatch").await?;
+            record_check_failure(database, access, "external_group_id_mismatch").await?;
         } else {
             record_status(
                 database,
                 access,
                 "failed",
-                Some("github_organization_id_mismatch"),
+                Some("external_group_id_mismatch"),
             )
             .await?;
         }
     } else {
-        let active_username = snapshot.active_member_username(&access.github_user_id);
+        let active_username = snapshot.active_member_username(&access.external_user_id);
 
         if access.state == "active" {
             if let Some(username) = active_username {
@@ -99,15 +119,15 @@ async fn reconcile_one(
                     database,
                     access.course_id,
                     access.profile_id,
-                    access.expected_github_org_id,
-                    &access.expected_github_org_slug,
-                    access.github_organization_invitation_id,
-                    &access.github_user_id,
+                    &access.expected_external_group_id,
+                    &access.expected_external_group_handle,
+                    &access.external_invitation_id,
+                    &access.external_user_id,
                     username,
                 )
                 .await?;
-                if access.github_username.as_deref() != Some(username) {
-                    tracing::info!(offering = %access.offering_key, "GitHub username cache refreshed");
+                if access.external_user_handle.as_deref() != Some(username) {
+                    tracing::info!(offering = %access.offering_key, "external username cache refreshed");
                 } else {
                     tracing::debug!(offering = %access.offering_key, "GitHub membership remains active");
                 }
@@ -125,14 +145,14 @@ async fn reconcile_one(
                 }
             }
         } else if let Some(invitation) =
-            snapshot.accepted_invitation(access.github_organization_invitation_id)
+            snapshot.accepted_invitation(&access.external_invitation_id)
         {
-            if invitation.github_user_id != access.github_user_id {
+            if invitation.user_id != access.external_user_id {
                 record_status(
                     database,
                     access,
                     "failed",
-                    Some("github_invitation_identity_mismatch"),
+                    Some("external_invitation_identity_mismatch"),
                 )
                 .await?;
             } else if let Some(username) = active_username {
@@ -140,25 +160,25 @@ async fn reconcile_one(
                     database,
                     access.course_id,
                     access.profile_id,
-                    access.expected_github_org_id,
-                    &access.expected_github_org_slug,
-                    access.github_organization_invitation_id,
-                    &access.github_user_id,
+                    &access.expected_external_group_id,
+                    &access.expected_external_group_handle,
+                    &access.external_invitation_id,
+                    &access.external_user_id,
                     username,
                 )
                 .await?;
-                tracing::info!(offering = %access.offering_key, "GitHub invitation and membership confirmed");
+                tracing::info!(offering = %access.offering_key, "external invitation and membership confirmed");
             } else {
                 record_status(
                     database,
                     access,
                     "failed",
-                    Some("github_membership_not_found"),
+                    Some("external_membership_not_found"),
                 )
                 .await?;
             }
         } else if snapshot
-            .pending_invitation(access.github_organization_invitation_id)
+            .pending_invitation(&access.external_invitation_id)
             .is_some()
         {
             record_status(database, access, "invitation_pending", None).await?;
@@ -167,7 +187,7 @@ async fn reconcile_one(
                 database,
                 access,
                 "failed",
-                Some("github_invitation_acceptance_not_confirmed"),
+                Some("external_invitation_acceptance_not_confirmed"),
             )
             .await?;
         }
@@ -205,6 +225,6 @@ async fn record_status(
         failure_code,
     )
     .await?;
-    tracing::info!(offering = %access.offering_key, state, "recorded GitHub access state");
+    tracing::info!(offering = %access.offering_key, state, "recorded external access state");
     Ok(())
 }

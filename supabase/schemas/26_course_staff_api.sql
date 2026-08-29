@@ -10,14 +10,14 @@ returns table (
   request_id uuid,
   offering_key text,
   display_name text,
-  github_username text,
+  external_user_handle text,
   verified_email text,
   reason text,
   status text,
   authorization_status text,
   requested_at timestamptz,
   decided_at timestamptz,
-  github_access_state text
+  external_access_state text
 )
 language plpgsql
 stable
@@ -26,9 +26,13 @@ set search_path = ''
 as $function$
 declare
   v_course_id uuid;
+  v_provider_issuer text;
 begin
-  select course.id into v_course_id
+  select course.id, organization.provider_issuer
+  into v_course_id, v_provider_issuer
   from public.courses as course
+  join private.course_definition_external_groups as organization
+    on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key;
 
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
@@ -44,8 +48,8 @@ begin
       select identifier.normalized_value
       from private.profile_identifiers as identifier
       where identifier.profile_id = request_row.requester_profile_id
-        and identifier.kind = 'github_username'
-        and identifier.issuer = 'github.com'
+        and identifier.kind = 'external_user_handle'
+        and identifier.issuer = v_provider_issuer
         and identifier.revoked_at is null
       order by identifier.last_verified_at desc
       limit 1
@@ -88,7 +92,7 @@ begin
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
   join public.profiles as profile on profile.id = request_row.requester_profile_id
-  left join private.github_course_access as access_row on access_row.access_request_id = request_row.id
+  left join private.external_course_access as access_row on access_row.access_request_id = request_row.id
   where request_row.course_id = v_course_id
     and (p_status is null or request_row.status = p_status)
     and (
@@ -132,9 +136,13 @@ declare
   v_course_id uuid;
   v_actor_profile_id uuid := private.current_profile_id();
   v_count integer;
+  v_provider_issuer text;
 begin
-  select course.id into v_course_id
+  select course.id, organization.provider_issuer
+  into v_course_id, v_provider_issuer
   from public.courses as course
+  join private.course_definition_external_groups as organization
+    on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key;
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
@@ -156,12 +164,12 @@ begin
       and not exists (
         select 1 from private.profile_identifiers as identifier
         where identifier.profile_id = request_row.requester_profile_id
-          and identifier.kind = 'github_user_id'
-          and identifier.issuer = 'github.com'
+          and identifier.kind = 'external_user_id'
+          and identifier.issuer = v_provider_issuer
           and identifier.revoked_at is null
       )
   ) then
-    raise sqlstate 'PT403' using message = 'github_identity_not_provisioned';
+    raise sqlstate 'PT403' using message = 'external_identity_not_provisioned';
   end if;
 
   with selected as (
@@ -178,13 +186,13 @@ begin
     where request_row.id = selected.id
     returning request_row.*
   )
-  insert into private.github_course_access (course_id, profile_id, access_request_id, github_user_id, state)
+  insert into private.external_course_access (course_id, profile_id, access_request_id, external_user_id, state)
   select changed.course_id, changed.requester_profile_id, changed.id, identifier.normalized_value, 'not_started'
   from changed
   join private.profile_identifiers as identifier
     on identifier.profile_id = changed.requester_profile_id
-   and identifier.kind = 'github_user_id'
-   and identifier.issuer = 'github.com'
+   and identifier.kind = 'external_user_id'
+   and identifier.issuer = v_provider_issuer
    and identifier.revoked_at is null
   on conflict (course_id, profile_id) do update set access_request_id = excluded.access_request_id;
 
@@ -227,5 +235,3 @@ begin
   return v_count;
 end
 $function$;
-
-

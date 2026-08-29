@@ -18,9 +18,9 @@ create table public.courses (
   constraint courses_course_definition_key_check check (
     course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'
   ),
-  constraint courses_course_definition_github_organization_fkey foreign key (
+  constraint courses_course_definition_external_group_fkey foreign key (
     course_definition_key
-  ) references private.course_definition_github_organizations (course_definition_key) on delete restrict,
+  ) references private.course_definition_external_groups (course_definition_key) on delete restrict,
   constraint courses_course_definition_release_fkey foreign key (
     course_definition_release_id,
     course_definition_key

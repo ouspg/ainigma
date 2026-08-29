@@ -144,6 +144,19 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_available_courses: {
+        Args: never
+        Returns: {
+          code: string
+          course_definition_key: string
+          course_definition_release_id: string
+          ends_at: string
+          enrollment_mode: string
+          external_url: string
+          offering_key: string
+          starts_at: string
+        }[]
+      }
       list_course_access_requests: {
         Args: {
           p_authorization_filter?: string
@@ -154,8 +167,8 @@ export type Database = {
           authorization_status: string
           decided_at: string
           display_name: string
-          github_access_state: string
-          github_username: string
+          external_access_state: string
+          external_user_handle: string
           offering_key: string
           reason: string
           request_id: string
@@ -179,7 +192,7 @@ export type Database = {
         Args: never
         Returns: {
           decided_at: string
-          github_access_state: string
+          external_access_state: string
           offering_key: string
           reason: string
           request_id: string

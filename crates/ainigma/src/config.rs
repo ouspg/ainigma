@@ -1,7 +1,5 @@
 use crate::errors::ConfigError;
 use crate::flag_generator;
-use rand::rngs::StdRng;
-use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::ffi::OsStr;
@@ -25,8 +23,7 @@ pub const DEFAULT_BUILD_MANIFEST: &str = "build-manifest.json";
 
 fn random_hex_secret() -> String {
     let mut random_bytes = vec![0u8; 32];
-    let mut rng = StdRng::from_os_rng();
-    rng.fill_bytes(random_bytes.as_mut_slice());
+    rand::fill(random_bytes.as_mut_slice());
     random_bytes.iter().fold(
         String::with_capacity(random_bytes.len() * 2),
         |mut acc, b| {

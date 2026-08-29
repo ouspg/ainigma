@@ -144,7 +144,7 @@ select extensions.is(
   (
     select count(*)::bigint
     from private.profile_identifiers
-    where kind = 'github_user_id'
+    where kind = 'external_user_id'
       and normalized_value = '12345678'
       and revoked_at is null
   ),
@@ -155,7 +155,7 @@ select extensions.is(
   (
     select count(*)::bigint
     from private.profile_identifiers
-    where kind = 'github_username'
+    where kind = 'external_user_handle'
       and normalized_value = 'firststudent'
       and revoked_at is null
   ),
@@ -189,7 +189,7 @@ select extensions.is(
   (
     select count(*)::bigint
     from private.profile_identifiers
-    where kind = 'github_username'
+    where kind = 'external_user_handle'
       and normalized_value = 'firststudent'
       and revoked_at is not null
   ),
@@ -200,7 +200,7 @@ select extensions.is(
   (
     select count(*)::bigint
     from private.profile_identifiers
-    where kind = 'github_username'
+    where kind = 'external_user_handle'
       and normalized_value = 'renamedstudent'
       and revoked_at is null
   ),

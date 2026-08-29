@@ -168,6 +168,7 @@ declare
   v_profile_id uuid := private.current_profile_id();
   v_course_id uuid;
   v_enrollment_mode text;
+  v_provider_issuer text;
   v_auto_approved boolean;
   v_request private.course_access_requests%rowtype;
   v_membership public.course_memberships%rowtype;
@@ -176,9 +177,11 @@ begin
     raise sqlstate 'PT400' using message = 'invalid_request_reason';
   end if;
 
-  select course.id, course.enrollment_mode
-  into v_course_id, v_enrollment_mode
+  select course.id, course.enrollment_mode, organization.provider_issuer
+  into v_course_id, v_enrollment_mode, v_provider_issuer
   from public.courses as course
+  join private.course_definition_external_groups as organization
+    on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key
     and course.status = 'published';
 
@@ -210,7 +213,7 @@ begin
 
   if found and v_request.status in ('pending', 'approved') then
     return jsonb_build_object(
-      'state', case when v_request.status = 'approved' then 'awaiting_github_access' else 'pending' end,
+      'state', case when v_request.status = 'approved' then 'awaiting_external_access' else 'pending' end,
       'offering_key', p_offering_key,
       'request_id', v_request.id
     );
@@ -234,8 +237,8 @@ begin
       select 1
       from private.profile_identifiers as identifier
       where identifier.profile_id = v_profile_id
-        and identifier.kind = 'github_user_id'
-        and identifier.issuer = 'github.com'
+        and identifier.kind = 'external_user_id'
+        and identifier.issuer = v_provider_issuer
         and identifier.revoked_at is null
     )
   into v_auto_approved;
@@ -259,8 +262,8 @@ begin
   returning * into v_request;
 
   if v_auto_approved then
-    insert into private.github_course_access (
-      course_id, profile_id, access_request_id, github_user_id, state
+    insert into private.external_course_access (
+      course_id, profile_id, access_request_id, external_user_id, state
     )
     select
       v_course_id,
@@ -270,14 +273,14 @@ begin
       'not_started'
     from private.profile_identifiers as identifier
     where identifier.profile_id = v_profile_id
-      and identifier.kind = 'github_user_id'
-      and identifier.issuer = 'github.com'
+      and identifier.kind = 'external_user_id'
+      and identifier.issuer = v_provider_issuer
       and identifier.revoked_at is null
     order by identifier.last_verified_at desc
     limit 1;
 
     return jsonb_build_object(
-      'state', 'awaiting_github_access',
+      'state', 'awaiting_external_access',
       'offering_key', p_offering_key,
       'request_id', v_request.id
     );
@@ -337,7 +340,7 @@ begin
     'offering_key', p_offering_key,
     'state', v_repository.state,
     'repository_name', v_repository.repository_name,
-    'repository_url', v_repository.github_repository_url,
+    'repository_url', v_repository.external_repository_url,
     'failure_code', v_repository.last_error,
     'requested_at', v_repository.created_at,
     'updated_at', v_repository.updated_at
@@ -358,39 +361,39 @@ declare
   v_profile_id uuid := private.current_profile_id();
   v_course_id uuid;
   v_access_request_id uuid;
-  v_github_org_id bigint;
-  v_github_org_slug text;
+  v_external_group_id text;
+  v_external_group_handle text;
 begin
   select
     course.id,
     access_row.access_request_id,
-    access_row.github_org_id,
-    access_row.github_org_slug
+    access_row.external_group_id,
+    access_row.external_group_handle
   into
     v_course_id,
     v_access_request_id,
-    v_github_org_id,
-    v_github_org_slug
+    v_external_group_id,
+    v_external_group_handle
   from public.courses as course
   join public.course_memberships as membership
     on membership.course_id = course.id
    and membership.profile_id = v_profile_id
    and membership.role = 'learner'
    and membership.status = 'active'
-  join private.github_course_access as access_row
+  join private.external_course_access as access_row
     on access_row.course_id = course.id
    and access_row.profile_id = v_profile_id
    and access_row.state = 'active'
-   and access_row.github_username is not null
+   and access_row.external_user_handle is not null
   join private.course_access_requests as request_row
     on request_row.id = access_row.access_request_id
    and request_row.course_id = access_row.course_id
    and request_row.requester_profile_id = access_row.profile_id
    and request_row.status = 'approved'
-  join private.course_definition_github_organizations as organization
+  join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
-   and organization.github_org_id = access_row.github_org_id
-   and organization.github_org_slug = access_row.github_org_slug
+   and organization.external_group_id = access_row.external_group_id
+   and organization.external_group_handle = access_row.external_group_handle
   where course.offering_key = p_offering_key
     and course.status = 'published'
   for update of access_row;
@@ -403,14 +406,14 @@ begin
     course_id,
     profile_id,
     access_request_id,
-    github_org_id,
-    github_org_slug
+    external_group_id,
+    external_group_handle
   ) values (
     v_course_id,
     v_profile_id,
     v_access_request_id,
-    v_github_org_id,
-    v_github_org_slug
+    v_external_group_id,
+    v_external_group_handle
   )
   on conflict (course_id, profile_id) do nothing;
 
@@ -427,7 +430,7 @@ returns table (
   reason text,
   requested_at timestamptz,
   decided_at timestamptz,
-  github_access_state text
+  external_access_state text
 )
 language sql
 stable
@@ -444,7 +447,7 @@ begin atomic
     access_row.state
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
-  left join private.github_course_access as access_row
+  left join private.external_course_access as access_row
     on access_row.access_request_id = request_row.id
   where request_row.requester_profile_id = private.current_profile_id()
   order by request_row.requested_at desc;

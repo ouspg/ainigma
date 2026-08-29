@@ -6,7 +6,7 @@ select extensions.plan(56);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
-select extensions.has_table('private', 'github_course_access', 'GitHub access table exists');
+select extensions.has_table('private', 'external_course_access', 'GitHub access table exists');
 select extensions.has_table('private', 'course_repository_provisioning', 'repository provisioning table exists');
 select extensions.is(
   (
@@ -14,7 +14,7 @@ select extensions.is(
     from pg_proc as function_row
     join pg_language as language_row on language_row.oid = function_row.prolang
     where function_row.oid = any (array[
-      'private.list_github_course_access_to_reconcile()'::regprocedure,
+      'private.list_external_course_access_to_reconcile()'::regprocedure,
       'public.list_my_courses()'::regprocedure,
       'public.list_my_course_access_requests()'::regprocedure
     ])
@@ -82,14 +82,14 @@ select set_config(
 
 -- Create a separate published course owned by the seeded owner.
 grant ainigma_maintenance to postgres;
-insert into private.course_definition_github_organizations (
+insert into private.course_definition_external_groups (
   course_definition_key,
-  github_org_id,
-  github_org_slug
+  external_group_id,
+  external_group_handle
 )
 values
-  ('access-gate-course', 88000001, 'access-gate-course-test-org'),
-  ('access-gate-auto-course', 88000002, 'access-gate-auto-course-test-org');
+  ('access-gate-course', '88000001', 'access-gate-course-test-org'),
+  ('access-gate-auto-course', '88000002', 'access-gate-auto-course-test-org');
 set role ainigma_maintenance;
 select private.sync_auth_identity('71000000-0000-0000-0000-000000000001');
 select private.branch_course_offering(
@@ -147,14 +147,14 @@ insert into private.course_roster_allowlist (
 )
 values (
   current_setting('ainigma_access_test.course_id')::uuid,
-  'github_user_id',
+  'external_user_id',
   'github.com',
   1,
   '97000001',
   'test roster'
 ), (
   current_setting('ainigma_access_test.auto_course_id')::uuid,
-  'github_user_id',
+  'external_user_id',
   'github.com',
   1,
   '97000001',
@@ -267,7 +267,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000001', true);
 select extensions.is(
-  (select github_access_state
+  (select external_access_state
    from public.list_my_course_access_requests()
    limit 1),
   'not_started'::text,
@@ -288,25 +288,25 @@ select extensions.throws_ok(
 reset role;
 grant ainigma_maintenance to postgres;
 set role ainigma_maintenance;
-select private.record_github_course_access_invitation(
+select private.record_external_course_access_invitation(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   'email',
   'requester@university.example',
-  98000001
+  '98000001'
 );
-select private.record_github_course_access_invitation(
+select private.record_external_course_access_invitation(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   'email',
   'requester@university.example',
-  98000001
+  '98000001'
 );
 reset role;
 revoke ainigma_maintenance from postgres;
 set local role authenticated;
 select extensions.is(
-  (select github_access_state
+  (select external_access_state
    from public.list_my_course_access_requests()
    limit 1),
   'invitation_pending'::text,
@@ -316,7 +316,7 @@ reset role;
 grant ainigma_maintenance to postgres;
 select extensions.is(
   (select invitation_method
-   from private.github_course_access
+   from private.external_course_access
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
   'email'::text,
@@ -324,69 +324,69 @@ select extensions.is(
 );
 select extensions.is(
   (select invitation_target
-   from private.github_course_access
+   from private.external_course_access
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
   'requester@university.example'::text,
   'the verified invitation target is stored'
 );
 select extensions.is(
-  (select github_organization_invitation_id
-   from private.github_course_access
+  (select external_invitation_id
+   from private.external_course_access
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
-  98000001::bigint,
+  '98000001'::text,
   'the exact GitHub organization invitation ID is stored'
 );
 select extensions.throws_ok(
-  $$select private.confirm_github_course_access(
+  $$select private.confirm_external_course_access(
     current_setting('ainigma_access_test.course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid,
-    88000001,
+    '88000001',
     'access-gate-course-test-org',
-    98000001,
+    '98000001',
     '99999999',
     'requester-test'
   )$$,
   '42501',
-  'github_identity_mismatch',
+  'external_identity_mismatch',
   'a mismatched GitHub identity cannot activate course access'
 );
 select extensions.throws_ok(
-  $$select private.confirm_github_course_access(
+  $$select private.confirm_external_course_access(
     current_setting('ainigma_access_test.course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid,
-    88000002,
+    '88000002',
     'access-gate-auto-course-test-org',
-    98000001,
+    '98000001',
     '97000001',
     'requester-test'
   )$$,
   '42501',
-  'github_organization_mismatch',
+  'external_group_mismatch',
   'a GitHub organization configured for another course cannot activate this offering'
 );
 select extensions.throws_ok(
-  $$select private.confirm_github_course_access(
+  $$select private.confirm_external_course_access(
     current_setting('ainigma_access_test.course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid,
-    88000001,
+    '88000001',
     'access-gate-course-test-org',
-    98000002,
+    '98000002',
     '97000001',
     'requester-test'
   )$$,
   '42501',
-  'github_invitation_mismatch',
+  'external_invitation_mismatch',
   'a different GitHub invitation cannot activate this offering'
 );
 set role ainigma_maintenance;
-select private.confirm_github_course_access(
+select private.confirm_external_course_access(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
-  88000001,
+  '88000001',
   'access-gate-course-test-org',
-  98000001,
+  '98000001',
   '97000001',
   'requester-test'
 );
@@ -413,8 +413,8 @@ select extensions.is(
 reset role;
 grant ainigma_maintenance to postgres;
 select extensions.is(
-  (select github_username
-   from private.github_course_access
+  (select external_user_handle
+   from private.external_course_access
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
   'requester-test'::text,
@@ -453,7 +453,7 @@ select extensions.is(
   'the explicit request queues one repository job for the offering and profile'
 );
 select extensions.is(
-  (select github_org_slug
+  (select external_group_handle
    from private.course_repository_provisioning
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
@@ -501,8 +501,8 @@ update private.course_repository_provisioning
 set next_attempt_at = clock_timestamp()
 where course_id = current_setting('ainigma_access_test.course_id')::uuid
   and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid;
-update private.github_course_access
-set github_username = 'requester-renamed'
+update private.external_course_access
+set external_user_handle = 'requester-renamed'
 where course_id = current_setting('ainigma_access_test.course_id')::uuid
   and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid;
 set role ainigma_maintenance;
@@ -530,7 +530,7 @@ select private.complete_course_repository_provisioning(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   current_setting('ainigma_access_test.repository_lease_token')::uuid,
-  99000001,
+  '99000001',
   'submissions-access-gate-course-test-requester-test',
   'https://github.example.test/access-gate-course-test-requester-test'
 );
@@ -548,7 +548,7 @@ select private.complete_course_repository_provisioning(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   current_setting('ainigma_access_test.repository_lease_token')::uuid,
-  99000001,
+  '99000001',
   'submissions-access-gate-course-test-requester-test',
   'https://github.example.test/access-gate-course-test-requester-test'
 );
@@ -575,7 +575,7 @@ grant ainigma_maintenance to postgres;
 select extensions.throws_ok(
   $$
     update private.course_repository_provisioning
-    set github_org_id = 99999999
+    set external_group_id = 99999999
     where course_id = current_setting('ainigma_access_test.course_id')::uuid
       and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid
   $$,
@@ -587,7 +587,7 @@ revoke ainigma_maintenance from postgres;
 set local role authenticated;
 select extensions.is(
   (select (public.request_course_access('access-gate-auto-course-test', null)->>'state')),
-  'awaiting_github_access',
+  'awaiting_external_access',
   'allowlist_auto skips owner approval but still waits for GitHub access'
 );
 select extensions.is(
@@ -599,19 +599,19 @@ select extensions.is(
 reset role;
 grant ainigma_maintenance to postgres;
 set role ainigma_maintenance;
-select private.record_github_course_access_invitation(
+select private.record_external_course_access_invitation(
   current_setting('ainigma_access_test.auto_course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
-  'github_user_id',
+  'external_user_id',
   '97000001',
-  98000002
+  '98000002'
 );
-select private.confirm_github_course_access(
+select private.confirm_external_course_access(
   current_setting('ainigma_access_test.auto_course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
-  88000002,
+  '88000002',
   'access-gate-auto-course-test-org',
-  98000002,
+  '98000002',
   '97000001',
   'requester-test'
 );
@@ -627,33 +627,33 @@ select extensions.is(
 reset role;
 grant ainigma_maintenance to postgres;
 set role ainigma_maintenance;
-select private.record_github_course_access_check_failure(
+select private.record_external_course_access_check_failure(
   current_setting('ainigma_access_test.auto_course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
-  'github_request_failed'
+  'external_request_failed'
 );
 reset role;
 select extensions.is(
   (select state
-   from private.github_course_access
+   from private.external_course_access
    where course_id = current_setting('ainigma_access_test.auto_course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
   'active'::text,
   'a transient GitHub check failure preserves confirmed access'
 );
 set role ainigma_maintenance;
-select private.confirm_github_course_access(
+select private.confirm_external_course_access(
   current_setting('ainigma_access_test.auto_course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
-  88000002,
+  '88000002',
   'access-gate-auto-course-test-org',
-  98000002,
+  '98000002',
   '97000001',
   'requester-test'
 );
 reset role;
 select extensions.is(
-  private.record_github_course_access_membership_absence(
+  private.record_external_course_access_membership_absence(
     current_setting('ainigma_access_test.auto_course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid
   ),
@@ -661,7 +661,7 @@ select extensions.is(
   'one missing member snapshot does not revoke offering access'
 );
 select extensions.is(
-  private.record_github_course_access_membership_absence(
+  private.record_external_course_access_membership_absence(
     current_setting('ainigma_access_test.auto_course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid
   ),
@@ -669,7 +669,7 @@ select extensions.is(
   'two consecutive missing snapshots still preserve offering access'
 );
 select extensions.is(
-  private.record_github_course_access_membership_absence(
+  private.record_external_course_access_membership_absence(
     current_setting('ainigma_access_test.auto_course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid
   ),
@@ -715,7 +715,7 @@ select set_config(
 
 select extensions.throws_ok(
   $$
-    update private.github_course_access as access_row
+    update private.external_course_access as access_row
     set access_request_id = current_setting('ainigma_access_test.mismatched_request_id')::uuid
     where access_row.course_id = current_setting('ainigma_access_test.course_id')::uuid
       and access_row.profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid
@@ -729,12 +729,12 @@ update public.courses
 set status = 'archived'
 where id = current_setting('ainigma_access_test.course_id')::uuid;
 select extensions.throws_ok(
-  $$select private.confirm_github_course_access(
+  $$select private.confirm_external_course_access(
     current_setting('ainigma_access_test.course_id')::uuid,
     current_setting('ainigma_access_test.requester_profile_id')::uuid,
-    88000001,
+    '88000001',
     'access-gate-course-test-org',
-    98000001,
+    '98000001',
     '97000001',
     'requester-renamed'
   )$$,
@@ -744,7 +744,7 @@ select extensions.throws_ok(
 );
 select extensions.is(
   (select count(*)::bigint
-   from private.list_github_course_access_to_reconcile()
+   from private.list_external_course_access_to_reconcile()
    where course_id = current_setting('ainigma_access_test.course_id')::uuid),
   0::bigint,
   'archived offerings stop GitHub membership reconciliation'

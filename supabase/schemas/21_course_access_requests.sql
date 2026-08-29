@@ -65,7 +65,7 @@ create table private.course_roster_allowlist (
   imported_by uuid references public.profiles (id) on delete restrict,
   revoked_at timestamptz,
   constraint course_roster_allowlist_kind_check check (
-    identifier_kind in ('email', 'github_user_id', 'student_identifier')
+    identifier_kind in ('email', 'external_user_id', 'student_identifier')
   ),
   constraint course_roster_allowlist_issuer_check check (
     identifier_issuer = btrim(identifier_issuer)

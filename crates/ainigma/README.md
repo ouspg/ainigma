@@ -5,6 +5,74 @@ Think of it as a dynamic CTF challenge generator, but with a twist: every partic
 
 It may or may not be completed. Heavily work-in-progress.
 
+## Manual GitHub access polling
+
+The `ainigma-course-access-worker` binary is a trusted control-plane helper for the current manual
+invitation workflow. It does not create student memberships directly and it does not require a
+student website auth link. It loads one paginated snapshot of each relevant GitHub organization
+(active members and pending invitations), then uses the database confirmation RPC only after
+GitHub reports the expected stable user ID as an active member.
+
+It requires a direct PostgreSQL connection and a GitHub token with organization-membership read
+access and organization audit-log read access. Database queries use SQLx checked against the local
+Supabase schema. Local development uses plain PostgreSQL; configure a TLS connection and a dedicated
+least-privilege worker role before using it against a hosted database.
+
+For local development:
+
+```sh
+export DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+```
+
+The SQLx query metadata is generated from that running local database and checked into the
+workspace at `.sqlx/`. After changing a declarative schema, reset the local database and refresh
+it with:
+
+```sh
+export DATABASE_URL='postgres://postgres:postgres@127.0.0.1:54322/postgres'
+npm run sqlx:prepare
+```
+
+CI can verify that the checked metadata still matches the queries with `npm run sqlx:check`.
+
+After an access request is approved, `poll` automatically invites the verified GitHub identity.
+Polling first adopts a matching manually sent email invitation; otherwise it invites by the stable
+GitHub user ID. The explicit command uses email by default; use `--by external-user-id` to choose
+the stable GitHub user ID explicitly:
+
+```sh
+export DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+export GITHUB_TOKEN='...'
+cargo run -p ainigma-course-access-worker -- \
+  poll
+cargo run -p ainigma-course-access-worker -- \
+  invite --by external-user-id --course-id COURSE_UUID --profile-id PROFILE_UUID
+```
+
+The explicit `invite` command remains available for a targeted retry or for sending by stable
+GitHub user ID.
+
+If the invitation was sent outside the worker, let the worker find the matching pending GitHub
+invitation and record its invitation ID:
+
+```sh
+cargo run -p ainigma-course-access-worker -- \
+  mark-invited --course-id COURSE_UUID --profile-id PROFILE_UUID
+```
+
+Use `poll --watch --interval-seconds 30` for a local polling loop. The worker records
+`invitation_pending`, `sso_required`, and provider failures. It preserves confirmed access through
+transient check failures and revokes it only after three consecutive complete member snapshots omit
+the learner. Archived offerings are not reconciled.
+
+Confirmation itself does not create a repository. Once active, a learner may call the authenticated
+`request_my_course_repository(offering_key)` RPC from a “Create repository” button. The poller then
+creates one private `submissions-<offering_key>-<external_user_handle>` repository per offering/profile
+and grants the student `maintain` permission. Existing marked repositories, repeated browser
+requests, and repeated worker jobs are safe. Repository retries are bounded; permanent failures are
+left `blocked` for operator review. Webhooks can call the same database reconciliation operations
+later; they are not required for this workflow.
+
 ## Minimum Requirements
 
 1. **Configuration File**: A `.toml` file defining the module, tasks, stages, build logic, and deployment rules.

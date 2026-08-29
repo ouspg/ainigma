@@ -1,16 +1,16 @@
--- Durable, explicitly requested GitHub repository provisioning.
+-- Durable, explicitly requested external repository provisioning.
 
 -- Durable outbox/state machine for one offering-specific submissions repository
--- per profile. External GitHub calls happen outside the database transaction.
+-- per profile. External provider calls happen outside the database transaction.
 create table private.course_repository_provisioning (
   course_id uuid not null,
   profile_id uuid not null,
   access_request_id uuid not null,
-  github_org_id bigint not null,
-  github_org_slug text not null,
+  external_group_id text not null,
+  external_group_handle text not null,
   repository_name text,
-  github_repository_id bigint,
-  github_repository_url text,
+  external_repository_id text,
+  external_repository_url text,
   state text not null default 'queued',
   attempt_count integer not null default 0,
   lease_token uuid,
@@ -24,33 +24,38 @@ create table private.course_repository_provisioning (
     course_id,
     profile_id,
     access_request_id,
-    github_org_id,
-    github_org_slug
-  ) references private.github_course_access (
+    external_group_id,
+    external_group_handle
+  ) references private.external_course_access (
     course_id,
     profile_id,
     access_request_id,
-    github_org_id,
-    github_org_slug
+    external_group_id,
+    external_group_handle
   ) on delete restrict,
   constraint course_repository_provisioning_request_fkey foreign key (
     access_request_id, course_id, profile_id
   ) references private.course_access_requests (id, course_id, requester_profile_id) on delete restrict,
-  constraint course_repository_provisioning_org_id_check check (github_org_id > 0),
-  constraint course_repository_provisioning_org_slug_check check (
-    github_org_slug = btrim(github_org_slug)
-    and char_length(github_org_slug) between 1 and 255
+  constraint course_repository_provisioning_group_id_check check (
+    external_group_id = btrim(external_group_id)
+    and char_length(external_group_id) between 1 and 255
+  ),
+  constraint course_repository_provisioning_group_handle_check check (
+    external_group_handle = btrim(external_group_handle)
+    and char_length(external_group_handle) between 1 and 255
   ),
   constraint course_repository_provisioning_name_check check (
     repository_name is null
     or (repository_name = btrim(repository_name) and char_length(repository_name) between 1 and 100)
   ),
   constraint course_repository_provisioning_repository_id_check check (
-    github_repository_id is null or github_repository_id > 0
+    external_repository_id is null
+    or (external_repository_id = btrim(external_repository_id)
+      and char_length(external_repository_id) between 1 and 255)
   ),
   constraint course_repository_provisioning_url_check check (
-    github_repository_url is null
-    or (github_repository_url = btrim(github_repository_url) and char_length(github_repository_url) between 1 and 2048)
+    external_repository_url is null
+    or (external_repository_url = btrim(external_repository_url) and char_length(external_repository_url) between 1 and 2048)
   ),
   constraint course_repository_provisioning_state_check check (
     state in ('queued', 'provisioning', 'retry_wait', 'ready', 'blocked')
@@ -63,8 +68,8 @@ create table private.course_repository_provisioning (
   constraint course_repository_provisioning_ready_shape_check check (
     (state = 'ready'
       and repository_name is not null
-      and github_repository_id is not null
-      and github_repository_url is not null)
+      and external_repository_id is not null
+      and external_repository_url is not null)
     or state <> 'ready'
   ),
   constraint course_repository_provisioning_next_attempt_check check (
@@ -83,17 +88,17 @@ create table private.course_repository_provisioning (
 );
 
 comment on table private.course_repository_provisioning is
-  'Durable idempotent outbox for one GitHub submissions repository per offering and profile.';
+  'Durable idempotent outbox for one external submissions repository per offering and profile.';
 comment on column private.course_repository_provisioning.repository_name is
-  'Deterministic offering-specific GitHub repository name, normally submissions-<offering_key>-<username>.';
-comment on column private.course_repository_provisioning.github_repository_id is
-  'Stable GitHub repository ID; used instead of the mutable repository name for reconciliation.';
+  'Deterministic offering-specific repository name, normally submissions-<offering_key>-<user_handle>.';
+comment on column private.course_repository_provisioning.external_repository_id is
+  'Stable provider repository ID; used instead of the mutable repository name for reconciliation.';
 
 create unique index course_repository_provisioning_repository_id_uidx
-  on private.course_repository_provisioning (github_repository_id)
-  where github_repository_id is not null;
+  on private.course_repository_provisioning (external_repository_id)
+  where external_repository_id is not null;
 create unique index course_repository_provisioning_org_name_uidx
-  on private.course_repository_provisioning (github_org_id, repository_name)
+  on private.course_repository_provisioning (external_group_id, repository_name)
   where repository_name is not null;
 create index course_repository_provisioning_claim_idx
   on private.course_repository_provisioning (state, next_attempt_at, lease_expires_at, updated_at);
@@ -113,13 +118,14 @@ returns table (
   profile_id uuid,
   access_request_id uuid,
   offering_key text,
-  github_org_id bigint,
-  github_org_slug text,
+  provider_kind text,
+  external_group_id text,
+  external_group_handle text,
   repository_name text,
-  github_repository_id bigint,
-  github_repository_url text,
-  github_username text,
-  github_user_id text,
+  external_repository_id text,
+  external_repository_url text,
+  external_user_handle text,
+  external_user_id text,
   lease_token uuid,
   attempt_count integer
 )
@@ -139,23 +145,24 @@ begin
       repository.profile_id,
       repository.access_request_id,
       course.offering_key,
-      repository.github_org_id,
-      repository.github_org_slug,
-      repository.github_repository_id,
-      repository.github_repository_url,
-      access_row.github_user_id,
-      access_row.github_username,
+      organization.provider_kind,
+      repository.external_group_id,
+      repository.external_group_handle,
+      repository.external_repository_id,
+      repository.external_repository_url,
+      access_row.external_user_id,
+      access_row.external_user_handle,
       case
-        when access_row.github_username is null then null
-        when char_length('submissions-' || course.offering_key || '-' || access_row.github_username) <= 100
-          then 'submissions-' || course.offering_key || '-' || access_row.github_username
+        when access_row.external_user_handle is null then null
+        when char_length('submissions-' || course.offering_key || '-' || access_row.external_user_handle) <= 100
+          then 'submissions-' || course.offering_key || '-' || access_row.external_user_handle
         else
           'submissions-' || left(course.offering_key, 58) || '-' ||
-          right(md5(course.offering_key || ':' || access_row.github_username), 8) || '-' ||
-          left(access_row.github_username, 20)
+          right(md5(course.offering_key || ':' || access_row.external_user_handle), 8) || '-' ||
+          left(access_row.external_user_handle, 20)
       end as generated_repository_name
     from private.course_repository_provisioning as repository
-    join private.github_course_access as access_row
+    join private.external_course_access as access_row
       on access_row.course_id = repository.course_id
      and access_row.profile_id = repository.profile_id
     join private.course_access_requests as request_row
@@ -168,9 +175,11 @@ begin
      and membership.created_from_access_request_id = repository.access_request_id
      and membership.status = 'active'
     join public.courses as course on course.id = repository.course_id
+    join private.course_definition_external_groups as organization
+      on organization.course_definition_key = course.course_definition_key
     where request_row.status = 'approved'
       and access_row.state = 'active'
-      and access_row.github_username is not null
+      and access_row.external_user_handle is not null
       and access_row.failure_code is null
       and access_row.last_checked_at >= clock_timestamp() - interval '5 minutes'
       and (p_course_id is null or repository.course_id = p_course_id)
@@ -202,18 +211,21 @@ begin
     claimed.profile_id,
     claimed.access_request_id,
     course.offering_key,
-    claimed.github_org_id,
-    claimed.github_org_slug,
+    organization.provider_kind,
+    claimed.external_group_id,
+    claimed.external_group_handle,
     claimed.repository_name,
-    claimed.github_repository_id,
-    claimed.github_repository_url,
-    access_row.github_username,
-    access_row.github_user_id,
+    claimed.external_repository_id,
+    claimed.external_repository_url,
+    access_row.external_user_handle,
+    access_row.external_user_id,
     claimed.lease_token,
     claimed.attempt_count
   from claimed
   join public.courses as course on course.id = claimed.course_id
-  join private.github_course_access as access_row
+  join private.course_definition_external_groups as organization
+    on organization.course_definition_key = course.course_definition_key
+  join private.external_course_access as access_row
     on access_row.course_id = claimed.course_id
    and access_row.profile_id = claimed.profile_id
   ;
@@ -226,9 +238,9 @@ create function private.complete_course_repository_provisioning(
   p_course_id uuid,
   p_profile_id uuid,
   p_lease_token uuid,
-  p_github_repository_id bigint,
-  p_github_repository_name text,
-  p_github_repository_url text
+  p_external_repository_id text,
+  p_repository_name text,
+  p_external_repository_url text
 )
 returns void
 language plpgsql
@@ -238,16 +250,17 @@ as $function$
 declare
   v_repository private.course_repository_provisioning%rowtype;
 begin
-  if p_github_repository_id is null
-    or p_github_repository_id <= 0
-    or p_github_repository_name is null
-    or p_github_repository_name <> btrim(p_github_repository_name)
-    or char_length(p_github_repository_name) not between 1 and 100
-    or p_github_repository_url is null
-    or p_github_repository_url <> btrim(p_github_repository_url)
-    or char_length(p_github_repository_url) not between 1 and 2048
+  if p_external_repository_id is null
+    or p_external_repository_id <> btrim(p_external_repository_id)
+    or char_length(p_external_repository_id) not between 1 and 255
+    or p_repository_name is null
+    or p_repository_name <> btrim(p_repository_name)
+    or char_length(p_repository_name) not between 1 and 100
+    or p_external_repository_url is null
+    or p_external_repository_url <> btrim(p_external_repository_url)
+    or char_length(p_external_repository_url) not between 1 and 2048
   then
-    raise exception using errcode = '22023', message = 'invalid_github_repository';
+    raise exception using errcode = '22023', message = 'invalid_external_repository';
   end if;
 
   select repository.*
@@ -262,9 +275,9 @@ begin
   end if;
 
   if v_repository.state = 'ready' then
-    if v_repository.github_repository_id = p_github_repository_id
-      and v_repository.repository_name = p_github_repository_name
-      and v_repository.github_repository_url = p_github_repository_url
+    if v_repository.external_repository_id = p_external_repository_id
+      and v_repository.repository_name = p_repository_name
+      and v_repository.external_repository_url = p_external_repository_url
     then
       return;
     end if;
@@ -277,14 +290,14 @@ begin
     raise exception using errcode = '55000', message = 'repository_lease_invalid';
   end if;
 
-  if v_repository.repository_name is distinct from p_github_repository_name then
+  if v_repository.repository_name is distinct from p_repository_name then
     raise exception using errcode = '42501', message = 'repository_name_mismatch';
   end if;
 
   update private.course_repository_provisioning
   set state = 'ready',
-      github_repository_id = p_github_repository_id,
-      github_repository_url = p_github_repository_url,
+      external_repository_id = p_external_repository_id,
+      external_repository_url = p_external_repository_url,
       lease_token = null,
       lease_expires_at = null,
       next_attempt_at = null,
@@ -365,5 +378,3 @@ begin
   where course_id = p_course_id and profile_id = p_profile_id;
 end
 $function$;
-
-

@@ -1,5 +1,4 @@
-use crate::{database, github};
-use reqwest::Client;
+use crate::{database, platform::ExternalPlatform};
 use sqlx::PgPool;
 use std::error::Error;
 use uuid::Uuid;
@@ -10,10 +9,9 @@ pub struct ProvisioningSummary {
     pub failed: usize,
 }
 
-pub async fn provision_repositories(
+pub async fn provision_repositories<P: ExternalPlatform>(
     database: &PgPool,
-    github_client: &Client,
-    github_api_url: &str,
+    platform: &P,
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
 ) -> Result<ProvisioningSummary, Box<dyn Error>> {
@@ -21,7 +19,7 @@ pub async fn provision_repositories(
     let mut summary = ProvisioningSummary::default();
 
     for job in jobs {
-        match provision_repository(database, github_client, github_api_url, &job).await {
+        match provision_repository(database, platform, &job).await {
             Ok(true) => summary.ready += 1,
             Ok(false) => summary.failed += 1,
             Err(error) => {
@@ -39,13 +37,22 @@ pub async fn provision_repositories(
     Ok(summary)
 }
 
-async fn provision_repository(
+async fn provision_repository<P: ExternalPlatform>(
     database: &PgPool,
-    github_client: &Client,
-    github_api_url: &str,
+    platform: &P,
     job: &database::RepositoryJob,
 ) -> Result<bool, Box<dyn Error>> {
-    let result = try_provision_repository(database, github_client, github_api_url, job).await;
+    if job.provider_kind != platform.kind() {
+        let error_code = "unsupported_external_provider";
+        database::fail_repository_job(database, job, error_code, false).await?;
+        tracing::warn!(
+            offering = %job.offering_key,
+            provider_kind = %job.provider_kind,
+            "repository job belongs to another external provider"
+        );
+        return Ok(false);
+    }
+    let result = try_provision_repository(database, platform, job).await;
 
     if let Err(error_code) = result {
         let retryable = is_retryable_error(&error_code);
@@ -63,42 +70,31 @@ async fn provision_repository(
     Ok(true)
 }
 
-async fn try_provision_repository(
+async fn try_provision_repository<P: ExternalPlatform>(
     database: &PgPool,
-    github_client: &Client,
-    github_api_url: &str,
+    platform: &P,
     job: &database::RepositoryJob,
 ) -> Result<(), String> {
     let username = job
-        .github_username
+        .external_user_handle
         .as_deref()
-        .ok_or_else(|| "github_username_not_found".to_owned())?;
+        .ok_or_else(|| "external_user_handle_not_found".to_owned())?;
     let repository_name = job
         .repository_name
         .as_deref()
-        .ok_or_else(|| "github_repository_name_not_generated".to_owned())?;
+        .ok_or_else(|| "external_repository_name_not_generated".to_owned())?;
     let marker = repository_marker(job.course_id, job.profile_id);
 
-    let repository = github::find_or_create_repository(
-        github_client,
-        github_api_url,
-        &job.github_org_slug,
-        repository_name,
-        &marker,
-    )
-    .await?;
-    github::grant_maintain(
-        github_client,
-        github_api_url,
-        &job.github_org_slug,
-        &repository.name,
-        username,
-    )
-    .await?;
+    let repository = platform
+        .find_or_create_repository(&job.external_group_handle, repository_name, &marker)
+        .await?;
+    platform
+        .grant_maintain(&job.external_group_handle, &repository.name, username)
+        .await?;
     database::complete_repository_job(
         database,
         job,
-        repository.id,
+        &repository.id,
         &repository.name,
         &repository.html_url,
     )
@@ -114,8 +110,8 @@ fn repository_marker(course_id: Uuid, profile_id: Uuid) -> String {
 fn is_retryable_error(error_code: &str) -> bool {
     !matches!(
         error_code,
-        "github_username_not_found"
-            | "github_repository_name_not_generated"
+        "external_user_handle_not_found"
+            | "external_repository_name_not_generated"
             | "github_repository_name_collision"
             | "github_collaborator_http_401"
             | "github_collaborator_http_403"

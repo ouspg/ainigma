@@ -1,12 +1,11 @@
 use core::panic;
-use hmac::{Hmac, Mac, digest::InvalidLength};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use hmac::{KeyInit, Mac, SimpleHmac, digest::InvalidLength};
+use rand::{RngExt, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
-use std::fmt::Write;
 use uuid::Uuid;
 
-type Hmac256 = Hmac<Sha3_256>;
+type Hmac256 = SimpleHmac<Sha3_256>;
 
 /// Type for all possible algorithms to use when generating flag
 ///
@@ -169,16 +168,13 @@ impl FlagUnit {
 
 /// Generates a completely random flag
 fn pure_random_flag(lenght: u8) -> String {
-    let mut rng = StdRng::from_os_rng();
+    let mut rng: StdRng = rand::make_rng();
     let size = lenght.into();
     let mut vec: Vec<u8> = vec![0; size];
     for i in &mut vec {
         *i = rng.random();
     }
-    vec.iter().fold(String::new(), |mut output, b| {
-        let _ = write!(output, "{b:02x}");
-        output
-    })
+    base16ct::lower::encode_string(&vec)
 }
 
 /// Generates a flag which is derived from user identifier and uses secret
@@ -197,7 +193,7 @@ fn user_derived_flag(
 
             let result = mac.finalize();
             let bytes = result.into_bytes();
-            Ok(format!("{bytes:x}"))
+            Ok(base16ct::lower::encode_string(bytes.as_slice()))
         }
     }
 }
@@ -216,7 +212,7 @@ fn compare_hmac(
 
     let result = mac.finalize();
     let bytes = result.into_bytes();
-    let s = format!("{bytes:x}");
+    let s = base16ct::lower::encode_string(bytes.as_slice());
     Ok(s == hmac)
 }
 

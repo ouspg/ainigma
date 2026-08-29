@@ -9,9 +9,9 @@ create table private.course_definition_releases (
   constraint course_definition_releases_definition_key_check check (
     course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'
   ),
-  constraint course_definition_releases_github_organization_fkey foreign key (
+  constraint course_definition_releases_external_group_fkey foreign key (
     course_definition_key
-  ) references private.course_definition_github_organizations (course_definition_key) on delete restrict,
+  ) references private.course_definition_external_groups (course_definition_key) on delete restrict,
   constraint course_definition_releases_source_commit_sha_check check (
     source_commit_sha ~ '^[0-9a-f]{40}([0-9a-f]{24})?$'
   ),

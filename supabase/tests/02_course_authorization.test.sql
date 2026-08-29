@@ -88,14 +88,14 @@ select set_config(
 );
 
 grant ainigma_maintenance to postgres;
-insert into private.course_definition_github_organizations (
+insert into private.course_definition_external_groups (
   course_definition_key,
-  github_org_id,
-  github_org_slug
+  external_group_id,
+  external_group_handle
 )
 values
-  ('security-fundamentals', 88000001, 'security-test-org'),
-  ('unrelated-course', 88000002, 'unrelated-test-org');
+  ('security-fundamentals', '88000001', 'security-test-org'),
+  ('unrelated-course', '88000002', 'unrelated-test-org');
 set role ainigma_maintenance;
 select set_config(
   'ainigma_test.security_release_id',

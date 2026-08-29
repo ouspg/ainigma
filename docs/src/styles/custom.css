@@ -1,0 +1,37 @@
+/* Ainigma's selected design tokens mapped onto the Nimbus design vocabulary. */
+:root {
+  --nb-background: var(--ainigma-color-background-body);
+  --nb-foreground: var(--ainigma-color-text-primary);
+  --nb-card: var(--ainigma-color-background-surface);
+  --nb-card-foreground: var(--ainigma-color-text-primary);
+  --nb-muted: var(--ainigma-color-background-muted);
+  --nb-muted-foreground: var(--ainigma-color-text-secondary);
+  --nb-accent: var(--ainigma-color-accent-muted);
+  --nb-accent-foreground: var(--ainigma-color-text-primary);
+  --nb-primary: var(--ainigma-color-accent);
+  --nb-primary-foreground: var(--ainigma-color-on-accent);
+  --nb-primary-hover: var(--ainigma-color-text-accent);
+  --nb-border: var(--ainigma-color-border);
+  --nb-border-strong: var(--ainigma-color-border-emphasized);
+  --nb-selected: var(--ainigma-color-accent-muted);
+  --nb-ring: color-mix(in srgb, var(--ainigma-color-accent) 42%, transparent);
+  --nb-font-sans: var(--ainigma-font-body);
+  --nb-font-mono: var(--ainigma-font-code);
+  --nb-shadow-sm: var(--ainigma-shadow-low);
+  --nb-shadow: var(--ainigma-shadow-medium);
+  --nb-shadow-lg: var(--ainigma-shadow-medium);
+  --nb-content-max: 50rem;
+}
+
+body {
+  background: var(--ainigma-color-background-body);
+}
+
+.docs-content :is(h1, h2, h3, h4, h5, h6),
+header a.group > span {
+  font-family: var(--ainigma-font-heading);
+}
+
+.docs-content :where(blockquote:not([class])) {
+  border-inline-start-color: var(--ainigma-color-accent);
+}

@@ -1,0 +1,4 @@
+.astro/
+.nimbus/
+dist/
+public/opengraph.png

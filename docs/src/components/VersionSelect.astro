@@ -1,0 +1,133 @@
+---
+import { docsVersions, versionPagePath } from "../../config/versions.mjs";
+
+const { current, versions } = docsVersions;
+const currentPath = Astro.url.pathname;
+const search = Astro.url.search;
+---
+
+<div class="docs-version-picker">
+  <span class="docs-version-context" aria-hidden="true">Version</span>
+  <details>
+    <summary aria-label={`Documentation version ${current.label}`}>
+      <span>{current.label}</span>
+      <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16">
+        <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+      </svg>
+    </summary>
+    <ul>
+      {
+        versions.map((version) => (
+          <li>
+            <a
+              href={versionPagePath(currentPath, current.base, version.base, search)}
+              aria-current={version.id === current.id ? "page" : undefined}
+            >
+              <span>{version.label}</span>
+              {version.id === current.id ? <span aria-hidden="true">✓</span> : null}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </details>
+</div>
+
+<style>
+  .docs-version-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--nb-primary);
+    font-family: var(--nb-font-sans);
+    font-size: 0.8125rem;
+  }
+
+  .docs-version-context {
+    color: var(--nb-muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  details {
+    position: relative;
+  }
+
+  summary {
+    display: flex;
+    min-width: 4.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--nb-border);
+    border-radius: var(--ainigma-radius-element);
+    background: var(--nb-card);
+    color: var(--nb-foreground);
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary:hover,
+  summary:focus-visible,
+  details[open] summary {
+    border-color: var(--nb-border-strong);
+    color: var(--nb-primary);
+  }
+
+  details[open] summary svg {
+    transform: rotate(180deg);
+  }
+
+  ul {
+    position: absolute;
+    z-index: 20;
+    inset-block-start: calc(100% + 0.35rem);
+    inset-inline-end: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+    padding: 0.3rem;
+    border: 1px solid var(--nb-border);
+    border-radius: var(--ainigma-radius-container);
+    background: var(--nb-card);
+    box-shadow: var(--nb-shadow);
+    list-style: none;
+  }
+
+  a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: var(--ainigma-radius-inner);
+    color: var(--nb-foreground);
+    text-decoration: none;
+  }
+
+  a:hover,
+  a:focus-visible,
+  a[aria-current="page"] {
+    background: var(--nb-accent);
+    color: var(--nb-primary);
+  }
+
+  @media (max-width: 50rem) {
+    .docs-version-picker {
+      justify-content: space-between;
+    }
+
+    ul {
+      inset-inline-start: 0;
+      inset-inline-end: auto;
+    }
+  }
+</style>

@@ -1,4 +1,6 @@
-# Ainigma long-term architecture plan
+---
+title: Ainigma long-term architecture plan
+---
 
 This document describes the target architecture after the first course is working. It is a direction, not a requirement to implement every component before launch.
 
@@ -124,8 +126,8 @@ The compiler is the center of the course-as-code workflow:
 ainigma course check
 ainigma course build
 ainigma course test
-ainigma course diff --target <course_key>
-ainigma course publish --target <course_key>
+ainigma course diff --target <offering_key>
+ainigma course publish --target <offering_key>
 ```
 
 ### `course check`
@@ -181,7 +183,11 @@ Classifies changes before publication:
 
 ### `course publish`
 
-Publishes only previously built artifacts, records the source commit, performs environment admission, and creates or reuses immutable database records.
+Publishes only previously built artifacts, records the source commit, performs environment
+admission, and creates or reuses immutable database records. It advances non-archived offerings of
+the definition to the admitted release. The compiler also owns the separate branch operation that
+creates a new offering, its initial owner membership, and its starting release pointer without
+copying the course directory.
 
 ## 5. Compiled artifacts and identity
 

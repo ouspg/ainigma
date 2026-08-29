@@ -1,4 +1,6 @@
-# Supabase database plan
+---
+title: Supabase database plan
+---
 
 Git/MDX owns presentation, while Postgres owns authorization and runtime state.
 
@@ -104,7 +106,7 @@ Store trusted identity claims used for course access checks without putting prov
 
 - `id uuid primary key`
 - `profile_id → public.profiles.id`
-- `kind`: initially `email`, `github_user_id`, `github_username`, or `student_identifier`
+- `kind`: initially `email`, `external_user_id`, `external_user_handle`, or `student_identifier`
 - `issuer`: for example `github.com` or the institution identifier
 - `scheme_version integer`
 - `normalized_value`
@@ -115,7 +117,7 @@ Store trusted identity claims used for course access checks without putting prov
 
 The identifier type is the tuple `(kind, issuer, scheme_version)`. In particular, a student-number type is never an unversioned generic string: use a definition such as `(student_identifier, example-university, 1)`. A change to its syntax or normalization creates version `2`; existing values are never silently reinterpreted.
 
-GitHub's stable numeric user ID is the authorization identity. A username is a mutable, potentially reusable alias used only for lookup and display/audit. When an administrator imports a roster or allowlist entry using a GitHub username, the trusted import path resolves it to `(github_user_id, github.com, 1, <numeric-id>)` and stores that stable target. It never authorizes by username alone.
+The external provider's stable user ID is the authorization identity. A handle is a mutable, potentially reusable alias used only for lookup and display/audit. When an administrator imports a roster or allowlist entry using a provider handle, the trusted import path resolves it to `(external_user_id, <provider issuer>, 1, <provider-id>)` and stores that stable target. It never authorizes by handle alone.
 
 Keep identifier history without treating stale claims as current. Enforce a partial uniqueness constraint on `(kind, issuer, scheme_version, normalized_value)` for active rows where `revoked_at is null`. Provider synchronization retires an old GitHub username alias when it changes, while the numeric GitHub ID remains stable. Normalization is implemented and tested by versioned application code; it is not supplied as executable database data.
 
@@ -126,8 +128,8 @@ Only trusted Auth synchronization, roster import, or an administrator workflow m
 One row represents one concrete operational course offering, not a second copy of its MDX presentation:
 
 - Database-generated stable UUID used by foreign keys
-- `course_key`: globally unique, meaningful, immutable key for this offering, such as `security-fundamentals-2026-spring`; this is the course key passed by the frontend RPCs
-- `definition_key`: meaningful immutable key matching the reusable Git course definition, such as `security-fundamentals`
+- `offering_key`: globally unique, meaningful, immutable key for this offering, such as `security-fundamentals-2026-spring`; this is the offering key passed by the frontend RPCs
+- `course_definition_key`: meaningful immutable key matching the reusable Git course definition, such as `security-fundamentals`
 - `code`
 - `status`: `draft`, `published`, or `archived`
 - `enrollment_mode`: `approval_required`, `allowlist_auto`, or `closed`
@@ -135,7 +137,7 @@ One row represents one concrete operational course offering, not a second copy o
 - Optional `external_url` for public course information
 - `created_at` and `updated_at`
 
-Git contains `definition_key`, not an environment- or semester-specific database UUID. The course overview frontmatter declares this immutable identity explicitly; the content directory name is only a mutable route slug and may be renamed without changing `definition_key`. Publisher configuration binds that definition to a target `course_key`/UUID and emits the bound safe frontend manifest. This lets the same validated source artifact be promoted between environments or reused for a later offering without editing Git solely to replace an operational UUID.
+Git contains `course_definition_key`, not an environment- or semester-specific database UUID. The course overview frontmatter declares this immutable identity explicitly; the content directory name is only a mutable definition slug and may be renamed without changing `course_definition_key`. Publisher configuration binds that definition to a target `offering_key`/UUID and emits the bound safe frontend manifest. This lets the same validated source artifact be promoted between environments or reused for a later offering without editing Git solely to replace an operational UUID.
 
 Course title, summary, navigation label, and content ordering remain authored in Git. The frontend and instructor dashboard read them from the generated course/frontend manifest; they are not independently edited on this row.
 
@@ -162,7 +164,7 @@ Provider-independent enrollment:
 - A learner membership is created as `active` only after the required external GitHub course-organization access is confirmed; approval alone is not membership.
 - Primary key `(course_id, profile_id)`
 
-Role and status transitions occur only through constrained functions and an append-only audit event. Each course has exactly one active owner; it may have any number of instructors and learners. Creation of the initial owner is an explicit publisher/administrator operation. Ownership transfer locks the course row, atomically demotes the previous owner to instructor and promotes an existing instructor, and may not leave the course without an active owner.
+Role and status transitions occur only through constrained functions and an append-only audit event. Each course has exactly one active owner; it may have any number of instructors and learners. The Ainigma compiler/control plane branches an offering from an exact course-definition release and creates its initial owner in the same transaction. Ownership transfer locks the course row, atomically demotes the previous owner to instructor and promotes an existing instructor, and may not leave the course without an active owner.
 
 GitHub organization membership will NOT control course access.
 
@@ -197,7 +199,7 @@ A course may have an imported roster or allowlist from an external student syste
 - `status`: `active` or `revoked`
 - `imported_at`, `imported_by`, and optional `revoked_at`
 
-Allowlist entries use stable identifiers where possible: verified email or a trusted versioned student identifier from the external system. GitHub authorization uses the stable numeric `github_user_id`; a mutable GitHub username is only an input alias that must be resolved before it becomes an allowlist target.
+Allowlist entries use stable identifiers where possible: verified email or a trusted versioned student identifier from the external system. External authorization uses the stable `external_user_id`; a mutable provider handle is only an input alias that must be resolved before it becomes an allowlist target.
 
 When displaying requests, the owner API compares the requester's active verified profile identifiers with active allowlist entries and returns a derived status such as:
 
@@ -209,19 +211,25 @@ This status is a filter and review aid. Even a `preauthorized` learner still req
 
 Allowlist import and reconciliation are idempotent and do not create memberships automatically. A future bulk workflow may import a roster, show the preauthorized pending requests, and let the owner approve all of them in one action.
 
-### `private.github_course_access`
+### `private.external_course_access`
 
 A course that requires GitHub repositories has one external-access record per requested profile. Owner approval creates or updates this record and starts the GitHub organization invitation workflow; it does not grant course content access:
 
 - `course_id`
 - `profile_id`
-- Stable `github_org_id` and organization slug retained for diagnostics
-- Stable `github_user_id`
+- Stable `external_group_id` and group handle retained for diagnostics
+- Stable `external_user_id`
+- Current `external_user_handle` as a replaceable API-handle cache
+- Exact `external_invitation_id` for acceptance correlation
 - `state`: `not_started`, `invitation_pending`, `sso_required`, `active`, `failed`, or `revoked`
 - `invited_at`, `last_checked_at`, `accepted_at`
 - Bounded `failure_code` and provider request metadata safe for diagnostics
 
-Only the trusted GitHub integration may change this state. When GitHub confirms active membership for the expected stable GitHub user ID, one transaction creates the learner's active `course_memberships` row and appends its membership event. Until then, all course-content and task RPCs deny access; the learner can see only a safe status such as `awaiting_github_access`.
+Only the trusted GitHub integration may change this state. When GitHub confirms active membership for
+the expected stable GitHub user ID and the matching organization invitation ID appears in the audit
+record, one transaction creates the learner's active `course_memberships` row and appends its
+membership event. Until then, all course-content and task RPCs deny access; the learner can see only
+a safe status such as `awaiting_external_access`.
 
 The integration must reconcile invitation acceptance, SSO authorization, organization removal, and failed invitations. A later check that the user no longer belongs to the course organization suspends or revokes the local membership according to course policy. GitHub organization membership is an external access prerequisite, not a substitute for the local course membership and RLS model.
 
@@ -234,7 +242,7 @@ Email invitations and personal enrollment links are deferred until the approval/
 Minimal operational task identity:
 
 - Internal stable task UUID generated or resolved by the publisher; authors do not copy this UUID into MDX
-- `definition_key`: meaningful immutable course-local authoring key such as `packet-traces`
+- `task_definition_key`: meaningful immutable course-local authoring key such as `packet-traces`
 - `course_id`
 - `status`
 - Timestamps
@@ -243,7 +251,7 @@ Task title, summary, estimated duration, route, ordering, and section placement 
 
 There is no `course_sections` table initially. Astro derives sections/weeks and navigation from the content directory and section `index.mdx` frontmatter. Add an operational section table only if sections later acquire database behavior such as independent enrollment, availability windows, prerequisites, or deadlines.
 
-Task UUIDs and definition keys remain stable when a title, route, or presentation changes. Definition keys use a constrained readable format such as `^[a-z][a-z0-9-]{2,63}$`. Enforce `unique (id, course_id)` and `unique (course_id, definition_key)`. The active course release—not a mutable task pointer—selects the task version.
+Task UUIDs and task definition keys remain stable when a title, route, or presentation changes. Task definition keys use a constrained readable format such as `^[a-z][a-z0-9-]{2,63}$`. Enforce `unique (id, course_id)` and `unique (course_id, task_definition_key)`. The offering's current course-definition release—not a mutable task pointer—selects the task version.
 
 The two identifiers serve different purposes:
 
@@ -442,15 +450,15 @@ The presentation repository may be public while runtime TOML, builders, and runt
 
 ### Course compiler
 
-A course is published only from compiler output; the publisher never scans an ad hoc checkout. One environment-neutral course manifest names the course `definition_key`, sections, tasks, logical runtime contracts, and source roots. The target deployment supplies the operational `course_key`.
+A course is published only from compiler output; the publisher never scans an ad hoc checkout. One environment-neutral course manifest names the `course_definition_key`, sections, tasks, logical runtime contracts, and source roots. The target deployment supplies the operational `offering_key`.
 
 The CLI workflow is:
 
 ```text
 ainigma course check
 ainigma course build
-ainigma course diff --target <course_key>
-ainigma course publish --target <course_key>
+ainigma course diff --target <offering_key>
+ainigma course publish --target <offering_key>
 ```
 
 `check` validates without side effects. `build` creates an immutable course bundle. `diff` shows content, interaction, runtime, and operational changes before publication. `publish` accepts only a previously built bundle and privately records every pinned source commit.
@@ -511,7 +519,7 @@ The Rust release library and Astro integration produce three artifacts:
 
 1. A private normalized runtime manifest and `runtime_digest`.
 2. Canonical task-binding bytes containing `interaction_schema_version`, task key, extracted `interaction_spec`, and the exact runtime digest; their SHA-256 is `task_release_digest`.
-3. A safe bound frontend manifest containing the operational `course_key`, presentation metadata, hashes of MDX/public assets and the frontend bundle, and each task's `task_release_digest`. Hashing its canonical payload produces `course_release_digest`, which is then stored in the manifest envelope.
+3. A safe bound frontend manifest containing the operational `offering_key`, presentation metadata, hashes of MDX/public assets and the frontend bundle, and each task's `task_release_digest`. Hashing its canonical payload produces `course_release_digest`, which is then stored in the manifest envelope.
 
 `course_release_digest` identifies the exact safe Astro deployment. `task_release_digest` deliberately excludes raw MDX prose and presentation-only assets. Astro never reads the private runtime manifest and never computes either task/runtime digest independently.
 
@@ -554,18 +562,27 @@ CI must:
 
 The current `challenges.json` may temporarily retain labels and placeholders, but no answer. Safe presentation should move beside MDX; grading and output contracts move to runtime TOML.
 
-### Course releases
+### Course-definition releases
 
-`private.course_releases` records one exact frontend deployment:
+`private.course_definition_releases` records one exact compiler output from the single living source
+directory:
 
-- `id`, `course_id`, presentation source commit, `course_release_digest`, deployment ID
-- Lifecycle: `staged`, `deployed`, `active`, `draining`, `retired`, or `failed`
-- Minimum support deadline and timestamps
-- Unique `(id, course_id)`
+- `id`, `course_definition_key`, presentation source commit, `course_release_digest`, and immutable
+  artifact reference
+- Creation timestamp; release rows are immutable
+- Unique `(course_definition_key, course_release_digest)`
 
-`private.course_release_tasks` maps that deployment to `(course_release_id, course_id, task_id, task_version_id, task_release_digest)` with composite foreign keys proving course, task, version, and digest agree.
+Each operational offering stores `course_definition_release_id`. Publishing a new release advances
+that pointer for non-archived offerings using the same `course_definition_key`. Archived offerings
+retain their existing pointer. The Ainigma compiler branches a new offering from an explicitly
+selected current release and creates a separate operational space and membership set; it never
+copies the source directory.
 
-A partial unique index permits only one `active` release per course. Activation locks the course and moves the old release to `draining` and the new release to `active` in one transaction; there are no per-task current pointers. `request_task` resolves versions through `course_release_tasks`. A typo creates a new course release with a new `course_release_digest` but reuses the same task version and `task_release_digest`.
+`private.course_definition_release_tasks` maps a definition release to its task versions and
+`task_release_digest` values with composite foreign keys proving the definition, task, version, and
+digest agree. `request_task` resolves versions through the requesting offering's exact definition
+release. A typo creates a new definition release but reuses the same task version and
+`task_release_digest`.
 
 ### Database publication boundary
 
@@ -575,7 +592,9 @@ PostgreSQL does not compile MDX or inspect Git. Constrained publisher functions:
 - Insert or reuse the runtime revision by `(task_id, runtime_digest)`.
 - Insert or reuse the task version by `(task_id, task_release_digest)` and verify its interaction/runtime projections.
 - Project runtime challenges relationally.
-- Create the course release and its composite-FK task mapping.
+- Create the course-definition release and its composite-FK task mapping.
+- Advance non-archived offerings or branch a new offering only through compiler/control-plane
+  operations.
 
 Repository-wide validation remains in Rust/CI. Database constraints enforce persisted identity, ownership, immutability, and lifecycle transitions.
 
@@ -583,13 +602,15 @@ Repository-wide validation remains in Rust/CI. Database constraints enforce pers
 
 1. Build and validate the runtime, binding, and frontend artifacts.
 2. Insert or reuse the runtime revision.
-3. Insert or reuse the task version. For a presentation-only change, runtime and task publication are no-ops; continue with the new frontend course release.
+3. Insert or reuse the task version. For a presentation-only change, runtime and task publication are no-ops; continue with the new frontend course-definition release.
 4. Ensure required workers and any shared runtime deployment are ready; learner requests never provision a replacement shared service.
-5. Build/upload the bound Astro artifact and create the staged course release with its `course_release_digest` and task mappings.
-6. Mark task versions launchable, activate the course release, and switch frontend traffic.
-7. Drain the previous course release; retire task/runtime versions only after no supported release or nonterminal run references them.
+5. Build/upload the bound Astro artifact and register the immutable course-definition release with
+   its `course_release_digest` and task mappings.
+6. Mark task versions launchable and advance all non-archived offerings of that definition.
+7. When creating a cohort, have the compiler branch its new offering from the selected current
+   release. Retire task/runtime versions only after no offering or nonterminal run references them.
 
-Each task page embeds only `course_key`, `taskKey`, and `task_release_digest`. The worker attempt records its build ID for diagnostics, but a generic worker binary hash is not part of the frontend contract.
+Each task page embeds only `offering_key`, `taskKey`, and `task_release_digest`. The worker attempt records its build ID for diagnostics, but a generic worker binary hash is not part of the frontend contract.
 
 ## 4. Runtime schema: second stage
 
@@ -822,18 +843,18 @@ The browser must not insert task runs or memberships directly.
 Expose authenticated functions:
 
 ```text
-request_course_access(course_key, reason?) → request_or_membership_state
+request_course_access(offering_key, reason?) → request_or_membership_state
 list_my_course_access_requests() → own_request_states
-list_course_access_requests(course_key, status?, authorization_filter?) → owner_queue
-approve_course_access_requests(course_key, request_ids[]?) → approval_summary
-reject_course_access_requests(course_key, request_ids[]?, decision_reason?) → rejection_summary
-request_task(course_key, task_key, task_release_digest, idempotency_key) → run_id
+list_course_access_requests(offering_key, status?, authorization_filter?) → owner_queue
+approve_course_access_requests(offering_key, request_ids[]?) → approval_summary
+reject_course_access_requests(offering_key, request_ids[]?, decision_reason?) → rejection_summary
+request_task(offering_key, task_key, task_release_digest, idempotency_key) → run_id
 submit_task_answer(run_id, challenge_key, answer, idempotency_key) → verdict
 request_task_stop(run_id)
 get_my_task_connection(run_id) → safe_endpoint_and_ticket
 ```
 
-`request_course_access` derives the learner from the authenticated session and accepts no profile or user ID. Owner decision functions recheck the acting owner's course role, lock the selected pending requests, verify that every selected row belongs to the requested course, start the external GitHub access workflow, and support an explicit approve-all-pending path. They do not create active memberships before GitHub confirmation. Request listings calculate whether each requester is `preauthorized`, `not_preauthorized`, or `unverified` against the trusted roster allowlist. `course_key` scopes course-local identifiers; `course_release_digest` is never a browser argument. RPCs that need private access are individually reviewed security-definer wrappers following the rules above.
+`request_course_access` derives the learner from the authenticated session and accepts no profile or user ID. Owner decision functions recheck the acting owner's course role, lock the selected pending requests, verify that every selected row belongs to the requested course, start the external GitHub access workflow, and support an explicit approve-all-pending path. They do not create active memberships before GitHub confirmation. Request listings calculate whether each requester is `preauthorized`, `not_preauthorized`, or `unverified` against the trusted roster allowlist. `offering_key` scopes course-local identifiers; `course_release_digest` is never a browser argument. RPCs that need private access are individually reviewed security-definer wrappers following the rules above.
 
 Roster/allowlist import is a trusted server or control-plane operation, not a direct browser table write. It is idempotent, records its source/import batch, and never creates memberships automatically in the initial model. A future course policy may allow one-click self-enrollment for preauthorized learners without changing identity or RLS rules.
 
@@ -870,8 +891,10 @@ RLS is defense in depth for rows returned by the function; it is not the answer 
 
 `request_task` performs one transaction:
 
-1. Resolve `course_key`, lock the caller's membership row consistently with membership-revocation functions, and verify active membership plus course availability.
-2. Resolve `task_key` only inside that course, then resolve the immutable task version matching `task_release_digest` and a recorded active/draining course release that may still serve that frontend build.
+1. Resolve `offering_key`, lock the caller's membership row consistently with membership-revocation functions, and verify active membership plus course availability.
+2. Resolve `task_key` only inside that offering's course definition, then resolve the immutable task
+   version matching `task_release_digest` and the exact course-definition release referenced by the
+   offering or a still-supported historical artifact.
 3. Return `task_definition_outdated` if the exact course/task/release tuple is unknown, disabled, outside its support window, or retired.
 4. Reuse an existing request with the same profile-scoped idempotency key and payload digest; return `idempotency_conflict` for different arguments.
 5. For `provision_shared_service`, resolve the pinned runtime revision's one `ready` deployment or return `task_temporarily_unavailable` without starting a replacement deployment from the learner request.
@@ -968,7 +991,11 @@ Supabase Cron performs only bounded database scheduling, using `FOR UPDATE SKIP 
 3. For a run with per-learner external or Storage resources, enqueue `{ queue_message_schema_version, target_kind: "run", run_id }` into `destroy_resource` and mark cleanup queued in the same transaction.
 4. For database-only runs, finish cleanup and mark them expired transactionally.
 5. Delete `private.task_run_verifiers` rows only after the run can no longer accept submissions and cleanup has reached the appropriate terminal boundary; non-plaintext grading events remain, and unreferenced pepper keys become retirable.
-6. Separately find shared deployments whose runtime revision has no active/draining course release or nonterminal run dependency and whose tickets have drained or passed the retirement deadline; mark them `retiring` and enqueue `{ queue_message_schema_version, target_kind: "shared_service_deployment", deployment_id }` into `destroy_resource`.
+6. Separately find shared deployments whose runtime revision has no course-definition release
+   referenced by an offering or nonterminal run and whose tickets have drained or passed the
+   retirement deadline; mark them `retiring` and enqueue
+   `{ queue_message_schema_version, target_kind: "shared_service_deployment", deployment_id }` into
+   `destroy_resource`.
 7. Purge plaintext submissions, invitation delivery payloads, stale identity aliases, and other PII in separate policy-driven bounded jobs after their recorded retention deadlines; retain only the non-plaintext grading and minimum audit records required by policy.
 
 Rust performs external and Storage cleanup:
@@ -1059,13 +1086,15 @@ Foundation tests:
 - Plaintext answers and secret values are absent from runtime, binding, and frontend artifacts.
 - Invalid interaction/runtime schemas, lifecycle states, or unsupported shared-service transport/ticket contracts fail publication.
 - Interaction, frontend-manifest, runtime, queue-message, and ticket-protocol versions evolve independently.
-- A course release stores the exact `course_release_digest` and task-version mapping; a partial unique index prevents two active releases, activation/rollback changes only course-release state, and old deployments drain before referenced task/runtime versions retire.
-- The safe frontend manifest contains `course_key`, `course_release_digest`, task keys, task release digests, and presentation metadata but no private runtime specification or secret binding.
+- A course-definition release stores the exact `course_release_digest` and task-version mapping;
+  publication advances only non-archived offering pointers, rollback selects an earlier immutable
+  release explicitly, and referenced task/runtime versions remain supported.
+- The safe frontend manifest contains `offering_key`, `course_release_digest`, task keys, task release digests, and presentation metadata but no private runtime specification or secret binding.
 
 Runtime tests:
 
-- Duplicate requests for the same authenticated profile, `course_key`, task, release, and idempotency payload return the same run; reusing a key with different arguments returns `idempotency_conflict`.
-- Two courses may use the same task key without ambiguity because `request_task` resolves it only inside the supplied `course_key`.
+- Duplicate requests for the same authenticated profile, `offering_key`, task, release, and idempotency payload return the same run; reusing a key with different arguments returns `idempotency_conflict`.
+- Two offerings may use the same task key without ambiguity because `request_task` resolves it only inside the supplied `offering_key`.
 - Every learner request owns a distinct run generation context; two different run IDs for the same task version produce different security-relevant values and verifier digests.
 - Retrying one run reproduces the same seed, builder inputs, and verifier digest.
 - A shared-service runtime revision has exactly one deployment row; duplicate messages cannot provision a second service, and multiple frontend content releases may reuse the same task version/runtime deployment.
@@ -1134,10 +1163,12 @@ Do not treat Auth, access requests/roster import, optional invitations/email, cr
 1. GitHub Auth configuration.
 2. `profiles`, `auth_user_links`, and the minimal idempotent Auth trigger/reconciliation path.
 3. `profile_identifiers` with stable GitHub numeric subjects, mutable alias history, and future SAML-compatible claims.
-4. Operational `courses` with `course_key`/`definition_key`, `course_memberships`, initial-owner creation, and constrained role/status transitions.
+4. Immutable `course_definition_releases`; operational `courses` with
+   `offering_key`/`course_definition_key`/`course_definition_release_id`; compiler-owned offering
+   branching; `course_memberships`; and constrained role/status transitions.
 5. `course_access_requests` with optional learner reason, owner-only decision functions, selected/all bulk approval, idempotency, and membership-event integration.
 6. `course_roster_allowlist` with trusted email/student-ID/GitHub-ID matching, import provenance, preauthorization filters, and no automatic membership creation.
-7. `github_course_access` with organization invitation/SSO states, trusted reconciliation, active-membership gating, and revocation handling.
+7. `external_course_access` with provider-group invitation/SSO states, trusted reconciliation, active-membership gating, and revocation handling.
 8. Explicit security-definer authorization helpers, column-level profile update grants, RLS, default-privilege lockdown, seed fixtures, and pgTAP plus real-JWT integration tests.
 
 ### Increment 2: optional identity-bound invitations
@@ -1153,7 +1184,8 @@ Do not treat Auth, access requests/roster import, optional invitations/email, cr
 2. Immutable `runtime_revisions`, relational runtime challenge projections, paired `task_versions`, and composite foreign-key invariants.
 3. `course_release_digest` for exact frontend builds, internal `runtime_digest`, and public `task_release_digest` for the canonical interaction/runtime binding.
 4. Static registered-component extraction, including typed one-off custom data contracts, plus restricted publication functions.
-5. Course releases that map one exact frontend deployment to reusable task versions and support rollback/draining.
+5. Course-definition releases that map one exact frontend artifact to reusable task versions,
+   advance non-archived offerings, preserve archived offering pointers, and support rollback.
 6. Publisher/browser role separation, Astro integration, forward-migration tests, and deployment-failure tests.
 
 ### Increment 4: per-run runtime and grading

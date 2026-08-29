@@ -4,7 +4,10 @@
 
 We are building a maintainable code that is easy to review and understand.
 We don't like duplicate or scattered code but we don't like unneccessary abstraction either. When making large changes, you are free to operate as you like in order to achieve the best solution, but there must be a separate step afterwards to re-avalute, if the suggested solution is maintainable, or whether there was existing code in place that was already doing something similar (or some part of it), or if the new solution left dead code or was not applied everywhere.
-Always consider the performance of such decisions if they are negative or positive. If you think that there are better way to do it, evaluate and apply it. But not, if the cost for maintainability is too high.
+
+Whatever we do, always consider durability and whether operation is idempotent.
+
+Always also consider the performance of such decisions if they are negative or positive. If you think that there are better way to do it, evaluate and apply it. But not, if the cost for maintainability is too high.
 
 Group similar things to similar directiories.
 

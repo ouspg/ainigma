@@ -1,8 +1,7 @@
 [workspace]
-members = ["crates/ainigma"]
+members = ["crates/ainigma", "crates/ainigma-course-access-worker"]
 resolver = "3"
 
 [profile.dev.package]
 insta.opt-level = 3
 similar.opt-level = 3
-

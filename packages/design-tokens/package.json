@@ -1,0 +1,10 @@
+{
+  "name": "@ainigma/design-tokens",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./academic": "./src/academic.ts",
+    "./terminal": "./src/terminal.ts"
+  }
+}

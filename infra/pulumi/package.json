@@ -6,11 +6,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pulumi/openstack": "5.5.1",
-    "@pulumi/pulumi": "3.259.0"
+    "@pulumi/openstack": "^5.5.1",
+    "@pulumi/pulumi": "^3.259.0"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
-    "typescript": "6.0.3"
+    "@types/node": "^26.2.0",
+    "typescript": "^6.0.3"
   }
 }

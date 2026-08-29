@@ -5,8 +5,10 @@ Cargo.lock
 .env
 .env.local
 .ainigma/
+.claude/
 .astro
 .shots/
+.sqlx/
 node_modules/
 result
 result-*

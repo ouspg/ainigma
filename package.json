@@ -3,22 +3,30 @@
   "private": true,
   "workspaces": [
     "apps/web",
-    "infra/pulumi"
+    "docs",
+    "infra/pulumi",
+    "packages/design-tokens"
   ],
   "type": "module",
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
+    "dev:docs": "npm --workspace docs run dev",
     "build:web": "npm --workspace apps/web run build",
+    "build:docs": "npm --workspace docs run build",
+    "check:docs": "npm --workspace docs run check",
+    "test:docs": "npm --workspace docs run test",
     "infra:typecheck": "npm --workspace infra/pulumi run typecheck",
     "supabase:start": "supabase start",
     "supabase:reset": "npm run supabase:fixtures && supabase db reset --local --yes",
     "supabase:fixtures": "node apps/web/scripts/build-dev-auth-fixtures.mjs",
-    "supabase:types": "supabase gen types typescript --local --schema public > apps/web/src/lib/supabase/database.types.ts"
+    "supabase:types": "supabase gen types typescript --local --schema public > apps/web/src/lib/supabase/database.types.ts",
+    "sqlx:prepare": "cargo sqlx prepare --workspace",
+    "sqlx:check": "cargo sqlx prepare --workspace --check"
   },
   "devDependencies": {
-    "js-yaml": "4.3.1",
+    "js-yaml": "^4.3.1",
     "supabase": "^2.115.0",
-    "vite-plus": "0.3.0"
+    "vite-plus": "^0.3.0"
   },
   "devEngines": {
     "packageManager": {

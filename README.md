@@ -12,7 +12,7 @@ It may or may not be completed. Heavily work-in-progress.
 - `supabase`: backend database, authentication, authorization, configuration, and tests.
 - `infra/pulumi`: CSC cPouta infrastructure.
 - `infra/nix`: NixOS images and host configuration.
-- `docs`: architecture plans.
+- `docs`: independent, fully static Astro/Nimbus documentation site and its Markdown sources.
 - `fixtures`: safe compiler and runtime test courses (some day).
 
 The overall goal is to define courses as code and publish them through a verified build pipeline. The

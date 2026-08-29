@@ -3,11 +3,14 @@
   "include": [".astro/types.d.ts", "**/*"],
   "exclude": ["dist"],
   "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "types": ["node"],
     "paths": {
-      "@course-components/*": ["./src/components/content/*"]
-    }
-  }
+      "@course-components/*": ["./src/components/content/*"],
+    },
+  },
 }

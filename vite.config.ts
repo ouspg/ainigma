@@ -10,6 +10,8 @@ export default defineConfig({
       "**/*.generated.css",
       "**/*.generated.ts",
       "**/database.types.ts",
+      // Nimbus registry components are tracked by exact source hashes.
+      "**/docs/src/components/ui/**",
     ],
   },
   lint: {

@@ -1,4 +1,10 @@
 import { defineTheme } from "@astryxdesign/core/theme";
+import {
+  terminalColors,
+  terminalRadii,
+  terminalShadows,
+  terminalTypography,
+} from "@ainigma/design-tokens/terminal";
 import { academicTheme } from "./academic.ts";
 
 /**
@@ -6,48 +12,39 @@ import { academicTheme } from "./academic.ts";
  * Body copy stays highly readable while headings, geometry, and color carry
  * the technical character.
  */
-const terminalOverrides = {
+const terminalThemeOverrides = {
   typography: {
-    scale: { base: 15, ratio: 1.2 },
-    body: {
-      family: "iA Writer Quattro S",
-      fallbacks: '"iA Writer Quattro", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace',
-    },
-    heading: {
-      family: "iA Writer Quattro S",
-      fallbacks: '"iA Writer Quattro", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace',
-    },
-    code: {
-      family: "iA Writer Quattro S",
-      fallbacks: '"iA Writer Quattro", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace',
-    },
+    scale: { ...terminalTypography.scale },
+    body: { ...terminalTypography.body },
+    heading: { ...terminalTypography.heading },
+    code: { ...terminalTypography.code },
   },
   tokens: {
-    "--color-accent": ["#087a46", "#36e77c"],
-    "--color-accent-muted": ["#087a461a", "#36e77c24"],
-    "--color-text-accent": ["#066238", "#65f29c"],
-    "--color-icon-accent": ["#066238", "#65f29c"],
-    "--color-on-accent": ["#f5fff8", "#031108"],
-    "--color-background-body": ["#eaf1ec", "#050a08"],
-    "--color-background-surface": ["#f5f9f6", "#08120d"],
-    "--color-background-card": ["#f3f8f4", "#0b1811"],
-    "--color-background-popover": ["#f8fcf9", "#0e1d15"],
-    "--color-background-muted": ["#dfe9e2", "#11241a"],
-    "--color-text-primary": ["#13251a", "#c4e4d0"],
-    "--color-text-secondary": ["#4c6555", "#90b29d"],
-    "--color-text-disabled": ["#8fa095", "#50705c"],
-    "--color-icon-primary": ["#13251a", "#c4e4d0"],
-    "--color-icon-secondary": ["#4c6555", "#90b29d"],
-    "--color-icon-disabled": ["#8fa095", "#50705c"],
-    "--color-border": ["#b9cabf", "#204a34"],
-    "--color-border-emphasized": ["#688174", "#3f8f61"],
-    "--color-shadow": ["#11351f1f", "#00000066"],
-    "--radius-inner": "0.125rem",
-    "--radius-element": "0.25rem",
-    "--radius-container": "0.375rem",
-    "--radius-page": "0.5rem",
-    "--shadow-low": "0 1px 0 #087a4626",
-    "--shadow-med": "0 2px 0 #087a462e, 0 10px 28px #0311081f",
+    "--color-accent": terminalColors.accent,
+    "--color-accent-muted": terminalColors.accentMuted,
+    "--color-text-accent": terminalColors.textAccent,
+    "--color-icon-accent": terminalColors.textAccent,
+    "--color-on-accent": terminalColors.onAccent,
+    "--color-background-body": terminalColors.backgroundBody,
+    "--color-background-surface": terminalColors.backgroundSurface,
+    "--color-background-card": terminalColors.backgroundCard,
+    "--color-background-popover": terminalColors.backgroundPopover,
+    "--color-background-muted": terminalColors.backgroundMuted,
+    "--color-text-primary": terminalColors.textPrimary,
+    "--color-text-secondary": terminalColors.textSecondary,
+    "--color-text-disabled": terminalColors.textDisabled,
+    "--color-icon-primary": terminalColors.textPrimary,
+    "--color-icon-secondary": terminalColors.textSecondary,
+    "--color-icon-disabled": terminalColors.textDisabled,
+    "--color-border": terminalColors.border,
+    "--color-border-emphasized": terminalColors.borderEmphasized,
+    "--color-shadow": terminalColors.shadow,
+    "--radius-inner": terminalRadii.inner,
+    "--radius-element": terminalRadii.element,
+    "--radius-container": terminalRadii.container,
+    "--radius-page": terminalRadii.page,
+    "--shadow-low": terminalShadows.low,
+    "--shadow-med": terminalShadows.medium,
   },
   components: {
     button: {
@@ -91,5 +88,5 @@ const terminalOverrides = {
 export const terminalTheme = defineTheme({
   name: "ainigma-terminal",
   extends: academicTheme,
-  ...terminalOverrides,
+  ...terminalThemeOverrides,
 });

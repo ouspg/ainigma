@@ -1,3 +1,4 @@
+use crate::http::{configure_client, log_request_error};
 use crate::platform::{
     AcceptedInvitation, ExternalPlatform, InvitationError, OrganizationSnapshot, PendingInvitation,
     Repository, SnapshotError,
@@ -21,7 +22,8 @@ const API_VERSION: &str = "2026-03-10";
 const INSTALLATION_TOKEN_REFRESH: Duration = Duration::from_secs(50 * 60);
 
 impl From<reqwest::Error> for SnapshotError {
-    fn from(_: reqwest::Error) -> Self {
+    fn from(error: reqwest::Error) -> Self {
+        log_request_error("github_snapshot_request", &error);
         Self::Failed("github_request_failed".to_owned())
     }
 }
@@ -315,10 +317,12 @@ pub fn client(token: &str) -> Result<Client, Box<dyn Error>> {
         header::HeaderValue::try_from(format!("Bearer {token}"))?,
     );
 
-    Ok(Client::builder()
-        .user_agent("ainigma-course-access-worker/0.1")
-        .default_headers(headers)
-        .build()?)
+    Ok(configure_client(
+        Client::builder()
+            .user_agent("ainigma-course-access-worker/0.1")
+            .default_headers(headers),
+    )
+    .build()?)
 }
 
 fn common_headers() -> header::HeaderMap {
@@ -425,15 +429,21 @@ async fn installation_token(
         header::AUTHORIZATION,
         header::HeaderValue::try_from(format!("Bearer {jwt}"))?,
     );
-    let response = Client::builder()
-        .user_agent("ainigma-course-access-worker/0.1")
-        .default_headers(headers)
-        .build()?
-        .post(format!(
-            "{api_url}/app/installations/{installation_id}/access_tokens"
-        ))
-        .send()
-        .await?;
+    let response = configure_client(
+        Client::builder()
+            .user_agent("ainigma-course-access-worker/0.1")
+            .default_headers(headers),
+    )
+    .build()?
+    .post(format!(
+        "{api_url}/app/installations/{installation_id}/access_tokens"
+    ))
+    .send()
+    .await
+    .map_err(|error| {
+        log_request_error("create_installation_access_token", &error);
+        error
+    })?;
 
     let status = response.status();
     if !status.is_success() {
@@ -445,7 +455,14 @@ async fn installation_token(
         .into());
     }
 
-    Ok(response.json::<InstallationTokenResponse>().await?.token)
+    Ok(response
+        .json::<InstallationTokenResponse>()
+        .await
+        .map_err(|error| {
+            log_request_error("decode_installation_access_token", &error);
+            error
+        })?
+        .token)
 }
 
 pub async fn email_invitation(
@@ -454,14 +471,18 @@ pub async fn email_invitation(
     organization: &str,
     email: &str,
 ) -> Result<reqwest::Response, reqwest::Error> {
-    github
+    let response = github
         .post(format!("{api_url}/orgs/{organization}/invitations"))
         .json(&json!({
             "email": email,
             "role": "direct_member"
         }))
         .send()
-        .await
+        .await;
+    if let Err(error) = &response {
+        log_request_error("invite_by_email", error);
+    }
+    response
 }
 
 pub async fn user_id_invitation(
@@ -473,15 +494,18 @@ pub async fn user_id_invitation(
     let invitee_id = github_user_id
         .parse::<i64>()
         .map_err(|_| "invalid GitHub user ID")?;
-    github
+    let response = github
         .post(format!("{api_url}/orgs/{organization}/invitations"))
         .json(&json!({
             "role": "direct_member",
             "invitee_id": invitee_id
         }))
         .send()
-        .await
-        .map_err(Into::into)
+        .await;
+    if let Err(error) = &response {
+        log_request_error("invite_by_user_id", error);
+    }
+    response.map_err(Into::into)
 }
 
 pub async fn user_login_by_id(
@@ -492,7 +516,11 @@ pub async fn user_login_by_id(
     let response = github
         .get(format!("{api_url}/user/{github_user_id}"))
         .send()
-        .await?;
+        .await
+        .map_err(|error| {
+            log_request_error("lookup_github_user", &error);
+            error
+        })?;
     if !response.status().is_success() {
         log_http_failure("lookup_github_user", &response);
         return Err(format!(
@@ -501,7 +529,14 @@ pub async fn user_login_by_id(
         )
         .into());
     }
-    Ok(response.json::<User>().await?.login)
+    Ok(response
+        .json::<User>()
+        .await
+        .map_err(|error| {
+            log_request_error("decode_github_user", &error);
+            error
+        })?
+        .login)
 }
 
 pub async fn organization_snapshot(
@@ -788,11 +823,10 @@ pub async fn find_or_create_repository(
     expected_description: &str,
 ) -> Result<Repository, String> {
     let get_url = format!("{api_url}/repos/{organization}/{repository_name}");
-    let response = github
-        .get(&get_url)
-        .send()
-        .await
-        .map_err(|_| "github_repository_lookup_failed".to_owned())?;
+    let response = github.get(&get_url).send().await.map_err(|error| {
+        log_request_error("lookup_github_repository", &error);
+        "github_repository_lookup_failed".to_owned()
+    })?;
 
     let repository = if response.status().is_success() {
         response
@@ -813,7 +847,10 @@ pub async fn find_or_create_repository(
             }))
             .send()
             .await
-            .map_err(|_| "github_repository_create_failed".to_owned())?;
+            .map_err(|error| {
+                log_request_error("create_github_repository", &error);
+                "github_repository_create_failed".to_owned()
+            })?;
 
         if create_response.status().is_success() {
             create_response
@@ -822,11 +859,10 @@ pub async fn find_or_create_repository(
                 .map(GithubRepository::into_platform)
                 .map_err(|_| "github_repository_response_invalid".to_owned())?
         } else if create_response.status() == StatusCode::UNPROCESSABLE_ENTITY {
-            let retry_response = github
-                .get(&get_url)
-                .send()
-                .await
-                .map_err(|_| "github_repository_lookup_failed".to_owned())?;
+            let retry_response = github.get(&get_url).send().await.map_err(|error| {
+                log_request_error("retry_lookup_github_repository", &error);
+                "github_repository_lookup_failed".to_owned()
+            })?;
             if !retry_response.status().is_success() {
                 log_http_failure("retry_lookup_github_repository", &retry_response);
                 return Err("github_repository_create_conflict".to_owned());
@@ -873,7 +909,10 @@ pub async fn grant_maintain(
         })
         .send()
         .await
-        .map_err(|_| "github_collaborator_request_failed".to_owned())?;
+        .map_err(|error| {
+            log_request_error("grant_github_repository_maintain", &error);
+            "github_collaborator_request_failed".to_owned()
+        })?;
     if !response.status().is_success() {
         log_http_failure("grant_github_repository_maintain", &response);
         return Err(format!(

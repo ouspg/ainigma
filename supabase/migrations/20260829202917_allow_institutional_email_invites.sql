@@ -17,6 +17,9 @@ declare
   v_expected_target text;
   v_expected_external_group_id text;
   v_expected_external_group_handle text;
+  v_email_domain text;
+  v_email_domain_enforced boolean;
+  v_email_domain_allowed boolean;
 begin
   if p_invitation_method not in ('email', 'external_user_id')
     or p_invitation_target is null
@@ -31,7 +34,28 @@ begin
 
   if p_invitation_method = 'email' then
     p_invitation_target := lower(p_invitation_target);
-    if p_invitation_target !~ '^[^@[:space:]]+@([^.@[:space:]]+[.])*oulu[.]fi$' then
+    v_email_domain := split_part(p_invitation_target, '@', 2);
+    if p_invitation_target !~ '^[^@[:space:]]+@[^@[:space:]]+$'
+      or v_email_domain ~ '(^[.]|[.]$|[.][.])' then
+      raise exception using errcode = '22023', message = 'email_domain_not_allowed';
+    end if;
+
+    select organization.email_domain_enforced,
+           exists (
+             select 1
+             from private.course_definition_external_email_domains as domain
+             where domain.course_definition_key = organization.course_definition_key
+               and (v_email_domain = domain.domain_suffix
+                 or v_email_domain like '%.' || domain.domain_suffix)
+           )
+    into v_email_domain_enforced, v_email_domain_allowed
+    from public.courses as course
+    join private.course_definition_external_groups as organization
+      on organization.course_definition_key = course.course_definition_key
+    where course.id = p_course_id;
+
+    if coalesce(v_email_domain_enforced, true)
+      and not coalesce(v_email_domain_allowed, false) then
       raise exception using errcode = '22023', message = 'email_domain_not_allowed';
     end if;
   end if;

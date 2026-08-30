@@ -55,6 +55,7 @@ create table "private"."course_definition_external_groups" (
   "provider_issuer"       text                     not null default 'github.com'::text,
   "external_group_id"     text                     not null,
   "external_group_handle" text                     not null,
+  "email_domain_enforced" boolean                  not null default true,
   "created_at"            timestamp with time zone not null default clock_timestamp(),
   constraint "course_definition_external_groups_definition_key_check" check ((course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'::text)),
   constraint "course_definition_external_groups_group_id_check"
@@ -66,6 +67,19 @@ create table "private"."course_definition_external_groups" (
     check
     (((provider_issuer = btrim(provider_issuer)) AND ((char_length(provider_issuer) >= 1) AND (char_length(provider_issuer) <= 255)) AND (provider_issuer !~ '[[:space:]]'::text))),
   constraint "course_definition_external_groups_provider_kind_check" check (((provider_kind = btrim(provider_kind)) AND (provider_kind ~ '^[a-z][a-z0-9_]{0,63}$'::text)))
+);
+
+create table "private"."course_definition_external_email_domains" (
+  "course_definition_key" text not null,
+  "domain_suffix" text not null,
+  constraint "course_definition_external_email_domains_pkey" primary key (course_definition_key, domain_suffix),
+  constraint "course_definition_external_email_domains_course_definition_key_fkey"
+    foreign key (course_definition_key) references private.course_definition_external_groups (course_definition_key) on delete cascade,
+  constraint "course_definition_external_email_domains_suffix_check" check (
+    ((domain_suffix = lower(btrim(domain_suffix))) AND (domain_suffix !~ '[[:space:]@]'::text)
+      AND (domain_suffix !~ '(^[.]|[.]$|[.][.])'::text)
+      AND (domain_suffix ~ '^[a-z0-9-]+([.][a-z0-9-]+)*$'::text))
+  )
 );
 
 create table "private"."course_definition_releases" (
@@ -3346,6 +3360,7 @@ grant insert, select, update on table "private"."course_access_requests" to "ain
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_access_requests" to "postgres";
 
 grant select on table "private"."course_definition_external_groups" to "ainigma_function_owner";
+grant select on table "private"."course_definition_external_email_domains" to "ainigma_function_owner";
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_definition_external_groups" to "postgres";
 

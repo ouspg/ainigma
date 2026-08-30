@@ -50,7 +50,7 @@ cargo run -p ainigma-course-access-worker -- poll --watch --interval-seconds 30
 cargo run -p ainigma-course-access-worker -- invite \
   --by email --course-id COURSE_UUID --profile-id PROFILE_UUID
 
-# Invite an approved profile to a different allowed institutional email.
+# Invite an approved profile to a different configured email domain.
 cargo run -p ainigma-course-access-worker -- invite \
   --by email --email person@student.oulu.fi \
   --course-id COURSE_UUID --profile-id PROFILE_UUID
@@ -59,7 +59,7 @@ cargo run -p ainigma-course-access-worker -- invite \
 cargo run -p ainigma-course-access-worker -- mark-invited \
   --course-id COURSE_UUID --profile-id PROFILE_UUID
 
-# Adopt one sent to an alternate allowed institutional email.
+# Adopt one sent to an alternate configured email domain.
 cargo run -p ainigma-course-access-worker -- mark-invited \
   --by email --email person@student.oulu.fi \
   --course-id COURSE_UUID --profile-id PROFILE_UUID
@@ -177,14 +177,18 @@ the database and worker path but cannot send a real GitHub invitation. For a
 real provider test, use a profile whose verified GitHub identity belongs to
 the target organization. The sample's `GITHUB_USER_ID` is used only for this
 disposable local test: its SQL updates the seeded learner's GitHub identity
-before approval, so the later reconciliation sees the same account. The email
-must use an allowed institutional domain. Do not commit personal test values.
+before approval, so the later reconciliation sees the same account. Email
+domains are configured per course definition in the database and are enforced
+by default. Set `email_domain_enforced` to `false` to allow any syntactically
+valid email, or add suffixes to
+`private.course_definition_external_email_domains`. Do not commit personal
+test values.
 The worker deliberately does not create profiles:
 Auth provisioning creates the profile and its verified identifiers first.
 
 The two UUIDs always identify an approved access record. `--by email` uses the
-profile's current verified email unless `--email` supplies another allowed
-institutional address. The override is recorded with the access record so
+profile's current verified email unless `--email` supplies another configured
+address. The override is recorded with the access record so
 retries remain idempotent; it does not create a profile or approve access.
 
 Polling is safe to repeat: existing invitations, memberships, repositories,

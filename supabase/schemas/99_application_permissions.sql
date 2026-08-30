@@ -33,6 +33,7 @@ using (true) with check (true);
 -- security-definer functions. It cannot authenticate directly.
 grant select, insert on private.course_definition_releases to ainigma_function_owner;
 grant select on private.course_definition_external_groups to ainigma_function_owner;
+grant select on private.course_definition_external_email_domains to ainigma_function_owner;
 grant select, insert, update on public.courses to ainigma_function_owner;
 grant select, insert, update on public.course_memberships to ainigma_function_owner;
 grant select, insert on private.course_membership_events to ainigma_function_owner;

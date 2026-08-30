@@ -19,8 +19,6 @@ pub enum InvitationMethod {
     ExternalUserId,
 }
 
-const ALLOWED_EMAIL_DOMAIN_SUFFIXES: [&str; 2] = ["oulu.fi", "student.oulu.fi"];
-
 impl InvitationMethod {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -38,17 +36,7 @@ pub async fn mark_invited_with_email<P: ExternalPlatform>(
     method: InvitationMethod,
     email: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
-    let email = email.map(validate_email).transpose()?;
-    if !adopt_pending_invitation(
-        database,
-        platform,
-        course_id,
-        profile_id,
-        method,
-        email.as_deref(),
-    )
-    .await?
-    {
+    if !adopt_pending_invitation(database, platform, course_id, profile_id, method, email).await? {
         return Err("matching pending external invitation not found".into());
     }
     Ok(())
@@ -65,7 +53,16 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
     email: Option<&str>,
 ) -> Result<bool, Box<dyn Error>> {
     let data = database::invitation_data(database, course_id, profile_id).await?;
-    ensure_email_override(&data, email)?;
+    let email = email
+        .map(|value| {
+            validate_email(
+                value,
+                data.email_domain_enforced,
+                &data.email_domain_suffixes,
+            )
+        })
+        .transpose()?;
+    ensure_email_override(&data, email.as_deref())?;
     if data.provider_kind != platform.kind() {
         return Err(format!(
             "configured provider {} is not supported by {}",
@@ -83,6 +80,7 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
             &data.external_group_handle,
             resolved_handle.as_deref(),
             email
+                .as_deref()
                 .or(data.invitation_target.as_deref())
                 .or(data.external_email.as_deref()),
         )
@@ -91,7 +89,7 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
     let Some(invitation_id) = pending else {
         return Ok(false);
     };
-    let target = target(&data, method, email)?;
+    let target = target(&data, method, email.as_deref())?;
     database::record_invitation(
         database,
         course_id,
@@ -122,8 +120,16 @@ pub async fn invite_one_with_email<P: ExternalPlatform>(
     method: InvitationMethod,
     email: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
-    let email = email.map(validate_email).transpose()?;
     let data = database::invitation_data(database, course_id, profile_id).await?;
+    let email = email
+        .map(|value| {
+            validate_email(
+                value,
+                data.email_domain_enforced,
+                &data.email_domain_suffixes,
+            )
+        })
+        .transpose()?;
     ensure_email_override(&data, email.as_deref())?;
     if data.provider_kind != platform.kind() {
         return Err(format!(
@@ -302,7 +308,11 @@ fn ensure_email_override(
     Ok(())
 }
 
-fn validate_email(email: &str) -> Result<String, Box<dyn Error>> {
+fn validate_email(
+    email: &str,
+    domain_enforced: bool,
+    allowed_domain_suffixes: &[String],
+) -> Result<String, Box<dyn Error>> {
     let normalized = email.trim().to_ascii_lowercase();
     if normalized.is_empty() || normalized.len() > 254 {
         return Err("email must contain between 1 and 254 characters".into());
@@ -329,9 +339,10 @@ fn validate_email(email: &str) -> Result<String, Box<dyn Error>> {
     {
         return Err("email domain is invalid".into());
     }
-    if !ALLOWED_EMAIL_DOMAIN_SUFFIXES
-        .iter()
-        .any(|allowed| domain == *allowed || domain.ends_with(&format!(".{allowed}")))
+    if domain_enforced
+        && !allowed_domain_suffixes
+            .iter()
+            .any(|allowed| domain == allowed || domain.ends_with(&format!(".{allowed}")))
     {
         return Err("email domain is not allowed for course invitations".into());
     }
@@ -343,23 +354,39 @@ fn validate_email(email: &str) -> Result<String, Box<dyn Error>> {
 mod tests {
     use super::validate_email;
 
+    fn oulu_domains() -> Vec<String> {
+        ["oulu.fi", "student.oulu.fi"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect()
+    }
+
     #[test]
     fn accepts_allowed_domains_and_normalizes_case() {
         assert_eq!(
-            validate_email("Person@Student.Oulu.fi").unwrap(),
+            validate_email("Person@Student.Oulu.fi", true, &oulu_domains()).unwrap(),
             "person@student.oulu.fi"
         );
-        assert!(validate_email("person@oulu.fi").is_ok());
-        assert!(validate_email("person@dept.student.oulu.fi").is_ok());
+        assert!(validate_email("person@oulu.fi", true, &oulu_domains()).is_ok());
+        assert!(validate_email("person@dept.student.oulu.fi", true, &oulu_domains()).is_ok());
     }
 
     #[test]
     fn rejects_other_domains_and_malformed_addresses() {
-        assert!(validate_email("person@example.com").is_err());
-        assert!(validate_email("person@notoulu.fi").is_err());
-        assert!(validate_email("person@oulu.fishing").is_err());
-        assert!(validate_email("person@dept..oulu.fi").is_err());
-        assert!(validate_email("person@sub.oulu.fi").is_ok());
-        assert!(validate_email("person..name@student.oulu.fi").is_err());
+        assert!(validate_email("person@example.com", true, &oulu_domains()).is_err());
+        assert!(validate_email("person@notoulu.fi", true, &oulu_domains()).is_err());
+        assert!(validate_email("person@oulu.fishing", true, &oulu_domains()).is_err());
+        assert!(validate_email("person@dept..oulu.fi", true, &oulu_domains()).is_err());
+        assert!(validate_email("person@sub.oulu.fi", true, &oulu_domains()).is_ok());
+        assert!(validate_email("person..name@student.oulu.fi", true, &oulu_domains()).is_err());
+    }
+
+    #[test]
+    fn uses_configured_domains_and_can_disable_enforcement() {
+        let domains = vec!["example.edu".to_owned()];
+        assert!(validate_email("person@dept.example.edu", true, &domains).is_ok());
+        assert!(validate_email("person@oulu.fi", true, &domains).is_err());
+        assert!(validate_email("person@anywhere.invalid", false, &[]).is_ok());
+        assert!(validate_email("person@anywhere.invalid", true, &[]).is_err());
     }
 }

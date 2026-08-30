@@ -6,6 +6,7 @@ create table private.course_definition_external_groups (
   provider_issuer text not null default 'github.com',
   external_group_id text not null,
   external_group_handle text not null,
+  email_domain_enforced boolean not null default true,
   created_at timestamptz not null default clock_timestamp(),
   constraint course_definition_external_groups_definition_key_check check (
     course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'
@@ -29,6 +30,18 @@ create table private.course_definition_external_groups (
   )
 );
 
+create table private.course_definition_external_email_domains (
+  course_definition_key text not null references private.course_definition_external_groups (course_definition_key) on delete cascade,
+  domain_suffix text not null,
+  primary key (course_definition_key, domain_suffix),
+  constraint course_definition_external_email_domains_suffix_check check (
+    domain_suffix = lower(btrim(domain_suffix))
+    and domain_suffix !~ '[[:space:]@]'
+    and domain_suffix !~ '(^[.]|[.]$|[.][.])'
+    and domain_suffix ~ '^[a-z0-9-]+([.][a-z0-9-]+)*$'
+  )
+);
+
 comment on table private.course_definition_external_groups is
   'The trusted external provider group configured for each reusable course definition.';
 comment on column private.course_definition_external_groups.provider_kind is
@@ -39,6 +52,10 @@ comment on column private.course_definition_external_groups.external_group_id is
   'Stable provider group ID used for authorization; the handle is only a display snapshot.';
 comment on column private.course_definition_external_groups.external_group_handle is
   'Current provider group handle for diagnostics and display; external_group_id is authoritative.';
+comment on column private.course_definition_external_groups.email_domain_enforced is
+  'Whether email invitation targets must match the configured domain suffixes.';
+comment on table private.course_definition_external_email_domains is
+  'Allowed email domain suffixes for invitations to a course definition.';
 
 create index course_definition_external_groups_group_id_idx
   on private.course_definition_external_groups (external_group_id);

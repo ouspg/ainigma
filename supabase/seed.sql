@@ -218,6 +218,16 @@ values
   ('test-course-a', '88000001', 'ainigma-dev-course-org'),
   ('test-course-b', '88000001', 'ainigma-dev-course-org');
 
+insert into private.course_definition_external_email_domains (
+  course_definition_key,
+  domain_suffix
+)
+values
+  ('test-course-a', 'oulu.fi'),
+  ('test-course-a', 'student.oulu.fi'),
+  ('test-course-b', 'oulu.fi'),
+  ('test-course-b', 'student.oulu.fi');
+
 insert into private.course_definition_releases (
   id,
   course_definition_key,

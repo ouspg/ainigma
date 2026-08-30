@@ -1,5 +1,6 @@
 mod database;
 mod github;
+mod http;
 mod invitations;
 mod platform;
 mod reconciliation;

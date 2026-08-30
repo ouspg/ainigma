@@ -12,6 +12,8 @@ pub struct InvitationData {
     pub invitation_target: Option<String>,
     pub external_invitation_id: Option<String>,
     pub state: String,
+    pub email_domain_enforced: bool,
+    pub email_domain_suffixes: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -77,6 +79,23 @@ pub async fn invitation_data(
     .await?
     .flatten();
 
+    let (email_domain_enforced, email_domain_suffixes) = sqlx::query_as::<_, (bool, Vec<String>)>(
+        r#"select organization.email_domain_enforced,
+                  coalesce(array_agg(domain.domain_suffix order by domain.domain_suffix)
+                           filter (where domain.domain_suffix is not null),
+                           '{}'::text[])
+           from public.courses course
+           join private.course_definition_external_groups organization
+             on organization.course_definition_key = course.course_definition_key
+           left join private.course_definition_external_email_domains domain
+             on domain.course_definition_key = organization.course_definition_key
+           where course.id = $1
+           group by organization.email_domain_enforced"#,
+    )
+    .bind(course_id)
+    .fetch_one(database)
+    .await?;
+
     Ok(InvitationData {
         provider_kind: row
             .provider_kind
@@ -94,6 +113,8 @@ pub async fn invitation_data(
         state: row
             .state
             .ok_or("database returned no external access state")?,
+        email_domain_enforced,
+        email_domain_suffixes,
     })
 }
 

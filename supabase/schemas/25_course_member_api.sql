@@ -116,8 +116,8 @@ end;
 create function public.list_course_roster(p_offering_key text)
 returns table (
   display_name text,
-  role text,
-  status text,
+    role private.course_membership_role,
+  status private.course_membership_status,
   created_at timestamptz,
   suspended_at timestamptz,
   revoked_at timestamptz
@@ -136,7 +136,7 @@ begin
   where course.offering_key = p_offering_key;
 
   if v_course_id is null
-    or not private.has_course_role(v_course_id, array['owner', 'instructor']::text[])
+    or not private.has_course_role(v_course_id, array['owner', 'instructor']::private.course_membership_role[])
   then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -255,7 +255,8 @@ begin
     v_course_id,
     v_profile_id,
     nullif(btrim(p_reason), ''),
-    case when v_auto_approved then 'approved' else 'pending' end,
+    case when v_auto_approved then 'approved'::private.course_access_request_status
+         else 'pending'::private.course_access_request_status end,
     case when v_auto_approved then 'allowlist' else 'owner' end,
     case when v_auto_approved then clock_timestamp() else null end
   )
@@ -426,7 +427,7 @@ create function public.list_my_course_access_requests()
 returns table (
   offering_key text,
   request_id uuid,
-  status text,
+  status private.course_access_request_status,
   reason text,
   requested_at timestamptz,
   decided_at timestamptz,
@@ -444,7 +445,7 @@ begin atomic
     request_row.reason,
     request_row.requested_at,
     request_row.decided_at,
-    access_row.state
+    access_row.state::text
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
   left join private.external_course_access as access_row

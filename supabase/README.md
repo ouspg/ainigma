@@ -102,11 +102,12 @@ is disabled in production builds. Astro injects the persona endpoint only during
 the endpoint and Admin client are absent from the production route manifest and bundle; the dev
 endpoint also only responds on loopback hosts.
 
-After a first login, `/desk/` verifies the session and should open. Course MDX routes also call
-`public.list_my_courses()` and return `403 Course access required` until that GitHub identity has an
-active membership for the exact `offering_key`; the returned `course_definition_key` selects the
-shared MDX definition and `course_definition_release_id` identifies its exact compiler release only
-after offering authorization succeeds. Login by itself intentionally grants no course access.
+After a first login, `/desk/` verifies the session and should open. Published course MDX routes are
+publicly readable, while the webapp uses `public.list_my_courses()` and
+`public.list_my_course_access_requests()` to decide whether interactive controls are available for
+the exact `offering_key`. The returned `course_definition_key` selects the shared MDX definition
+and `course_definition_release_id` identifies its exact compiler release for accepted members.
+Login by itself intentionally grants no course access.
 
 `db reset` recreates the local database, applies every migration in order, runs `seed.sql`, and
 loads the custom roles from `roles.sql`. The generated seed is produced from the schema-aware

@@ -3,7 +3,7 @@
 -- Staff request review is scoped to one offering and reveals no caller-controlled profile identifiers.
 create function public.list_course_access_requests(
   p_offering_key text,
-  p_status text default 'pending',
+  p_status private.course_access_request_status default 'pending',
   p_authorization_filter text default null
 )
 returns table (
@@ -13,7 +13,7 @@ returns table (
   external_user_handle text,
   verified_email text,
   reason text,
-  status text,
+  status private.course_access_request_status,
   authorization_status text,
   requested_at timestamptz,
   decided_at timestamptz,
@@ -35,7 +35,7 @@ begin
     on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key;
 
-  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
+  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
 
@@ -88,7 +88,7 @@ begin
     end,
     request_row.requested_at,
     request_row.decided_at,
-    access_row.state
+    access_row.state::text
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
   join public.profiles as profile on profile.id = request_row.requester_profile_id
@@ -144,7 +144,7 @@ begin
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key;
-  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
+  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
 
@@ -220,7 +220,7 @@ begin
   select course.id into v_course_id
   from public.courses as course
   where course.offering_key = p_offering_key;
-  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
+  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
 

@@ -3,18 +3,12 @@
 create table public.course_memberships (
   course_id uuid not null references public.courses (id) on delete restrict,
   profile_id uuid not null references public.profiles (id) on delete restrict,
-  role text not null,
-  status text not null default 'active',
+  role private.course_membership_role not null,
+  status private.course_membership_status not null default 'active',
   created_at timestamptz not null default clock_timestamp(),
   suspended_at timestamptz,
   revoked_at timestamptz,
   primary key (course_id, profile_id),
-  constraint course_memberships_role_check check (
-    role in ('owner', 'instructor', 'learner')
-  ),
-  constraint course_memberships_status_check check (
-    status in ('active', 'suspended', 'revoked')
-  ),
   constraint course_memberships_status_timestamps_check check (
     (status = 'active' and suspended_at is null and revoked_at is null)
     or (status = 'suspended' and suspended_at is not null and revoked_at is null)
@@ -41,27 +35,15 @@ create table private.course_membership_events (
   course_id uuid not null references public.courses (id) on delete restrict,
   profile_id uuid not null references public.profiles (id) on delete restrict,
   event_kind text not null,
-  previous_role text,
-  previous_status text,
-  new_role text not null,
-  new_status text not null,
+  previous_role private.course_membership_role,
+  previous_status private.course_membership_status,
+  new_role private.course_membership_role not null,
+  new_status private.course_membership_status not null,
   actor_profile_id uuid references public.profiles (id) on delete restrict,
   reason text not null,
   created_at timestamptz not null default clock_timestamp(),
   constraint course_membership_events_kind_check check (
     event_kind in ('created', 'transitioned')
-  ),
-  constraint course_membership_events_previous_role_check check (
-    previous_role is null or previous_role in ('owner', 'instructor', 'learner')
-  ),
-  constraint course_membership_events_previous_status_check check (
-    previous_status is null or previous_status in ('active', 'suspended', 'revoked')
-  ),
-  constraint course_membership_events_new_role_check check (
-    new_role in ('owner', 'instructor', 'learner')
-  ),
-  constraint course_membership_events_new_status_check check (
-    new_status in ('active', 'suspended', 'revoked')
   ),
   constraint course_membership_events_reason_check check (
     reason = btrim(reason) and char_length(reason) between 1 and 2000
@@ -99,7 +81,7 @@ before update or delete on private.course_definition_releases
 for each row execute function private.reject_mutation();
 
 -- Role checks derive the caller internally; null filters deny without requiring an authenticated identity.
-create function private.has_course_role(p_course_id uuid, p_roles text[])
+create function private.has_course_role(p_course_id uuid, p_roles private.course_membership_role[])
 returns boolean
 language plpgsql
 stable
@@ -166,7 +148,7 @@ $function$;
 create function private.add_course_membership(
   p_course_id uuid,
   p_profile_id uuid,
-  p_role text,
+  p_role private.course_membership_role,
   p_actor_profile_id uuid,
   p_reason text
 )
@@ -176,7 +158,7 @@ security definer
 set search_path = ''
 as $function$
 declare
-  v_actor_role text;
+  v_actor_role private.course_membership_role;
 begin
   if p_role is null or p_role not in ('instructor', 'learner') then
     if p_role = 'owner' then
@@ -233,8 +215,8 @@ $function$;
 create function private.transition_course_membership(
   p_course_id uuid,
   p_profile_id uuid,
-  p_new_role text,
-  p_new_status text,
+  p_new_role private.course_membership_role,
+  p_new_status private.course_membership_status,
   p_actor_profile_id uuid,
   p_reason text
 )
@@ -245,7 +227,7 @@ set search_path = ''
 as $function$
 declare
   v_membership public.course_memberships%rowtype;
-  v_actor_role text;
+  v_actor_role private.course_membership_role;
   v_active_owner_count integer;
 begin
   if p_new_role is null or p_new_role not in ('owner', 'instructor', 'learner') then

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(45);
+select extensions.plan(48);
 
 select extensions.is(
   current_setting('plpgsql.extra_errors'),
@@ -423,7 +423,7 @@ select extensions.is(
         ('public.get_my_course_repository(text)'::regprocedure, false),
         ('public.request_my_course_repository(text)'::regprocedure, false),
         ('public.list_my_course_access_requests()'::regprocedure, false),
-        ('public.list_course_access_requests(text, text, text)'::regprocedure, false),
+        ('public.list_course_access_requests(text, private.course_access_request_status, text)'::regprocedure, false),
         ('public.approve_course_access_requests(text, uuid[])'::regprocedure, false),
         ('public.reject_course_access_requests(text, uuid[], text)'::regprocedure, false)
     )
@@ -447,7 +447,7 @@ select extensions.is(
         ('public.get_my_course_repository(text)'::regprocedure),
         ('public.request_my_course_repository(text)'::regprocedure),
         ('public.list_my_course_access_requests()'::regprocedure),
-        ('public.list_course_access_requests(text, text, text)'::regprocedure),
+        ('public.list_course_access_requests(text, private.course_access_request_status, text)'::regprocedure),
         ('public.approve_course_access_requests(text, uuid[])'::regprocedure),
         ('public.reject_course_access_requests(text, uuid[], text)'::regprocedure)
     )

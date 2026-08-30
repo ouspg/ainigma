@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(56);
+select extensions.plan(60);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
@@ -90,6 +90,13 @@ insert into private.course_definition_external_groups (
 values
   ('access-gate-course', '88000001', 'access-gate-course-test-org'),
   ('access-gate-auto-course', '88000002', 'access-gate-auto-course-test-org');
+insert into private.course_definition_external_email_domains (
+  course_definition_key,
+  domain_suffix
+)
+values
+  ('access-gate-course', 'student.oulu.fi'),
+  ('access-gate-auto-course', 'student.oulu.fi');
 set role ainigma_maintenance;
 select private.sync_auth_identity('71000000-0000-0000-0000-000000000001');
 select private.branch_course_offering(
@@ -700,7 +707,7 @@ select extensions.is(
    from private.external_course_access
    where course_id = current_setting('ainigma_access_test.auto_course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
-  'active'::text,
+  'active'::private.external_course_access_state,
   'a transient GitHub check failure preserves confirmed access'
 );
 set role ainigma_maintenance;

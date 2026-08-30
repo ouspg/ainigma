@@ -493,7 +493,7 @@ select extensions.is(
     where course_id = current_setting('ainigma_test.course_id')::uuid
       and profile_id = current_setting('ainigma_test.owner_profile_id')::uuid
   ),
-  'instructor'::text,
+  'instructor'::private.course_membership_role,
   'ownership transfer demotes the previous owner to instructor'
 );
 select extensions.is(
@@ -503,7 +503,7 @@ select extensions.is(
     where course_id = current_setting('ainigma_test.course_id')::uuid
       and profile_id = current_setting('ainigma_test.instructor_profile_id')::uuid
   ),
-  'owner'::text,
+  'owner'::private.course_membership_role,
   'ownership transfer promotes the selected instructor to owner'
 );
 select extensions.is(

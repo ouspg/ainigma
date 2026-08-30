@@ -4,20 +4,16 @@ create table private.course_access_requests (
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references public.courses (id) on delete restrict,
   requester_profile_id uuid not null references public.profiles (id) on delete restrict,
-  requested_role text not null default 'learner',
+  requested_role private.course_membership_role not null default 'learner',
   reason text,
-  status text not null default 'pending',
+  status private.course_access_request_status not null default 'pending',
   decision_source text not null default 'owner',
   requested_at timestamptz not null default clock_timestamp(),
   decided_at timestamptz,
   decided_by uuid references public.profiles (id) on delete restrict,
   decision_reason text,
-  constraint course_access_requests_role_check check (requested_role = 'learner'),
   constraint course_access_requests_reason_check check (
     reason is null or (reason = btrim(reason) and char_length(reason) between 1 and 2000)
-  ),
-  constraint course_access_requests_status_check check (
-    status in ('pending', 'approved', 'rejected', 'cancelled')
   ),
   constraint course_access_requests_decision_source_check check (
     decision_source in ('owner', 'allowlist')
@@ -58,7 +54,7 @@ create table private.course_roster_allowlist (
   identifier_issuer text not null,
   identifier_scheme_version integer not null,
   normalized_identifier_value text not null,
-  role text not null default 'learner',
+  role private.course_membership_role not null default 'learner',
   source text not null,
   status text not null default 'active',
   imported_at timestamptz not null default clock_timestamp(),
@@ -76,7 +72,6 @@ create table private.course_roster_allowlist (
     normalized_identifier_value = btrim(normalized_identifier_value)
     and char_length(normalized_identifier_value) between 1 and 512
   ),
-  constraint course_roster_allowlist_role_check check (role = 'learner'),
   constraint course_roster_allowlist_source_check check (
     source = btrim(source) and char_length(source) between 1 and 255
   ),
@@ -99,5 +94,3 @@ create unique index course_roster_allowlist_active_uidx
 
 create index course_roster_allowlist_course_idx
   on private.course_roster_allowlist (course_id, status);
-
-

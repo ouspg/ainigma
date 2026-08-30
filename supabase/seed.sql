@@ -218,16 +218,6 @@ values
   ('test-course-a', '88000001', 'ainigma-dev-course-org'),
   ('test-course-b', '88000001', 'ainigma-dev-course-org');
 
-insert into private.course_definition_external_email_domains (
-  course_definition_key,
-  domain_suffix
-)
-values
-  ('test-course-a', 'oulu.fi'),
-  ('test-course-a', 'student.oulu.fi'),
-  ('test-course-b', 'oulu.fi'),
-  ('test-course-b', 'student.oulu.fi');
-
 insert into private.course_definition_releases (
   id,
   course_definition_key,
@@ -283,7 +273,7 @@ set role ainigma_maintenance;
 select private.add_course_membership(
   (current_setting('ainigma_seed.offering_ids')::jsonb ->> replace(membership ->> 'offeringKey', '-', '_'))::uuid,
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> (persona ->> 'key'))::uuid,
-  membership ->> 'role',
+  (membership ->> 'role')::private.course_membership_role,
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> 'owner')::uuid,
   'development seed ' || (persona ->> 'key')
 )

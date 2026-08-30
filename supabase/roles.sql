@@ -17,6 +17,7 @@ $roles$;
 
 grant ainigma_function_owner to postgres;
 grant ainigma_maintenance to postgres;
+grant usage on schema extensions to ainigma_maintenance;
 
 -- Function ownership transfers in generated migrations require the target role
 -- to have CREATE on the containing schema before any migration is applied.

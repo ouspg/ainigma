@@ -13,16 +13,13 @@ create table private.external_course_access (
   external_invitation_id text,
   invitation_method text not null default 'email',
   invitation_target text,
-  state text not null default 'not_started',
+  state private.external_course_access_state not null default 'not_started',
   invited_at timestamptz,
   accepted_at timestamptz,
   last_checked_at timestamptz,
   failure_code text,
   consecutive_membership_absences integer not null default 0,
   primary key (course_id, profile_id),
-  constraint external_course_access_state_check check (
-    state in ('not_started', 'invitation_pending', 'sso_required', 'active', 'failed', 'revoked')
-  ),
   constraint external_course_access_group_shape_check check (
     (state = 'not_started' and external_group_id is null and external_group_handle is null)
     or (state <> 'not_started' and external_group_id is not null and external_group_handle is not null)
@@ -129,7 +126,7 @@ begin atomic
     email.normalized_value,
     access_row.invitation_method,
     access_row.invitation_target,
-    access_row.state
+    access_row.state::text
   from private.external_course_access as access_row
   join private.course_access_requests as request_row
     on request_row.id = access_row.access_request_id
@@ -295,7 +292,7 @@ $function$;
 create function private.record_external_course_access_status(
   p_course_id uuid,
   p_profile_id uuid,
-  p_state text,
+  p_state private.external_course_access_state,
   p_failure_code text default null
 )
 returns void

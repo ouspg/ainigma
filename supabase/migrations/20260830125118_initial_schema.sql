@@ -1,8 +1,5 @@
 set local check_function_bodies = off;
 
-create type "private"."course_offering_status" as enum ('draft', 'published', 'archived');
-create type "private"."course_enrollment_mode" as enum ('approval_required', 'allowlist_auto', 'closed');
-
 alter default privileges for role "postgres" in schema "public" revoke all on sequences from "anon";
 
 alter default privileges for role "postgres" in schema "public" revoke all on sequences from "authenticated";
@@ -26,24 +23,16 @@ create table "private"."course_access_requests" (
   "id"                   uuid                     not null default gen_random_uuid(),
   "course_id"            uuid                     not null,
   "requester_profile_id" uuid                     not null,
-  "requested_role"       text                     not null default 'learner'::text,
   "reason"               text,
-  "status"               text                     not null default 'pending'::text,
   "decision_source"      text                     not null default 'owner'::text,
   "requested_at"         timestamp with time zone not null default clock_timestamp(),
   "decided_at"           timestamp with time zone,
   "decided_by"           uuid,
   "decision_reason"      text,
-  constraint "course_access_requests_decision_shape_check"
-    check ((((status = ANY (ARRAY['pending'::text, 'cancelled'::text])) AND (decided_at IS NULL) AND (decided_by IS NULL)) OR ((status = 'approved'::text) AND (decided_at IS
-    NOT NULL) AND ((decided_by IS NOT NULL) OR (decision_source = 'allowlist'::text))) OR ((status = 'rejected'::text) AND (decided_at IS NOT NULL) AND (decided_by IS
-    NOT NULL) AND (decision_source = 'owner'::text)))),
   constraint "course_access_requests_decision_source_check" check ((decision_source = ANY (ARRAY['owner'::text, 'allowlist'::text]))),
   constraint "course_access_requests_id_course_profile_unique" unique (id, course_id, requester_profile_id),
   constraint "course_access_requests_pkey" primary key (id),
-  constraint "course_access_requests_reason_check" check (((reason IS NULL) OR ((reason = btrim(reason)) AND ((char_length(reason) >= 1) AND (char_length(reason) <= 2000))))),
-  constraint "course_access_requests_role_check" check ((requested_role = 'learner'::text)),
-  constraint "course_access_requests_status_check" check ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])))
+  constraint "course_access_requests_reason_check" check (((reason IS NULL) OR ((reason = btrim(reason)) AND ((char_length(reason) >= 1) AND (char_length(reason) <= 2000)))))
 );
 
 alter table "private"."course_access_requests"
@@ -51,6 +40,16 @@ alter table "private"."course_access_requests"
 
 alter table "private"."course_access_requests"
   force row level security;
+
+create table "private"."course_definition_external_email_domains" (
+  "course_definition_key" text not null,
+  "domain_suffix"         text not null,
+  constraint "course_definition_external_email_domains_pkey" primary key (course_definition_key, domain_suffix),
+  constraint "course_definition_external_email_domains_suffix_check"
+    check
+    (((domain_suffix = lower(btrim(domain_suffix))) AND (domain_suffix !~ '[[:space:]@]'::text) AND (domain_suffix !~ '(^[.]|[.]$|[.][.])'::text) AND (domain_suffix ~
+    '^[a-z0-9-]+([.][a-z0-9-]+)*$'::text)))
+);
 
 create table "private"."course_definition_external_groups" (
   "course_definition_key" text                     not null,
@@ -70,19 +69,6 @@ create table "private"."course_definition_external_groups" (
     check
     (((provider_issuer = btrim(provider_issuer)) AND ((char_length(provider_issuer) >= 1) AND (char_length(provider_issuer) <= 255)) AND (provider_issuer !~ '[[:space:]]'::text))),
   constraint "course_definition_external_groups_provider_kind_check" check (((provider_kind = btrim(provider_kind)) AND (provider_kind ~ '^[a-z][a-z0-9_]{0,63}$'::text)))
-);
-
-create table "private"."course_definition_external_email_domains" (
-  "course_definition_key" text not null,
-  "domain_suffix" text not null,
-  constraint "course_definition_external_email_domains_pkey" primary key (course_definition_key, domain_suffix),
-  constraint "course_definition_external_email_domains_course_definition_key_fkey"
-    foreign key (course_definition_key) references private.course_definition_external_groups (course_definition_key) on delete cascade,
-  constraint "course_definition_external_email_domains_suffix_check" check (
-    ((domain_suffix = lower(btrim(domain_suffix))) AND (domain_suffix !~ '[[:space:]@]'::text)
-      AND (domain_suffix !~ '(^[.]|[.]$|[.][.])'::text)
-      AND (domain_suffix ~ '^[a-z0-9-]+([.][a-z0-9-]+)*$'::text))
-  )
 );
 
 create table "private"."course_definition_releases" (
@@ -107,24 +93,12 @@ create table "private"."course_membership_events" (
   "course_id"        uuid                     not null,
   "profile_id"       uuid                     not null,
   "event_kind"       text                     not null,
-  "previous_role"    text,
-  "previous_status"  text,
-  "new_role"         text                     not null,
-  "new_status"       text                     not null,
   "actor_profile_id" uuid,
   "reason"           text                     not null,
   "created_at"       timestamp with time zone not null default clock_timestamp(),
   constraint "course_membership_events_kind_check" check ((event_kind = ANY (ARRAY['created'::text, 'transitioned'::text]))),
-  constraint "course_membership_events_new_role_check" check ((new_role = ANY (ARRAY['owner'::text, 'instructor'::text, 'learner'::text]))),
-  constraint "course_membership_events_new_status_check" check ((new_status = ANY (ARRAY['active'::text, 'suspended'::text, 'revoked'::text]))),
   constraint "course_membership_events_pkey" primary key (id),
-  constraint "course_membership_events_previous_role_check" check (((previous_role IS NULL) OR (previous_role = ANY (ARRAY['owner'::text, 'instructor'::text, 'learner'::text])))),
-  constraint "course_membership_events_previous_status_check"
-    check (((previous_status IS NULL) OR (previous_status = ANY (ARRAY['active'::text, 'suspended'::text, 'revoked'::text])))),
-  constraint "course_membership_events_reason_check" check (((reason = btrim(reason)) AND ((char_length(reason) >= 1) AND (char_length(reason) <= 2000)))),
-  constraint "course_membership_events_shape_check"
-    check ((((event_kind = 'created'::text) AND (previous_role IS NULL) AND (previous_status IS NULL)) OR ((event_kind = 'transitioned'::text) AND (previous_role IS
-    NOT NULL) AND (previous_status IS NOT NULL))))
+  constraint "course_membership_events_reason_check" check (((reason = btrim(reason)) AND ((char_length(reason) >= 1) AND (char_length(reason) <= 2000))))
 );
 
 create table "private"."course_repository_provisioning" (
@@ -185,7 +159,6 @@ create table "private"."course_roster_allowlist" (
   "identifier_issuer"           text                     not null,
   "identifier_scheme_version"   integer                  not null,
   "normalized_identifier_value" text                     not null,
-  "role"                        text                     not null default 'learner'::text,
   "source"                      text                     not null,
   "status"                      text                     not null default 'active'::text,
   "imported_at"                 timestamp with time zone not null default clock_timestamp(),
@@ -197,7 +170,6 @@ create table "private"."course_roster_allowlist" (
   constraint "course_roster_allowlist_pkey" primary key (id),
   constraint "course_roster_allowlist_revoked_shape_check" check ((((status = 'active'::text) AND (revoked_at IS NULL)) OR ((status = 'revoked'::text) AND (revoked_at IS
     NOT NULL)))),
-  constraint "course_roster_allowlist_role_check" check ((role = 'learner'::text)),
   constraint "course_roster_allowlist_scheme_check" check ((identifier_scheme_version > 0)),
   constraint "course_roster_allowlist_source_check" check (((source = btrim(source)) AND ((char_length(source) >= 1) AND (char_length(source) <= 255)))),
   constraint "course_roster_allowlist_status_check" check ((status = ANY (ARRAY['active'::text, 'revoked'::text]))),
@@ -224,7 +196,6 @@ create table "private"."external_course_access" (
   "external_invitation_id"          text,
   "invitation_method"               text                     not null default 'email'::text,
   "invitation_target"               text,
-  "state"                           text                     not null default 'not_started'::text,
   "invited_at"                      timestamp with time zone,
   "accepted_at"                     timestamp with time zone,
   "last_checked_at"                 timestamp with time zone,
@@ -236,9 +207,6 @@ create table "private"."external_course_access" (
     check
     (((external_group_handle IS NULL) OR ((external_group_handle = btrim(external_group_handle)) AND ((char_length(external_group_handle) >= 1) AND
     (char_length(external_group_handle) <= 255))))),
-  constraint "external_course_access_group_shape_check"
-    check ((((state = 'not_started'::text) AND (external_group_id IS NULL) AND (external_group_handle IS NULL)) OR ((state <> 'not_started'::text) AND (external_group_id IS
-    NOT NULL) AND (external_group_handle IS NOT NULL)))),
   constraint "external_course_access_invitation_id_check"
     check
     (((external_invitation_id IS NULL) OR ((external_invitation_id = btrim(external_invitation_id)) AND ((char_length(external_invitation_id) >= 1) AND
@@ -250,8 +218,6 @@ create table "private"."external_course_access" (
   constraint "external_course_access_membership_absences_check" check ((consecutive_membership_absences >= 0)),
   constraint "external_course_access_pkey" primary key (course_id, profile_id),
   constraint "external_course_access_repository_identity_unique" unique (course_id, profile_id, access_request_id, external_group_id, external_group_handle),
-  constraint "external_course_access_state_check"
-    check ((state = ANY (ARRAY['not_started'::text, 'invitation_pending'::text, 'sso_required'::text, 'active'::text, 'failed'::text, 'revoked'::text]))),
   constraint "external_course_access_user_handle_check"
     check
     (((external_user_handle IS NULL) OR ((external_user_handle = btrim(external_user_handle)) AND ((char_length(external_user_handle) >= 1) AND (char_length(external_user_handle)
@@ -294,19 +260,11 @@ create table "private"."profile_identifiers" (
 create table "public"."course_memberships" (
   "course_id"                      uuid                     not null,
   "profile_id"                     uuid                     not null,
-  "role"                           text                     not null,
-  "status"                         text                     not null default 'active'::text,
   "created_at"                     timestamp with time zone not null default clock_timestamp(),
   "suspended_at"                   timestamp with time zone,
   "revoked_at"                     timestamp with time zone,
   "created_from_access_request_id" uuid,
-  constraint "course_memberships_owner_status_check" check (((role <> 'owner'::text) OR (status = 'active'::text))),
-  constraint "course_memberships_pkey" primary key (course_id, profile_id),
-  constraint "course_memberships_role_check" check ((role = ANY (ARRAY['owner'::text, 'instructor'::text, 'learner'::text]))),
-  constraint "course_memberships_status_check" check ((status = ANY (ARRAY['active'::text, 'suspended'::text, 'revoked'::text]))),
-  constraint "course_memberships_status_timestamps_check"
-    check ((((status = 'active'::text) AND (suspended_at IS NULL) AND (revoked_at IS NULL)) OR ((status = 'suspended'::text) AND (suspended_at IS
-    NOT NULL) AND (revoked_at IS NULL)) OR ((status = 'revoked'::text) AND (revoked_at IS NOT NULL))))
+  constraint "course_memberships_pkey" primary key (course_id, profile_id)
 );
 
 alter table "public"."course_memberships"
@@ -321,13 +279,11 @@ create table "public"."courses" (
   "course_definition_key"        text                     not null,
   "course_definition_release_id" uuid                     not null,
   "code"                         text                     not null,
-  "status"                       private.course_offering_status not null default 'draft'::private.course_offering_status,
   "starts_at"                    timestamp with time zone,
   "ends_at"                      timestamp with time zone,
   "external_url"                 text,
   "created_at"                   timestamp with time zone not null default clock_timestamp(),
   "updated_at"                   timestamp with time zone not null default clock_timestamp(),
-  "enrollment_mode"              private.course_enrollment_mode not null default 'approval_required'::private.course_enrollment_mode,
   constraint "courses_code_check" check (((code = btrim(code)) AND ((char_length(code) >= 1) AND (char_length(code) <= 32)))),
   constraint "courses_course_definition_key_check" check ((course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'::text)),
   constraint "courses_external_url_check" check (((external_url IS NULL) OR ((char_length(external_url) <= 2048) AND (external_url ~ '^https?://'::text)))),
@@ -359,10 +315,86 @@ alter table "public"."profiles"
 alter table "public"."profiles"
   force row level security;
 
+create type "private"."course_access_request_status" as enum (
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled'
+);
+
+alter table "private"."course_access_requests"
+  add column "status" private.course_access_request_status not null default 'pending'::private.course_access_request_status;
+
+create type "private"."course_enrollment_mode" as enum (
+  'approval_required',
+  'allowlist_auto',
+  'closed'
+);
+
+alter table "public"."courses"
+  add column "enrollment_mode" private.course_enrollment_mode not null default 'approval_required'::private.course_enrollment_mode;
+
+create type "private"."course_membership_role" as enum (
+  'owner',
+  'instructor',
+  'learner'
+);
+
+alter table "private"."course_access_requests"
+  add column "requested_role" private.course_membership_role not null default 'learner'::private.course_membership_role;
+
+alter table "private"."course_membership_events"
+  add column "previous_role" private.course_membership_role;
+
+alter table "private"."course_membership_events"
+  add column "new_role" private.course_membership_role not null;
+
+alter table "private"."course_roster_allowlist"
+  add column "role" private.course_membership_role not null default 'learner'::private.course_membership_role;
+
+alter table "public"."course_memberships"
+  add column "role" private.course_membership_role not null;
+
+create type "private"."course_membership_status" as enum (
+  'active',
+  'suspended',
+  'revoked'
+);
+
+alter table "private"."course_membership_events"
+  add column "previous_status" private.course_membership_status;
+
+alter table "private"."course_membership_events"
+  add column "new_status" private.course_membership_status not null;
+
+alter table "public"."course_memberships"
+  add column "status" private.course_membership_status not null default 'active'::private.course_membership_status;
+
+create type "private"."course_offering_status" as enum (
+  'draft',
+  'published',
+  'archived'
+);
+
+alter table "public"."courses"
+  add column "status" private.course_offering_status not null default 'draft'::private.course_offering_status;
+
+create type "private"."external_course_access_state" as enum (
+  'not_started',
+  'invitation_pending',
+  'sso_required',
+  'active',
+  'failed',
+  'revoked'
+);
+
+alter table "private"."external_course_access"
+  add column "state" private.external_course_access_state not null default 'not_started'::private.external_course_access_state;
+
 create or replace function private.add_course_membership (
   p_course_id        uuid,
   p_profile_id       uuid,
-  p_role             text,
+  p_role             private.course_membership_role,
   p_actor_profile_id uuid,
   p_reason           text
 )
@@ -372,7 +404,7 @@ create or replace function private.add_course_membership (
   set search_path to ''
   AS $function$
 declare
-  v_actor_role text;
+  v_actor_role private.course_membership_role;
 begin
   if p_role is null or p_role not in ('instructor', 'learner') then
     if p_role = 'owner' then
@@ -425,7 +457,7 @@ begin
 end
 $function$;
 
-alter function "private"."add_course_membership"(uuid, uuid, text, uuid, text) owner to "ainigma_function_owner";
+alter function "private"."add_course_membership"(uuid, uuid, private.course_membership_role, uuid, text) owner to "ainigma_function_owner";
 
 create or replace function private.advance_open_course_offerings_to_release (
   p_course_definition_release_id uuid
@@ -987,6 +1019,20 @@ $function$;
 
 alter function "private"."ensure_auth_user_profile"(uuid) owner to "ainigma_function_owner";
 
+create or replace function private.handle_auth_identity_changed()
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path to ''
+  AS $function$
+begin
+  perform private.sync_auth_identity(new.id);
+  return new;
+end
+$function$;
+
+alter function "private"."handle_auth_identity_changed"() owner to "ainigma_function_owner";
+
 create or replace function private.handle_auth_user_created()
   returns trigger
   language plpgsql
@@ -1003,7 +1049,7 @@ alter function "private"."handle_auth_user_created"() owner to "ainigma_function
 
 create or replace function private.has_course_role (
   p_course_id uuid,
-  p_roles     text[]
+  p_roles     private.course_membership_role[]
 )
   returns boolean
   language plpgsql
@@ -1031,7 +1077,7 @@ begin
 end
 $function$;
 
-alter function "private"."has_course_role"(uuid, text[]) owner to "ainigma_function_owner";
+alter function "private"."has_course_role"(uuid, private.course_membership_role[]) owner to "ainigma_function_owner";
 
 create or replace function private.list_external_course_access_to_reconcile()
   returns table (
@@ -1070,21 +1116,19 @@ BEGIN ATOMIC
      email.normalized_value,
      access_row.invitation_method,
      access_row.invitation_target,
-     access_row.state
-    from ((((private.external_course_access access_row
-      JOIN private.course_access_requests request_row
-        on (((request_row.id = access_row.access_request_id) AND (request_row.course_id = access_row.course_id) AND (request_row.requester_profile_id = access_row.profile_id))))
-      JOIN public.courses course on ((course.id = access_row.course_id)))
-      JOIN private.course_definition_external_groups organization on ((organization.course_definition_key = course.course_definition_key)))
-      LEFT JOIN LATERAL ( select identifier.normalized_value
-            from private.profile_identifiers identifier
-           where
-             ((identifier.profile_id = access_row.profile_id) AND (identifier.kind = 'email'::text) AND (identifier.issuer = organization.provider_issuer) AND
-             (identifier.revoked_at is null))
-           ORDER by identifier.last_verified_at desc
-          limit 1) email on (true))
-   where ((request_row.status = 'approved'::text) AND (course.status = 'published'::text) AND (access_row.state <> 'revoked'::text));
-end;
+     (access_row.state)::text
+  AS state
+    FROM ((((private.external_course_access access_row
+      JOIN private.course_access_requests request_row ON (((request_row.id = access_row.access_request_id) AND (request_row.course_id = access_row.course_id) AND (request_row.requester_profile_id = access_row.profile_id))))
+      JOIN public.courses course ON ((course.id = access_row.course_id)))
+      JOIN private.course_definition_external_groups organization ON ((organization.course_definition_key = course.course_definition_key)))
+      LEFT JOIN LATERAL ( SELECT identifier.normalized_value
+            FROM private.profile_identifiers identifier
+           WHERE ((identifier.profile_id = access_row.profile_id) AND (identifier.kind = 'email'::text) AND (identifier.issuer = organization.provider_issuer) AND (identifier.revoked_at IS NULL))
+           ORDER BY identifier.last_verified_at DESC
+          LIMIT 1) email ON (true))
+   WHERE ((request_row.status = 'approved'::private.course_access_request_status) AND (course.status = 'published'::private.course_offering_status) AND (access_row.state <> 'revoked'::private.external_course_access_state));
+END;
 
 alter function "private"."list_external_course_access_to_reconcile"() owner to "ainigma_function_owner";
 
@@ -1286,6 +1330,9 @@ declare
   v_expected_target text;
   v_expected_external_group_id text;
   v_expected_external_group_handle text;
+  v_email_domain text;
+  v_email_domain_enforced boolean;
+  v_email_domain_allowed boolean;
 begin
   if p_invitation_method not in ('email', 'external_user_id')
     or p_invitation_target is null
@@ -1296,6 +1343,34 @@ begin
     or char_length(p_external_invitation_id) not between 1 and 255
   then
     raise exception using errcode = '22023', message = 'invalid_external_invitation_target';
+  end if;
+
+  if p_invitation_method = 'email' then
+    p_invitation_target := lower(p_invitation_target);
+    v_email_domain := split_part(p_invitation_target, '@', 2);
+    if p_invitation_target !~ '^[^@[:space:]]+@[^@[:space:]]+$'
+      or v_email_domain ~ '(^[.]|[.]$|[.][.])' then
+      raise exception using errcode = '22023', message = 'email_domain_not_allowed';
+    end if;
+
+    select organization.email_domain_enforced,
+           exists (
+             select 1
+             from private.course_definition_external_email_domains as domain
+             where domain.course_definition_key = organization.course_definition_key
+               and (v_email_domain = domain.domain_suffix
+                 or v_email_domain like '%.' || domain.domain_suffix)
+           )
+    into v_email_domain_enforced, v_email_domain_allowed
+    from public.courses as course
+    join private.course_definition_external_groups as organization
+      on organization.course_definition_key = course.course_definition_key
+    where course.id = p_course_id;
+
+    if coalesce(v_email_domain_enforced, true)
+      and not coalesce(v_email_domain_allowed, false) then
+      raise exception using errcode = '22023', message = 'email_domain_not_allowed';
+    end if;
   end if;
 
   select access_row.*
@@ -1320,28 +1395,11 @@ begin
     raise exception using errcode = '42501', message = 'course_access_not_approved';
   end if;
 
-  if p_invitation_method = 'email' then
-    select identifier.normalized_value
-    into v_expected_target
-    from private.profile_identifiers as identifier
-    where identifier.profile_id = p_profile_id
-      and identifier.kind = 'email'
-      and identifier.issuer = (
-        select organization.provider_issuer
-        from public.courses as course
-        join private.course_definition_external_groups as organization
-          on organization.course_definition_key = course.course_definition_key
-        where course.id = p_course_id
-      )
-      and identifier.revoked_at is null
-    order by identifier.last_verified_at desc
-    limit 1;
-  else
+  if p_invitation_method <> 'email' then
     v_expected_target := v_access.external_user_id;
-  end if;
-
-  if v_expected_target is null or v_expected_target <> p_invitation_target then
-    raise exception using errcode = '42501', message = 'external_invitation_identity_mismatch';
+    if v_expected_target is null or v_expected_target <> p_invitation_target then
+      raise exception using errcode = '42501', message = 'external_invitation_identity_mismatch';
+    end if;
   end if;
 
   select organization.external_group_id, organization.external_group_handle
@@ -1448,8 +1506,8 @@ alter function "private"."record_external_course_access_membership_absence"(uuid
 create or replace function private.record_external_course_access_status (
   p_course_id    uuid,
   p_profile_id   uuid,
-  p_state        text,
-  p_failure_code text default null::text
+  p_state        private.external_course_access_state,
+  p_failure_code text                                 default null::text
 )
   returns void
   language plpgsql
@@ -1574,7 +1632,7 @@ begin
 end
 $function$;
 
-alter function "private"."record_external_course_access_status"(uuid, uuid, text, text) owner to "ainigma_function_owner";
+alter function "private"."record_external_course_access_status"(uuid, uuid, private.external_course_access_state, text) owner to "ainigma_function_owner";
 
 create or replace function private.register_course_definition_release (
   p_course_definition_key text,
@@ -1905,8 +1963,8 @@ alter function "private"."transfer_course_ownership"(uuid, uuid, uuid, text) own
 create or replace function private.transition_course_membership (
   p_course_id        uuid,
   p_profile_id       uuid,
-  p_new_role         text,
-  p_new_status       text,
+  p_new_role         private.course_membership_role,
+  p_new_status       private.course_membership_status,
   p_actor_profile_id uuid,
   p_reason           text
 )
@@ -1917,7 +1975,7 @@ create or replace function private.transition_course_membership (
   AS $function$
 declare
   v_membership public.course_memberships%rowtype;
-  v_actor_role text;
+  v_actor_role private.course_membership_role;
   v_active_owner_count integer;
 begin
   if p_new_role is null or p_new_role not in ('owner', 'instructor', 'learner') then
@@ -2022,7 +2080,7 @@ begin
 end
 $function$;
 
-alter function "private"."transition_course_membership"(uuid, uuid, text, text, uuid, text) owner to "ainigma_function_owner";
+alter function "private"."transition_course_membership"(uuid, uuid, private.course_membership_role, private.course_membership_status, uuid, text) owner to "ainigma_function_owner";
 
 create or replace function private.upsert_verified_identifier (
   p_profile_id           uuid,
@@ -2133,7 +2191,7 @@ begin
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key;
-  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
+  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
 
@@ -2301,8 +2359,8 @@ alter function "public"."list_available_courses"() owner to "ainigma_function_ow
 
 create or replace function public.list_course_access_requests (
   p_offering_key         text,
-  p_status               text default 'pending'::text,
-  p_authorization_filter text default null::text
+  p_status               private.course_access_request_status default 'pending'::private.course_access_request_status,
+  p_authorization_filter text                                 default null::text
 )
   returns table (
     request_id            uuid,
@@ -2311,7 +2369,7 @@ create or replace function public.list_course_access_requests (
     external_user_handle  text,
     verified_email        text,
     reason                text,
-    status                text,
+    status                private.course_access_request_status,
     authorization_status  text,
     requested_at          timestamp with time zone,
     decided_at            timestamp with time zone,
@@ -2333,7 +2391,7 @@ begin
     on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key;
 
-  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
+  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
 
@@ -2386,7 +2444,7 @@ begin
     end,
     request_row.requested_at,
     request_row.decided_at,
-    access_row.state
+    access_row.state::text
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
   join public.profiles as profile on profile.id = request_row.requester_profile_id
@@ -2420,15 +2478,15 @@ begin
 end
 $function$;
 
-alter function "public"."list_course_access_requests"(text, text, text) owner to "ainigma_function_owner";
+alter function "public"."list_course_access_requests"(text, private.course_access_request_status, text) owner to "ainigma_function_owner";
 
 create or replace function public.list_course_roster (
   p_offering_key text
 )
   returns table (
     display_name text,
-    role         text,
-    status       text,
+    role         private.course_membership_role,
+    status       private.course_membership_status,
     created_at   timestamp with time zone,
     suspended_at timestamp with time zone,
     revoked_at   timestamp with time zone
@@ -2447,7 +2505,7 @@ begin
   where course.offering_key = p_offering_key;
 
   if v_course_id is null
-    or not private.has_course_role(v_course_id, array['owner', 'instructor']::text[])
+    or not private.has_course_role(v_course_id, array['owner', 'instructor']::private.course_membership_role[])
   then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -2474,7 +2532,7 @@ create or replace function public.list_my_course_access_requests()
   returns table (
     offering_key          text,
     request_id            uuid,
-    status                text,
+    status                private.course_access_request_status,
     reason                text,
     requested_at          timestamp with time zone,
     decided_at            timestamp with time zone,
@@ -2491,13 +2549,14 @@ BEGIN ATOMIC
      request_row.reason,
      request_row.requested_at,
      request_row.decided_at,
-     access_row.state
-    from ((private.course_access_requests request_row
-      JOIN public.courses course on ((course.id = request_row.course_id)))
-      LEFT JOIN private.external_course_access access_row on ((access_row.access_request_id = request_row.id)))
-   where (request_row.requester_profile_id = private.current_profile_id())
-   ORDER by request_row.requested_at desc;
-end;
+     (access_row.state)::text
+  AS state
+    FROM ((private.course_access_requests request_row
+      JOIN public.courses course ON ((course.id = request_row.course_id)))
+      LEFT JOIN private.external_course_access access_row ON ((access_row.access_request_id = request_row.id)))
+   WHERE (request_row.requester_profile_id = private.current_profile_id())
+   ORDER BY request_row.requested_at DESC;
+END;
 
 alter function "public"."list_my_course_access_requests"() owner to "ainigma_function_owner";
 
@@ -2526,8 +2585,10 @@ BEGIN ATOMIC
             from (public.courses course
               JOIN public.course_memberships membership on ((membership.course_id = course.id)))
            where
-             ((membership.profile_id = private.current_profile_id()) AND (membership.status = 'active'::text) AND ((course.status = ANY (ARRAY['published'::text,
-             'archived'::text])) or ((course.status = 'draft'::text) AND (membership.role = ANY (ARRAY['owner'::text, 'instructor'::text])))))),
+             ((membership.profile_id = private.current_profile_id()) AND (membership.status = 'active'::private.course_membership_status) AND ((course.status = ANY
+             (ARRAY['published'::private.course_offering_status, 'archived'::private.course_offering_status])) or
+             ((course.status = 'draft'::private.course_offering_status) AND (membership.role = ANY (ARRAY['owner'::private.course_membership_role,
+             'instructor'::private.course_membership_role])))))),
              '[]'::jsonb),
              'inactive_memberships',
              COALESCE(( select jsonb_agg(jsonb_build_object('offering_key', course.offering_key, 'course_definition_release_id', course.course_definition_release_id,
@@ -2541,8 +2602,10 @@ BEGIN ATOMIC
             from (public.courses course
               JOIN public.course_memberships membership on ((membership.course_id = course.id)))
            where
-             ((membership.profile_id = private.current_profile_id()) AND (not ((membership.status = 'active'::text) AND ((course.status = ANY (ARRAY['published'::text,
-             'archived'::text])) or ((course.status = 'draft'::text) AND (membership.role = ANY (ARRAY['owner'::text, 'instructor'::text])))))))), '[]'::jsonb))
+             ((membership.profile_id = private.current_profile_id()) AND (not ((membership.status = 'active'::private.course_membership_status) AND ((course.status = ANY
+             (ARRAY['published'::private.course_offering_status, 'archived'::private.course_offering_status])) or
+             ((course.status = 'draft'::private.course_offering_status) AND (membership.role = ANY (ARRAY['owner'::private.course_membership_role,
+             'instructor'::private.course_membership_role])))))))), '[]'::jsonb))
   AS jsonb_build_object;
 END;
 
@@ -2566,7 +2629,7 @@ begin
   select course.id into v_course_id
   from public.courses as course
   where course.offering_key = p_offering_key;
-  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::text[]) then
+  if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
 
@@ -2684,7 +2747,8 @@ begin
     v_course_id,
     v_profile_id,
     nullif(btrim(p_reason), ''),
-    case when v_auto_approved then 'approved' else 'pending' end,
+    case when v_auto_approved then 'approved'::private.course_access_request_status
+         else 'pending'::private.course_access_request_status end,
     case when v_auto_approved then 'allowlist' else 'owner' end,
     case when v_auto_approved then clock_timestamp() else null end
   )
@@ -2824,13 +2888,36 @@ alter function "public"."update_my_profile"(text) owner to "ainigma_function_own
 alter table "private"."auth_user_links"
   add constraint "auth_user_links_auth_user_id_fkey" foreign key (auth_user_id) references auth.users(id) on delete cascade;
 
+alter table "private"."course_access_requests"
+  add constraint "course_access_requests_decision_shape_check"
+    check
+    ((((status = ANY (ARRAY['pending'::private.course_access_request_status, 'cancelled'::private.course_access_request_status])) AND (decided_at IS NULL) AND (decided_by IS NULL))
+    OR ((status = 'approved'::private.course_access_request_status) AND (decided_at IS NOT NULL) AND ((decided_by IS
+    NOT NULL) OR (decision_source = 'allowlist'::text))) OR ((status = 'rejected'::private.course_access_request_status) AND (decided_at IS NOT NULL) AND (decided_by IS
+    NOT NULL) AND (decision_source = 'owner'::text))));
+
+alter table "private"."course_definition_external_email_domains"
+  add constraint "course_definition_external_email_dom_course_definition_key_fkey" foreign key (course_definition_key)
+    references private.course_definition_external_groups(course_definition_key) on delete cascade;
+
 alter table "private"."course_definition_releases"
   add constraint "course_definition_releases_external_group_fkey" foreign key (course_definition_key) references private.course_definition_external_groups(course_definition_key)
     on delete restrict;
 
+alter table "private"."course_membership_events"
+  add constraint "course_membership_events_shape_check"
+    check ((((event_kind = 'created'::text) AND (previous_role IS NULL) AND (previous_status IS NULL)) OR ((event_kind = 'transitioned'::text) AND (previous_role IS
+    NOT NULL) AND (previous_status IS NOT NULL))));
+
 alter table "private"."course_repository_provisioning"
   add constraint "course_repository_provisioning_request_fkey" foreign key (access_request_id, course_id, profile_id)
     references private.course_access_requests(id, course_id, requester_profile_id) on delete restrict;
+
+alter table "private"."external_course_access"
+  add constraint "external_course_access_group_shape_check"
+    check
+    ((((state = 'not_started'::private.external_course_access_state) AND (external_group_id IS NULL) AND (external_group_handle IS NULL)) OR ((state <>
+    'not_started'::private.external_course_access_state) AND (external_group_id IS NOT NULL) AND (external_group_handle IS NOT NULL))));
 
 alter table "private"."course_repository_provisioning"
   add constraint "course_repository_provisioning_access_identity_fkey" foreign key (course_id, profile_id, access_request_id, external_group_id, external_group_handle)
@@ -2845,6 +2932,15 @@ alter table "private"."profile_identifiers"
 
 alter table "public"."course_memberships"
   add constraint "course_memberships_access_request_fk" foreign key (created_from_access_request_id) references private.course_access_requests(id) on delete restrict;
+
+alter table "public"."course_memberships"
+  add constraint "course_memberships_owner_status_check" check (((role <> 'owner'::private.course_membership_role) OR (status = 'active'::private.course_membership_status)));
+
+alter table "public"."course_memberships"
+  add constraint "course_memberships_status_timestamps_check"
+    check
+    ((((status = 'active'::private.course_membership_status) AND (suspended_at IS NULL) AND (revoked_at IS NULL)) OR ((status = 'suspended'::private.course_membership_status) AND
+    (suspended_at IS NOT NULL) AND (revoked_at IS NULL)) OR ((status = 'revoked'::private.course_membership_status) AND (revoked_at IS NOT NULL))));
 
 alter table "public"."courses"
   add constraint "courses_course_definition_external_group_fkey" foreign key (course_definition_key) references private.course_definition_external_groups(course_definition_key)
@@ -2952,7 +3048,7 @@ create index auth_user_links_profile_id_idx on private.auth_user_links using btr
 create index course_access_requests_course_status_idx on private.course_access_requests using btree (course_id, status, requested_at);
 
 create unique index course_access_requests_pending_uidx on private.course_access_requests using btree (course_id, requester_profile_id)
-  where (status = 'pending'::text);
+  where (status = 'pending'::private.course_access_request_status);
 
 create index course_definition_external_groups_group_id_idx on private.course_definition_external_groups using btree (external_group_id);
 
@@ -2978,11 +3074,11 @@ create index course_roster_allowlist_course_idx on private.course_roster_allowli
 
 create unique index external_course_access_request_uidx on private.external_course_access using btree (access_request_id);
 
+create unique index profile_identifiers_active_external_user_uidx on private.profile_identifiers using btree (profile_id, issuer, scheme_version)
+  where ((kind = 'external_user_id'::text) AND (revoked_at is null));
+
 create unique index profile_identifiers_active_identity_uidx on private.profile_identifiers using btree (kind, issuer, scheme_version, normalized_value)
   where (revoked_at is null);
-
-create unique index profile_identifiers_active_external_user_uidx on private.profile_identifiers using btree (profile_id, issuer, scheme_version)
-  where (kind = 'external_user_id'::text and revoked_at is null);
 
 create index profile_identifiers_profile_active_idx on private.profile_identifiers using btree (profile_id, kind, issuer, scheme_version)
   where (revoked_at is null);
@@ -2996,7 +3092,7 @@ create unique index course_memberships_access_request_uidx on public.course_memb
 create index course_memberships_course_role_status_idx on public.course_memberships using btree (course_id, role, status);
 
 create unique index course_memberships_one_active_owner_uidx on public.course_memberships using btree (course_id)
-  where ((role = 'owner'::text) AND (status = 'active'::text));
+  where ((role = 'owner'::private.course_membership_role) AND (status = 'active'::private.course_membership_status));
 
 create index course_memberships_profile_status_role_idx on public.course_memberships using btree (profile_id, status, role, course_id);
 
@@ -3005,6 +3101,11 @@ create index courses_course_definition_key_idx on public.courses using btree (co
 create index courses_course_definition_release_id_idx on public.courses using btree (course_definition_release_id);
 
 create index courses_status_window_idx on public.courses using btree (status, starts_at, ends_at);
+
+create trigger on_auth_identity_changed
+  after insert or update of provider_id, identity_data, provider on auth.identities
+  for each row
+  execute function private.handle_auth_identity_changed();
 
 create trigger on_auth_user_created
   after insert on auth.users
@@ -3075,8 +3176,8 @@ create policy "course_memberships_select_authorized" on "public"."course_members
   for select
   to "authenticated"
   using
-    (((profile_id = ( select private.current_profile_id() as current_profile_id)) or ( select private.has_course_role(course_memberships.course_id, ARRAY['owner'::text,
-    'instructor'::text]) as has_course_role)));
+    (((profile_id = ( select private.current_profile_id() as current_profile_id)) or ( select private.has_course_role(course_memberships.course_id,
+    ARRAY['owner'::private.course_membership_role, 'instructor'::private.course_membership_role]) as has_course_role)));
 
 create policy "courses_function_owner_access" on "public"."courses"
   for all
@@ -3088,8 +3189,11 @@ create policy "courses_select_enrolled" on "public"."courses"
   for select
   to "authenticated"
   using
-    ((((status = 'published'::text) AND ( select private.has_course_role(courses.id, ARRAY['owner'::text, 'instructor'::text, 'learner'::text]) as has_course_role)) or ((status =
-    'draft'::text) AND ( select private.has_course_role(courses.id, ARRAY['owner'::text, 'instructor'::text]) as has_course_role))));
+    ((((status = 'published'::private.course_offering_status) AND ( select private.has_course_role(courses.id, ARRAY['owner'::private.course_membership_role,
+    'instructor'::private.course_membership_role,
+    'learner'::private.course_membership_role]) as has_course_role)) or
+    ((status = 'draft'::private.course_offering_status) AND ( select private.has_course_role(courses.id, ARRAY['owner'::private.course_membership_role,
+    'instructor'::private.course_membership_role]) as has_course_role))));
 
 create policy "profiles_function_owner_access" on "public"."profiles"
   for all
@@ -3107,6 +3211,8 @@ create policy "profiles_update_own_display_name" on "public"."profiles"
   to "authenticated"
   using ((id = ( select private.current_profile_id() as current_profile_id)))
   with check ((id = ( SELECT private.current_profile_id() AS current_profile_id)));
+
+comment on column "private"."course_definition_external_groups"."email_domain_enforced" is 'Whether email invitation targets must match the configured domain suffixes.';
 
 comment on column "private"."course_definition_external_groups"."external_group_handle" is 'Current provider group handle for diagnostics and display; external_group_id is authoritative.';
 
@@ -3134,6 +3240,8 @@ comment on column "public"."courses"."course_definition_release_id" is 'Exact co
 
 comment on column "public"."courses"."offering_key" is 'Globally unique immutable key for one term, cohort, or operational course space.';
 
+comment on table "private"."course_definition_external_email_domains" is 'Allowed email domain suffixes for invitations to a course definition.';
+
 comment on table "private"."course_definition_external_groups" is 'The trusted external provider group configured for each reusable course definition.';
 
 comment on table "private"."course_definition_releases" is 'Immutable Ainigma compiler outputs for reusable course definitions.';
@@ -3144,9 +3252,9 @@ comment on table "public"."courses" is 'Operational course offerings. Titles, na
 
 comment on table "public"."profiles" is 'Provider-neutral application identities. Authorization claims remain private.';
 
-revoke all on function "private"."add_course_membership"(uuid, uuid, text, uuid, text) from public;
+revoke all on function "private"."add_course_membership"(uuid, uuid, private.course_membership_role, uuid, text) from public;
 
-grant execute on function "private"."add_course_membership"(uuid, uuid, text, uuid, text) to "ainigma_maintenance";
+grant execute on function "private"."add_course_membership"(uuid, uuid, private.course_membership_role, uuid, text) to "ainigma_maintenance";
 
 revoke all on function "private"."advance_open_course_offerings_to_release"(uuid) from public;
 
@@ -3180,11 +3288,13 @@ revoke all on function "private"."ensure_auth_user_profile"(uuid) from public;
 
 grant execute on function "private"."ensure_auth_user_profile"(uuid) to "ainigma_maintenance";
 
+revoke all on function "private"."handle_auth_identity_changed"() from public;
+
 revoke all on function "private"."handle_auth_user_created"() from public;
 
-revoke all on function "private"."has_course_role"(uuid, text[]) from public;
+revoke all on function "private"."has_course_role"(uuid, private.course_membership_role[]) from public;
 
-grant execute on function "private"."has_course_role"(uuid, text[]) to "authenticated";
+grant execute on function "private"."has_course_role"(uuid, private.course_membership_role[]) to "authenticated";
 
 revoke all on function "private"."list_external_course_access_to_reconcile"() from public;
 
@@ -3214,9 +3324,9 @@ revoke all on function "private"."record_external_course_access_membership_absen
 
 grant execute on function "private"."record_external_course_access_membership_absence"(uuid, uuid) to "ainigma_maintenance";
 
-revoke all on function "private"."record_external_course_access_status"(uuid, uuid, text, text) from public;
+revoke all on function "private"."record_external_course_access_status"(uuid, uuid, private.external_course_access_state, text) from public;
 
-grant execute on function "private"."record_external_course_access_status"(uuid, uuid, text, text) to "ainigma_maintenance";
+grant execute on function "private"."record_external_course_access_status"(uuid, uuid, private.external_course_access_state, text) to "ainigma_maintenance";
 
 revoke all on function "private"."register_course_definition_release"(text, text, text, text) from public;
 
@@ -3246,9 +3356,11 @@ revoke all on function "private"."transfer_course_ownership"(uuid, uuid, uuid, t
 
 grant execute on function "private"."transfer_course_ownership"(uuid, uuid, uuid, text) to "ainigma_maintenance";
 
-revoke all on function "private"."transition_course_membership"(uuid, uuid, text, text, uuid, text) from public;
+revoke all on function "private"."transition_course_membership"(uuid, uuid, private.course_membership_role, private.course_membership_status, uuid, text) from public;
 
-grant execute on function "private"."transition_course_membership"(uuid, uuid, text, text, uuid, text) to "ainigma_maintenance";
+grant execute
+  on function "private"."transition_course_membership"(uuid, uuid, private.course_membership_role, private.course_membership_status, uuid, text)
+  to "ainigma_maintenance";
 
 revoke all on function "private"."upsert_verified_identifier"(uuid, text, text, integer, text, timestamp with time zone, uuid, text) from public;
 
@@ -3284,13 +3396,13 @@ grant execute on function "public"."list_available_courses"() to "ainigma_functi
 
 grant execute on function "public"."list_available_courses"() to "anon", "authenticated";
 
-revoke all on function "public"."list_course_access_requests"(text, text, text) from public;
+revoke all on function "public"."list_course_access_requests"(text, private.course_access_request_status, text) from public;
 
-revoke all on function "public"."list_course_access_requests"(text, text, text) from "ainigma_function_owner";
+revoke all on function "public"."list_course_access_requests"(text, private.course_access_request_status, text) from "ainigma_function_owner";
 
-grant execute on function "public"."list_course_access_requests"(text, text, text) to "ainigma_function_owner";
+grant execute on function "public"."list_course_access_requests"(text, private.course_access_request_status, text) to "ainigma_function_owner";
 
-grant execute on function "public"."list_course_access_requests"(text, text, text) to "authenticated";
+grant execute on function "public"."list_course_access_requests"(text, private.course_access_request_status, text) to "authenticated";
 
 revoke all on function "public"."list_course_roster"(text) from public;
 
@@ -3360,8 +3472,11 @@ grant insert, select, update on table "private"."course_access_requests" to "ain
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_access_requests" to "postgres";
 
-grant select on table "private"."course_definition_external_groups" to "ainigma_function_owner";
 grant select on table "private"."course_definition_external_email_domains" to "ainigma_function_owner";
+
+grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_definition_external_email_domains" to "postgres";
+
+grant select on table "private"."course_definition_external_groups" to "ainigma_function_owner";
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "private"."course_definition_external_groups" to "postgres";
 
@@ -3400,6 +3515,18 @@ grant delete, insert, maintain, references, select, trigger, truncate, update on
 grant insert, select, update on table "public"."profiles" to "ainigma_function_owner";
 
 grant delete, insert, maintain, references, select, trigger, truncate, update on table "public"."profiles" to "postgres";
+
+grant usage on type "private"."course_access_request_status" to "postgres";
+
+grant usage on type "private"."course_enrollment_mode" to "postgres";
+
+grant usage on type "private"."course_membership_role" to "postgres";
+
+grant usage on type "private"."course_membership_status" to "postgres";
+
+grant usage on type "private"."course_offering_status" to "postgres";
+
+grant usage on type "private"."external_course_access_state" to "postgres";
 
 grant select on table "private"."auth_identities" to "ainigma_function_owner";
 

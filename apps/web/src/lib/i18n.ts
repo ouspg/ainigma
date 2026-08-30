@@ -70,8 +70,6 @@ export interface AppMessages {
     aboutPlaceholder: string;
     privacyTitle: string;
     privacyIntro: string;
-    privacySectionTitle: string;
-    privacyPlaceholder: string;
   };
   errors: {
     notFoundTitle: string;
@@ -231,7 +229,8 @@ const en: AppMessages = {
     aboutTitle: "About | Ainigma",
     aboutDescription: "Information about the Ainigma learning environment.",
     privacyTitle: "Privacy policy | Ainigma",
-    privacyDescription: "Placeholder for the Ainigma privacy notice.",
+    privacyDescription:
+      "How Ainigma processes personal data in the University of Oulu learning environment.",
   },
   publicHome: {
     signIn: "Sign in",
@@ -271,10 +270,7 @@ const en: AppMessages = {
       "This is a placeholder. Ownership, responsible unit, accessibility information, support contacts, and service details will be added before launch.",
     privacyTitle: "Privacy policy",
     privacyIntro:
-      "This page is reserved for the privacy notice covering the Ainigma learning environment.",
-    privacySectionTitle: "Privacy notice pending",
-    privacyPlaceholder:
-      "This is a placeholder. Before production use, this page will describe the data controller, purposes and legal bases for processing, data categories, retention, recipients, learner rights, contact details, and the use of browser storage.",
+      "This notice explains how personal data is processed in the Ainigma learning environment and what rights you have.",
   },
   errors: {
     notFoundTitle: "Page not found",
@@ -467,7 +463,8 @@ const fi: AppMessages = {
     aboutTitle: "Tietoa palvelusta | Ainigma",
     aboutDescription: "Tietoa Ainigma-oppimisympäristöstä.",
     privacyTitle: "Tietosuojaseloste | Ainigma",
-    privacyDescription: "Ainigma-palvelun tietosuojaselosteen paikkamerkki.",
+    privacyDescription:
+      "Miten Ainigma käsittelee henkilötietoja Oulun yliopiston oppimisympäristössä.",
   },
   publicHome: {
     signIn: "Kirjaudu",
@@ -506,10 +503,8 @@ const fi: AppMessages = {
     aboutPlaceholder:
       "Tämä on paikkamerkki. Palvelun omistaja, vastuuyksikkö, saavutettavuustiedot, tukiyhteystiedot ja palvelun tarkemmat tiedot lisätään ennen käyttöönottoa.",
     privacyTitle: "Tietosuojaseloste",
-    privacyIntro: "Tämä sivu on varattu Ainigma-oppimisympäristön tietosuojaselosteelle.",
-    privacySectionTitle: "Tietosuojaseloste valmisteilla",
-    privacyPlaceholder:
-      "Tämä on paikkamerkki. Ennen tuotantokäyttöä sivulle lisätään tiedot rekisterinpitäjästä, käsittelyn tarkoituksista ja oikeusperusteista, tietoryhmistä, säilytysajoista, vastaanottajista, opiskelijan oikeuksista, yhteystiedoista ja selaintallennuksen käytöstä.",
+    privacyIntro:
+      "Tässä selosteessa kerrotaan, miten henkilötietoja käsitellään Ainigma-oppimisympäristössä ja mitä oikeuksia sinulla on.",
   },
   errors: {
     notFoundTitle: "Sivua ei löytynyt",

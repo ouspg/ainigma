@@ -3,7 +3,6 @@
 This is an Astro app using Vite Plus, React, and Astryx.
 
 - Astro MCP is available as `mcp_servers.astro-docs`
-- Start the app with `vp run dev --background` and manage it with `vp run dev status`, `vp run dev logs`, and `vp run dev stop`.
 - Run `vp check`, `vp test`, and `vp run build` before handing off changes.
 - Before adding UI, run `npx astryx build "<idea>"`, inspect named templates, and read the component docs for every Astryx component used.
 - Full pages use `AppShell`; secondary regions use `Layout` and `LayoutPanel`.

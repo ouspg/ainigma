@@ -17,8 +17,6 @@ const copy = messages.publicInfo;
 const isAbout = kind === "about";
 const title = isAbout ? copy.aboutTitle : copy.privacyTitle;
 const intro = isAbout ? copy.aboutIntro : copy.privacyIntro;
-const sectionTitle = isAbout ? copy.aboutSectionTitle : copy.privacySectionTitle;
-const placeholder = isAbout ? copy.aboutPlaceholder : copy.privacyPlaceholder;
 ---
 
 <Section className="public-info-intro" padding={0} variant="transparent">
@@ -36,10 +34,16 @@ const placeholder = isAbout ? copy.aboutPlaceholder : copy.privacyPlaceholder;
 </Section>
 
 <Section className="public-info-section" dividers={["top"]} padding={0} variant="transparent">
-  <VStack className="public-section-heading" gap={3}>
-    <Heading level={2}>{sectionTitle}</Heading>
-    <Text type="body" color="secondary">
-      {placeholder}
-    </Text>
-  </VStack>
+  {isAbout ? (
+    <VStack className="public-section-heading" gap={3}>
+      <Heading level={2}>{copy.aboutSectionTitle}</Heading>
+      <Text type="body" color="secondary">
+        {copy.aboutPlaceholder}
+      </Text>
+    </VStack>
+  ) : (
+    <article class="reading-prose">
+      <slot />
+    </article>
+  )}
 </Section>

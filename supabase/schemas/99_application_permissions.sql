@@ -1,12 +1,22 @@
--- Final application-wide ownership, grants, RLS policies, and direct-access restrictions.
+-- Final application-wide security policy.
+-- Keep this file grouped by responsibility: RLS, function ownership, relation
+-- access, and role-specific function execution.
 
+-- ============================================================================
+-- INTERNAL TABLE RLS
+-- Internal tables are never directly exposed. These policies let trusted
+-- database functions access them without granting browser roles any access.
+
+-- Enable RLS on every private application table.
 alter table private.course_access_requests enable row level security;
-alter table private.course_access_requests force row level security;
 alter table private.course_roster_allowlist enable row level security;
-alter table private.course_roster_allowlist force row level security;
 alter table private.external_course_access enable row level security;
-alter table private.external_course_access force row level security;
 alter table private.course_repository_provisioning enable row level security;
+
+-- Force RLS so even table owners cannot bypass these policies accidentally.
+alter table private.course_access_requests force row level security;
+alter table private.course_roster_allowlist force row level security;
+alter table private.external_course_access force row level security;
 alter table private.course_repository_provisioning force row level security;
 
 create policy course_access_requests_function_access
@@ -29,8 +39,9 @@ for all to ainigma_function_owner, ainigma_maintenance
 using (true) with check (true);
 
 
--- The function owner receives only the relation access needed by the
--- security-definer functions. It cannot authenticate directly.
+-- ============================================================================
+-- FUNCTION OWNER RELATION ACCESS
+-- This NOLOGIN role receives only the relation privileges required by the SECURITY DEFINER functions it owns.
 grant select, insert on private.course_definition_releases to ainigma_function_owner;
 grant select on private.course_definition_external_groups to ainigma_function_owner;
 grant select on private.course_definition_external_email_domains to ainigma_function_owner;
@@ -43,6 +54,9 @@ grant select, insert, update on private.course_roster_allowlist to ainigma_funct
 grant select, insert, update on private.external_course_access to ainigma_function_owner, ainigma_maintenance;
 grant select, insert, update on private.course_repository_provisioning to ainigma_function_owner;
 
+-- ============================================================================
+-- SECURITY DEFINER FUNCTION OWNERSHIP
+-- Ownership is separate from application login roles and is never a runtime connection identity.
 alter function private.has_course_role(uuid, private.course_membership_role[]) owner to ainigma_function_owner;
 alter function private.can_view_profile(uuid) owner to ainigma_function_owner;
 alter function private.register_course_definition_release(text, text, text, text) owner to ainigma_function_owner;
@@ -71,6 +85,10 @@ alter function public.list_course_access_requests(text, private.course_access_re
 alter function public.approve_course_access_requests(text, uuid[]) owner to ainigma_function_owner;
 alter function public.reject_course_access_requests(text, uuid[], text) owner to ainigma_function_owner;
 
+-- ============================================================================
+-- DEFAULT FUNCTION LOCKDOWN
+-- Remove PostgreSQL's default PUBLIC EXECUTE privilege before adding explicit
+-- grants below. This keeps every function's caller set auditable.
 revoke all on function
   private.reject_mutation(),
   private.has_course_role(uuid, private.course_membership_role[]),
@@ -104,9 +122,13 @@ revoke all on function
   public.reject_course_access_requests(text, uuid[], text)
 from public, anon, authenticated, service_role, ainigma_maintenance;
 
+-- ============================================================================
+-- AUTHENTICATED BROWSER API
 grant execute on function private.current_profile_id() to authenticated;
 grant execute on function private.has_course_role(uuid, private.course_membership_role[]) to authenticated;
 grant execute on function private.can_view_profile(uuid) to authenticated;
+-- ============================================================================
+-- GENERAL MAINTENANCE API
 grant execute on function private.ensure_auth_user_profile(uuid) to ainigma_maintenance;
 grant execute on function private.sync_auth_identity(uuid) to ainigma_maintenance;
 grant execute on function private.reconcile_auth_users() to ainigma_maintenance;
@@ -128,8 +150,9 @@ grant execute on function private.complete_course_repository_provisioning(uuid, 
 grant execute on function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) to ainigma_maintenance;
 grant execute on function private.confirm_external_course_access(uuid, uuid, text, text, text, text, text) to ainigma_maintenance;
 
--- The external worker receives only trusted RPC execution. It has no direct
--- table access; deployment creates a separate LOGIN role as its member.
+-- ============================================================================
+-- EXTERNAL PROVISIONING WORKER API
+-- This capability role has no direct table access. Deployment creates a separate restricted LOGIN role as its member.
 grant usage on schema private to ainigma_external_provisioning_worker;
 grant execute on function private.list_external_course_access_to_reconcile() to ainigma_external_provisioning_worker;
 grant execute on function private.record_external_course_access_invitation(uuid, uuid, private.external_invitation_method, text, text) to ainigma_external_provisioning_worker;
@@ -141,6 +164,8 @@ grant execute on function private.claim_course_repository_provisioning(integer, 
 grant execute on function private.complete_course_repository_provisioning(uuid, uuid, uuid, text, text, text) to ainigma_external_provisioning_worker;
 grant execute on function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) to ainigma_external_provisioning_worker;
 
+-- ============================================================================
+-- AUTHENTICATED PUBLIC RPC API
 grant execute on function
   public.get_my_profile(),
   public.update_my_profile(text),
@@ -159,15 +184,20 @@ grant execute on function
   public.reject_course_access_requests(text, uuid[], text)
 to authenticated;
 
+-- ============================================================================
+-- PUBLIC TABLE RLS
+-- Enable RLS before defining the public relation policies.
 alter table public.profiles enable row level security;
-alter table public.profiles force row level security;
 alter table public.courses enable row level security;
-alter table public.courses force row level security;
 alter table public.course_memberships enable row level security;
+
+-- Force RLS so relation owners cannot bypass the public access model.
+alter table public.profiles force row level security;
+alter table public.courses force row level security;
 alter table public.course_memberships force row level security;
 
--- Internal functions operate under this NOLOGIN role. Explicit policies avoid
--- recursive browser policies without giving the role BYPASSRLS.
+-- Function-owner policies allow trusted functions to access public relations
+-- without recursive browser policies or BYPASSRLS.
 create policy profiles_function_owner_access
 on public.profiles
 for all
@@ -226,8 +256,13 @@ using (
   or (select private.has_course_role(course_id, array['owner', 'instructor']::private.course_membership_role[]))
 );
 
+-- ============================================================================
+-- DIRECT TABLE ACCESS LOCKDOWN
 grant usage on schema public to authenticated;
 
+-- Direct relation access.
+-- Browser and service roles use the RPC surface; table access is denied even
+-- when a table lives in an exposed schema.
 revoke all on public.profiles, public.courses, public.course_memberships
   from public, anon, authenticated, service_role;
 revoke all on private.auth_users,

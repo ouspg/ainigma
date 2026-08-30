@@ -440,9 +440,8 @@ async fn installation_token(
     ))
     .send()
     .await
-    .map_err(|error| {
-        log_request_error("create_installation_access_token", &error);
-        error
+    .inspect_err(|error| {
+        log_request_error("create_installation_access_token", error);
     })?;
 
     let status = response.status();
@@ -458,9 +457,8 @@ async fn installation_token(
     Ok(response
         .json::<InstallationTokenResponse>()
         .await
-        .map_err(|error| {
-            log_request_error("decode_installation_access_token", &error);
-            error
+        .inspect_err(|error| {
+            log_request_error("decode_installation_access_token", error);
         })?
         .token)
 }
@@ -517,9 +515,8 @@ pub async fn user_login_by_id(
         .get(format!("{api_url}/user/{github_user_id}"))
         .send()
         .await
-        .map_err(|error| {
-            log_request_error("lookup_github_user", &error);
-            error
+        .inspect_err(|error| {
+            log_request_error("lookup_github_user", error);
         })?;
     if !response.status().is_success() {
         log_http_failure("lookup_github_user", &response);
@@ -532,9 +529,8 @@ pub async fn user_login_by_id(
     Ok(response
         .json::<User>()
         .await
-        .map_err(|error| {
-            log_request_error("decode_github_user", &error);
-            error
+        .inspect_err(|error| {
+            log_request_error("decode_github_user", error);
         })?
         .login)
 }

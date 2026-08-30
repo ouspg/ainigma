@@ -1,5 +1,6 @@
 {
   "packet-triage": {
+    "courseDefinitionKey": "test-course-a",
     "type": "multipart",
     "title": "Packet triage",
     "description": "Complete both checkpoints before submitting the final flag.",
@@ -24,6 +25,7 @@
     ]
   },
   "investigation-flag": {
+    "courseDefinitionKey": "test-course-a",
     "type": "flag",
     "title": "Investigation flag",
     "description": "Submit the conclusion from the trace comparison.",

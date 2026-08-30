@@ -1,0 +1,59 @@
+---
+import LearningLayout from "./LearningLayout.astro";
+import ReadingWorkspace from "../pages/ReadingWorkspace.astro";
+import type { CoursePageData, OutlineSection } from "../../lib/learning/catalog";
+import type { Locale } from "../../lib/i18n";
+import type { AppPath } from "../../lib/routes";
+
+interface ReadingPageLink {
+  href: AppPath;
+  label: string;
+}
+
+interface Props {
+  currentPath: AppPath;
+  eyebrow: string;
+  locale: Locale;
+  meta?: string[];
+  next?: ReadingPageLink;
+  outline?: OutlineSection[];
+  page: CoursePageData;
+  previous?: ReadingPageLink;
+  summary: string;
+  title: string;
+}
+
+const {
+  currentPath,
+  eyebrow,
+  locale,
+  meta,
+  next,
+  outline,
+  page,
+  previous,
+  summary,
+  title,
+} = Astro.props;
+---
+
+<LearningLayout
+  title={`${title} | ${page.course.title}`}
+  description={summary}
+  {currentPath}
+  frame={page}
+  {locale}
+>
+  <ReadingWorkspace
+    {eyebrow}
+    {title}
+    {summary}
+    {locale}
+    {...(meta ? { meta } : {})}
+    {...(outline ? { outline } : {})}
+    {...(previous ? { previous } : {})}
+    {...(next ? { next } : {})}
+  >
+    <slot />
+  </ReadingWorkspace>
+</LearningLayout>

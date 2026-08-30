@@ -72,7 +72,3 @@ export function parseCourseDefinitionReleaseId(value: string): CourseDefinitionR
   }
   return value;
 }
-
-export function courseOfferingKeyFromParam(value: string | undefined): CourseOfferingKey | null {
-  return value && isCourseOfferingKey(value) ? value : null;
-}

@@ -1,10 +1,10 @@
 ---
-import BaseLayout from "../layouts/BaseLayout.astro";
-import LoginPage from "../components/pages/LoginPage";
-import SiteFooter from "../components/layout/SiteFooter.astro";
+import PublicLayout from "../components/layout/PublicLayout.astro";
+import LoginPage from "../components/pages/LoginPage.astro";
 import type { LocalAuthPersonaOption } from "../dev/dev-local-auth";
 import { safeNextPath } from "../lib/auth/redirects";
 import { getLocale, getMessages } from "../lib/i18n";
+import { routes } from "../lib/routes";
 
 export const prerender = false;
 
@@ -14,17 +14,26 @@ const next = safeNextPath(Astro.url.searchParams.get("next"));
 const authError = Astro.url.searchParams.has("error");
 let localAuth = false;
 let localAuthPersonas: readonly LocalAuthPersonaOption[] = [];
+let LocalAuthPicker: typeof import("../dev/DevLocalAuthPicker.astro").default | undefined;
 
 if (import.meta.env.DEV && import.meta.env.PUBLIC_AUTH_MODE === "local") {
   const localAuthModule = await import("../dev/dev-local-auth");
   localAuth = true;
   localAuthPersonas = localAuthModule.localAuthPersonas;
+  LocalAuthPicker = (await import("../dev/DevLocalAuthPicker.astro")).default;
 }
 ---
 
-<BaseLayout title={metadata.loginTitle} description={metadata.loginDescription} {locale}>
-  <div class="login-page-frame">
-    <LoginPage {authError} {locale} {next} {localAuth} localAuthPersonas={localAuthPersonas} />
-    <SiteFooter {locale} />
-  </div>
-</BaseLayout>
+<PublicLayout
+  title={metadata.loginTitle}
+  description={metadata.loginDescription}
+  currentPath={routes.login.path()}
+  variant="login"
+  {locale}
+>
+  <LoginPage {authError} {locale} {next}>
+    {localAuth && LocalAuthPicker ? (
+      <LocalAuthPicker {locale} {next} personas={localAuthPersonas} />
+    ) : null}
+  </LoginPage>
+</PublicLayout>

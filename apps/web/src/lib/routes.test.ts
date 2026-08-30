@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { parseCourseOfferingKey } from "./learning/identifiers";
 import {
+  apiRoutes,
   canonicalPath,
   courseRouteTargetPath,
   localizedPath,
@@ -29,6 +30,9 @@ describe("application routes", () => {
     expect(localizedPath("fi", routes.course.path({ offeringKey }))).toBe(
       "/fi/courses/security-fundamentals-2026-spring/",
     );
+    expect(apiRoutes.courseChallenge.path({ offeringKey })).toBe(
+      "/api/courses/security-fundamentals-2026-spring/challenge",
+    );
   });
 
   it("normalizes locale prefixes without changing query strings or fragments", () => {
@@ -44,7 +48,7 @@ describe("application routes", () => {
     expect(matchAppRoute("/fi/desk/")?.access).toBe("authenticated");
     expect(matchAppRoute("/courses/security-fundamentals-2026-spring/week-04/task/")).toMatchObject(
       {
-        access: "courseMember",
+        access: "coursePublic",
         params: { offeringKey, task: "task", week: "week-04" },
       },
     );

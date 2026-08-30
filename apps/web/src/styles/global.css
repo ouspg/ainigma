@@ -76,13 +76,9 @@ a {
   --ainigma-course-mark: 2.75rem;
 }
 
-/* Astro named slots are layout-transparent, matching direct React children. */
-.learning-frame astro-static-slot[name="topNavEnd"],
-.learning-frame astro-static-slot[name="topNavEnd"] > astro-island,
-.learning-frame astro-static-slot[name="sideNav"],
-.learning-frame astro-static-slot[name="sideNav"] > astro-island,
-.learning-frame > .astryx-layout astro-static-slot:not([name]) {
-  display: contents;
+.learning-frame.public-shell {
+  /* Anonymous course pages use the taller site header above the learning body. */
+  --_app-shell-header-height: calc(5rem + var(--border-width));
 }
 
 .learning-mobile-nav-toggle {
@@ -95,7 +91,7 @@ a {
     display: none;
   }
 
-  .learning-mobile-nav-toggle {
+  .learning-frame .learning-mobile-nav-toggle {
     display: flex !important;
   }
 }
@@ -155,6 +151,10 @@ a {
 
 /* ── Public academic entry ───────────────────────────────────────── */
 
+.site-page-frame:not(.login-page-frame) {
+  display: contents;
+}
+
 .public-shell {
   min-height: 100dvh;
   --ainigma-public-max: 72rem;
@@ -180,12 +180,12 @@ a {
   border: 0 !important;
 }
 
-.public-header {
+.site-header {
   width: 100%;
   background: color-mix(in srgb, var(--color-background-body) 92%, var(--color-background-surface));
 }
 
-.public-header-row {
+.site-header-row {
   min-height: 5rem;
   padding: var(--spacing-6);
 }
@@ -194,85 +194,6 @@ a {
 .public-home-shell .astryx-layout,
 .public-home-shell .public-page {
   background: color-mix(in srgb, var(--color-background-body) 92%, var(--color-background-surface));
-}
-
-.public-theme-menu {
-  position: relative;
-}
-
-.public-theme-menu-trigger {
-  display: inline-flex;
-  width: 2rem;
-  height: 2rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-full);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  list-style: none;
-}
-
-.public-theme-menu-trigger::-webkit-details-marker {
-  display: none;
-}
-
-.public-theme-menu-trigger:hover,
-.public-theme-menu-trigger:focus-visible,
-.public-theme-menu[open] .public-theme-menu-trigger {
-  background: var(--color-accent-muted);
-  color: var(--color-text-accent);
-}
-
-.public-theme-menu-list {
-  position: absolute;
-  z-index: 30;
-  inset-block-start: calc(100% + var(--spacing-2));
-  inset-inline-end: 0;
-  width: 15rem;
-  margin: 0;
-  padding: var(--spacing-2);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-container);
-  background: var(--color-background-card);
-  box-shadow: var(--shadow-medium);
-  list-style: none;
-}
-
-.public-theme-menu-heading {
-  padding: var(--spacing-2) var(--spacing-3);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.public-theme-menu-divider {
-  height: var(--border-width);
-  margin-block: var(--spacing-2);
-  background: var(--color-border);
-}
-
-.public-theme-menu-option {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-2) var(--spacing-3);
-  border: 0;
-  border-radius: var(--radius-inner);
-  background: transparent;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  font: inherit;
-  text-align: start;
-}
-
-.public-theme-menu-option:hover,
-.public-theme-menu-option:focus-visible,
-.public-theme-menu-option[aria-pressed="true"] {
-  background: var(--color-accent-muted);
-  color: var(--color-text-accent);
 }
 
 .public-page {
@@ -596,15 +517,6 @@ a {
   color: var(--color-text-accent);
 }
 
-.term-metrics {
-  min-height: var(--spacing-10);
-}
-
-.study-note {
-  padding-inline-start: var(--spacing-4);
-  border-inline-start: var(--border-width) solid var(--color-border-emphasized);
-}
-
 /* ── Learner activity ────────────────────────────────────────────── */
 
 .activity-popover {
@@ -720,11 +632,6 @@ a {
   width: var(--ainigma-outline-width) !important;
   margin-inline-start: var(--spacing-10);
   overflow: visible !important;
-}
-
-.course-progress-summary {
-  border-block: var(--border-width) solid var(--color-border);
-  padding-block: var(--spacing-5);
 }
 
 .course-map {
@@ -950,6 +857,12 @@ a {
   margin-block: var(--spacing-6);
 }
 
+.course-access-gate {
+  margin-block: var(--spacing-6);
+  border-color: var(--color-border-accent);
+  background: var(--color-accent-muted);
+}
+
 .lesson-navigation {
   margin-block-start: var(--spacing-10);
   padding-block-start: var(--spacing-5);
@@ -1010,10 +923,8 @@ html[data-appearance-theme="terminal"] .login-title {
   text-decoration: none;
 }
 
-.login-page-frame > .site-footer {
-  width: min(100%, var(--ainigma-public-max));
-  margin-inline: auto;
-  padding-inline: var(--spacing-8);
+.login-page-frame > .public-footer-frame {
+  --ainigma-public-max: 68rem;
 }
 
 /* ── Responsive contract ──────────────────────────────────────────── */
@@ -1038,7 +949,7 @@ html[data-appearance-theme="terminal"] .login-title {
 }
 
 @media (max-width: 48rem) {
-  .public-header-row {
+  .site-header-row {
     padding-inline: var(--spacing-6);
   }
 
@@ -1128,7 +1039,7 @@ html[data-appearance-theme="terminal"] .login-title {
     display: none;
   }
 
-  .learning-frame-locale {
+  .header-locale {
     display: none;
   }
 
@@ -1140,13 +1051,9 @@ html[data-appearance-theme="terminal"] .login-title {
     padding-inline: var(--spacing-4);
   }
 
-  .public-header-row {
+  .site-header-row {
     gap: var(--spacing-2);
     padding: var(--spacing-4);
-  }
-
-  .login-page-frame > .site-footer {
-    padding-inline: var(--spacing-4);
   }
 
   .public-intro,

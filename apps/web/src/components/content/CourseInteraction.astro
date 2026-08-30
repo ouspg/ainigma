@@ -1,0 +1,24 @@
+---
+import CourseAccessGate from "./CourseAccessGate.astro";
+import { getLocale } from "../../lib/i18n";
+import type { CourseOfferingKey } from "../../lib/learning/identifiers";
+
+interface Props {
+  offeringKey: CourseOfferingKey;
+}
+
+const accessState = Astro.locals.courseAccessState ?? "anonymous";
+const locale = getLocale(Astro.currentLocale);
+const { offeringKey } = Astro.props;
+---
+
+{accessState === "accepted" ? (
+  <slot />
+) : (
+  <CourseAccessGate
+    {accessState}
+    {locale}
+    nextPath={`${Astro.url.pathname}${Astro.url.search}`}
+    {offeringKey}
+  />
+)}

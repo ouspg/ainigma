@@ -1,5 +1,6 @@
 ---
 import FlagChallengeIsland from "../islands/FlagChallengeIsland";
+import CourseInteraction from "./CourseInteraction.astro";
 import { getFlagChallenge } from "../../lib/challenges/repository";
 
 interface Props {
@@ -7,9 +8,18 @@ interface Props {
 }
 
 const { taskId } = Astro.props;
-const challenge = getFlagChallenge(taskId);
+const offering = Astro.locals.availableCourseOffering;
+if (!offering) throw new Error("Course challenges require an available course offering.");
+const challenge = getFlagChallenge(offering.courseDefinitionKey, taskId);
 ---
 
 <section class="task-island-anchor" data-task-id={taskId}>
-  <FlagChallengeIsland client:idle {taskId} {challenge} />
+  <CourseInteraction offeringKey={offering.offeringKey}>
+    <FlagChallengeIsland
+      client:idle
+      {taskId}
+      {challenge}
+      offeringKey={offering.offeringKey}
+    />
+  </CourseInteraction>
 </section>

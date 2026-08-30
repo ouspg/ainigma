@@ -1,14 +1,11 @@
-import { routes } from "../routes";
+import { courseRouteTargetPath, routes } from "../routes";
 import type {
   Announcement,
-  CourseInfo,
   CourseDefinition,
-  CourseStatus,
+  CourseInfo,
   LearnerActivity,
   LearningWorkspace,
-  PublicCourseInfo,
   StudentProfile,
-  WeekInfo,
 } from "./types";
 import { getLearningSnapshot, type LearningSnapshot } from "./repository";
 import {
@@ -16,12 +13,16 @@ import {
   parseCourseDefinitionSlug,
   parseCourseOfferingKey,
   type CourseDefinitionKey,
-  type CourseDefinitionReleaseId,
   type CourseDefinitionSlug,
   type CourseOfferingKey,
 } from "./identifiers";
-import type { CourseEntry } from "./course-manifest";
 import { COURSE_DEFINITIONS } from "./course-manifest.generated";
+import type {
+  AvailableCourseOffering,
+  CourseAccessState,
+  CourseMembership,
+  CourseOfferingReference,
+} from "../auth/course-access";
 type TypedCourseDefinition = Omit<
   CourseDefinition,
   "courseDefinitionSlug" | "courseDefinitionKey"
@@ -39,29 +40,11 @@ const COURSE_DEFINITION_BY_KEY = new Map(
     (definition) => [definition.courseDefinitionKey, definition] as const,
   ),
 );
-type SnapshotRouteTarget = LearningSnapshot["agenda"][number]["target"];
 type CourseOfferingSnapshot = LearningSnapshot["courseOfferings"][CourseOfferingKey];
 type LinkedSnapshotItem =
   | LearningSnapshot["agenda"][number]
   | LearningSnapshot["announcements"][number]
   | LearningSnapshot["activity"][number];
-
-function routeTargetPath(target: SnapshotRouteTarget) {
-  switch (target.route) {
-    case "course":
-      return routes.course.path({ offeringKey: target.offeringKey });
-    case "coursePage":
-      return routes.coursePage.path({ offeringKey: target.offeringKey, page: target.page });
-    case "courseWeek":
-      return routes.courseWeek.path({ offeringKey: target.offeringKey, week: target.week });
-    case "courseTask":
-      return routes.courseTask.path({
-        offeringKey: target.offeringKey,
-        week: target.week,
-        task: target.task,
-      });
-  }
-}
 
 function courseForLinkedItem(
   item: LinkedSnapshotItem,
@@ -76,105 +59,207 @@ function courseForLinkedItem(
   return courseByOfferingKey.get(item.offeringKey);
 }
 
-function buildCourseOffering(
-  offeringKey: CourseOfferingKey,
-  snapshot: CourseOfferingSnapshot,
+function buildCourse(
+  offering: CourseOfferingReference,
+  snapshot?: CourseOfferingSnapshot,
 ): CourseInfo {
-  const definition = COURSE_DEFINITION_BY_KEY.get(snapshot.courseDefinitionKey);
+  const definition = COURSE_DEFINITION_BY_KEY.get(offering.courseDefinitionKey);
   if (!definition || definition.draft) {
     throw new Error(
-      `Missing published course definition ${snapshot.courseDefinitionKey} for offering ${offeringKey}`,
+      `Missing published course definition ${offering.courseDefinitionKey} for offering ${offering.offeringKey}`,
     );
   }
-  if (snapshot.nextActivity.target.offeringKey !== offeringKey) {
-    throw new Error(`Next activity points outside course offering ${offeringKey}`);
+  if (snapshot && snapshot.courseDefinitionKey !== offering.courseDefinitionKey) {
+    throw new Error(
+      `Course definition mismatch for ${offering.offeringKey}: ` +
+        `${offering.courseDefinitionKey} !== ${snapshot.courseDefinitionKey}`,
+    );
+  }
+  if (snapshot && snapshot.courseDefinitionReleaseId !== offering.courseDefinitionReleaseId) {
+    throw new Error(
+      `Course definition release mismatch for ${offering.offeringKey}: ` +
+        `${offering.courseDefinitionReleaseId} !== ${snapshot.courseDefinitionReleaseId}`,
+    );
+  }
+  if (snapshot && snapshot.nextActivity.target.offeringKey !== offering.offeringKey) {
+    throw new Error(`Next activity points outside course offering ${offering.offeringKey}`);
   }
 
-  const weeks: WeekInfo[] = definition.weeks.map((week) => ({
+  const weeks = definition.weeks.map((week) => ({
     ...week,
-    href: routes.courseWeek.path({ offeringKey, week: week.slug }),
-    status: snapshot.weekStatuses[week.slug] ?? ("not-started" as CourseStatus),
+    href: routes.courseWeek.path({ offeringKey: offering.offeringKey, week: week.slug }),
     tasks: week.tasks.map((task) => ({
       ...task,
-      href: routes.courseTask.path({ offeringKey, week: week.slug, task: task.slug }),
+      href: routes.courseTask.path({
+        offeringKey: offering.offeringKey,
+        week: week.slug,
+        task: task.slug,
+      }),
     })),
   }));
   const pages = definition.pages.map((page) => ({
     ...page,
-    href: routes.coursePage.path({ offeringKey, page: page.page }),
+    href: routes.coursePage.path({ offeringKey: offering.offeringKey, page: page.page }),
   }));
 
   return {
-    offeringKey,
+    offeringKey: offering.offeringKey,
     courseDefinitionSlug: definition.courseDefinitionSlug,
     courseDefinitionKey: definition.courseDefinitionKey,
-    courseDefinitionReleaseId: snapshot.courseDefinitionReleaseId,
+    courseDefinitionReleaseId: offering.courseDefinitionReleaseId,
     code: definition.code,
     navMark: definition.navMark,
-    startDate: snapshot.startDate,
-    endDate: snapshot.endDate,
     title: definition.title,
     summary: definition.summary,
-    href: routes.course.path({ offeringKey }),
+    href: routes.course.path({ offeringKey: offering.offeringKey }),
     ...(definition.catalogUrl ? { catalogUrl: definition.catalogUrl } : {}),
     tone: definition.tone,
-    progress: snapshot.progress,
-    status: snapshot.status,
-    earnedPoints: snapshot.earnedPoints,
-    availablePoints: snapshot.availablePoints,
     weeks,
     pages,
     taskCount: definition.taskCount,
-    nextActivity: {
-      eyebrow: snapshot.nextActivity.eyebrow,
-      title: snapshot.nextActivity.title,
-      description: snapshot.nextActivity.description,
-      href: routeTargetPath(snapshot.nextActivity.target),
-      estimatedMinutes: snapshot.nextActivity.estimatedMinutes,
-      completedSteps: snapshot.nextActivity.completedSteps,
-      totalSteps: snapshot.nextActivity.totalSteps,
-      savedLabel: snapshot.nextActivity.savedLabel,
-    },
+    ...(snapshot
+      ? {
+          learner: {
+            schedule: {
+              startDate: snapshot.startDate,
+              endDate: snapshot.endDate,
+            },
+            progress: snapshot.progress,
+            status: snapshot.status,
+            earnedPoints: snapshot.earnedPoints,
+            availablePoints: snapshot.availablePoints,
+            weekStatuses: snapshot.weekStatuses,
+            nextActivity: {
+              eyebrow: snapshot.nextActivity.eyebrow,
+              title: snapshot.nextActivity.title,
+              description: snapshot.nextActivity.description,
+              href: courseRouteTargetPath(snapshot.nextActivity.target),
+              estimatedMinutes: snapshot.nextActivity.estimatedMinutes,
+              completedSteps: snapshot.nextActivity.completedSteps,
+              totalSteps: snapshot.nextActivity.totalSteps,
+              savedLabel: snapshot.nextActivity.savedLabel,
+            },
+          },
+        }
+      : {}),
+  };
+}
+
+export async function getCoursePageData({
+  accessState,
+  availableOfferings,
+  memberships = [],
+  offering,
+  profile,
+}: {
+  accessState: CourseAccessState;
+  availableOfferings: readonly AvailableCourseOffering[];
+  memberships?: readonly CourseMembership[];
+  offering: AvailableCourseOffering;
+  profile?: StudentProfile | undefined;
+}): Promise<CoursePageData> {
+  const availableCourses = buildCourseCatalog(availableOfferings);
+  const availableCourse = availableCourses.find(
+    (course) => course.offeringKey === offering.offeringKey,
+  );
+  if (!availableCourse) {
+    throw new Error(
+      `Course offering is missing from the available catalog: ${offering.offeringKey}`,
+    );
+  }
+  const shell = profile
+    ? await getLearningShellData(profile, memberships, availableOfferings)
+    : undefined;
+  const course =
+    shell?.workspace.courses.find((candidate) => candidate.offeringKey === offering.offeringKey) ??
+    availableCourse;
+
+  if (accessState === "accepted" && (!profile || !course.learner)) {
+    throw new Error(`Accepted course access is missing learner state: ${offering.offeringKey}`);
+  }
+
+  return {
+    accessState,
+    course,
+    navigationCourses: shell?.navigationCourses ?? availableCourses,
+    ...(shell ? { workspace: shell.workspace } : {}),
   };
 }
 
 /**
- * Public course information comes only from authored course overview files.
+ * Available course information comes only from authored course overview files.
  * Learner enrollment and progress snapshots must never be needed to render
  * the signed-out front page.
  */
-export function getPublicCourseCatalog(): PublicCourseInfo[] {
-  return COURSE_DEFINITIONS_TYPED.filter((definition) => !definition.draft)
-    .sort((a, b) => a.catalogOrder - b.catalogOrder || a.title.localeCompare(b.title))
-    .map((definition) => ({
-      courseDefinitionSlug: definition.courseDefinitionSlug,
-      courseDefinitionKey: definition.courseDefinitionKey,
-      code: definition.code,
-      title: definition.title,
-      summary: definition.summary,
-      tone: definition.tone,
-      ...(definition.catalogUrl ? { catalogUrl: definition.catalogUrl } : {}),
-    }));
+export function buildCourseCatalog(offerings: readonly AvailableCourseOffering[]): CourseInfo[] {
+  return offerings
+    .map((offering) => buildCourse(offering))
+    .sort((a, b) => a.title.localeCompare(b.title) || a.offeringKey.localeCompare(b.offeringKey));
+}
+
+export interface LearningShellContext {
+  navigationCourses: CourseInfo[];
+  workspace?: LearningWorkspace;
+}
+
+export interface LearningShellData extends LearningShellContext {
+  availableCourses: CourseInfo[];
+  workspace: LearningWorkspace;
+}
+
+export interface CoursePageData extends LearningShellContext {
+  accessState: CourseAccessState;
+  course: CourseInfo;
+}
+
+export async function getLearningShellData(
+  profile: StudentProfile,
+  memberships: readonly CourseMembership[],
+  availableOfferings: readonly AvailableCourseOffering[],
+): Promise<LearningShellData> {
+  const availableCourses = buildCourseCatalog(availableOfferings);
+  const workspace = await getLearningWorkspace(profile, undefined, memberships);
+  return {
+    availableCourses,
+    navigationCourses: workspace.courses.length > 0 ? workspace.courses : availableCourses,
+    workspace,
+  };
 }
 
 export async function getLearningWorkspace(
-  profile?: StudentProfile,
+  profile: StudentProfile,
   learning?: LearningSnapshot,
+  memberships?: readonly CourseMembership[],
 ): Promise<LearningWorkspace> {
   const snapshot = learning ?? (await getLearningSnapshot());
-  if (!profile) {
-    throw new Error("Authenticated student profile is required for the learning workspace.");
-  }
-  const courses = buildCourses(snapshot);
+  const courses = buildCourses(snapshot, memberships);
 
   return buildWorkspace(profile, snapshot, courses);
 }
 
-function buildCourses(learning: LearningSnapshot): CourseInfo[] {
+function buildCourses(
+  learning: LearningSnapshot,
+  memberships?: readonly CourseMembership[],
+): CourseInfo[] {
+  const membershipByOfferingKey = memberships
+    ? new Map(memberships.map((membership) => [membership.offeringKey, membership] as const))
+    : null;
+
   return Object.entries(learning.courseOfferings)
-    .map(([offeringKey, snapshot]) =>
-      buildCourseOffering(parseCourseOfferingKey(offeringKey), snapshot),
+    .filter(
+      ([offeringKey]) =>
+        !membershipByOfferingKey ||
+        membershipByOfferingKey.has(parseCourseOfferingKey(offeringKey)),
     )
+    .map(([offeringKey, snapshot]) => {
+      const parsedOfferingKey = parseCourseOfferingKey(offeringKey);
+      const offering = membershipByOfferingKey?.get(parsedOfferingKey) ?? {
+        offeringKey: parsedOfferingKey,
+        courseDefinitionKey: snapshot.courseDefinitionKey,
+        courseDefinitionReleaseId: snapshot.courseDefinitionReleaseId,
+      };
+      return buildCourse(offering, snapshot);
+    })
     .sort((a, b) => a.title.localeCompare(b.title) || a.offeringKey.localeCompare(b.offeringKey));
 }
 
@@ -195,7 +280,7 @@ function buildWorkspace(
       const course = courseForLinkedItem(item, courseByOfferingKey);
       if (!course) return [];
       const { target, ...agenda } = item;
-      return [{ ...agenda, href: routeTargetPath(target) }];
+      return [{ ...agenda, href: courseRouteTargetPath(target) }];
     }),
     announcements: learning.announcements.flatMap((item): Announcement[] => {
       const course = courseForLinkedItem(item, courseByOfferingKey);
@@ -204,7 +289,7 @@ function buildWorkspace(
       return [
         {
           ...announcement,
-          href: routeTargetPath(target),
+          href: courseRouteTargetPath(target),
         },
       ];
     }),
@@ -212,44 +297,9 @@ function buildWorkspace(
       const course = courseForLinkedItem(item, courseByOfferingKey);
       if (!course) return [];
       const { target, ...activity } = item;
-      return [{ ...activity, href: routeTargetPath(target) }];
+      return [{ ...activity, href: courseRouteTargetPath(target) }];
     }),
   };
-}
-
-export async function getLearningPageData(
-  profile: StudentProfile,
-  offeringKey: CourseOfferingKey,
-  authorizedCourseDefinitionKey: CourseDefinitionKey,
-  authorizedCourseDefinitionReleaseId: CourseDefinitionReleaseId,
-): Promise<{ course: CourseInfo; workspace: LearningWorkspace }> {
-  const learning = await getLearningSnapshot();
-  const courses = buildCourses(learning);
-  const course = courses.find((candidate) => candidate.offeringKey === offeringKey);
-  if (!course) {
-    throw new Error(`Incomplete course offering manifest for ${offeringKey}`);
-  }
-  if (course.courseDefinitionKey !== authorizedCourseDefinitionKey) {
-    throw new Error(
-      `Authorized course definition mismatch for ${offeringKey}: ` +
-        `${authorizedCourseDefinitionKey} !== ${course.courseDefinitionKey}`,
-    );
-  }
-  if (course.courseDefinitionReleaseId !== authorizedCourseDefinitionReleaseId) {
-    throw new Error(
-      `Authorized course definition release mismatch for ${offeringKey}: ` +
-        `${authorizedCourseDefinitionReleaseId} !== ${course.courseDefinitionReleaseId}`,
-    );
-  }
-  return { course, workspace: buildWorkspace(profile, learning, courses) };
-}
-
-export function getCourseEntry(entries: CourseEntry[], id: string): CourseEntry {
-  const entry = entries.find((candidate) => candidate.id === id);
-  if (!entry) {
-    throw new Error(`Missing course content entry: ${id}`);
-  }
-  return entry;
 }
 
 export interface HeadingInfo {

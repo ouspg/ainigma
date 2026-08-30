@@ -4,7 +4,6 @@ import { z } from "astro/zod";
 import type { ExternalUrl } from "./lib/external-links";
 
 const externalUrlSchema = z
-  .string()
   .url()
   .refine((value) => value.startsWith("https://"), "External URLs must use HTTPS")
   .transform((value): ExternalUrl => value as ExternalUrl);

@@ -28,17 +28,30 @@ import LocaleSwitcher from "../islands/LocaleSwitcher";
 interface Props {
   currentPath: AppPath;
   courses: CourseInfo[];
-  profile: StudentProfile;
-  term: AcademicTerm;
+  profile?: StudentProfile;
+  term?: AcademicTerm;
   activities: LearnerActivity[];
   locale: Locale;
+  isWorkspace: boolean;
+  showMobileNav: boolean;
+  showSignIn: boolean;
 }
 
 function goTo(path: AppPath) {
   window.location.assign(path);
 }
 
-function HeaderControls({ currentPath, courses, profile, term, activities, locale }: Props) {
+function HeaderControlsContent({
+  currentPath,
+  courses,
+  profile,
+  term,
+  activities,
+  locale,
+  isWorkspace,
+  showMobileNav,
+  showSignIn,
+}: Props) {
   const translateAstryx = useTranslator();
   const messages = getMessages(locale);
   const copy = messages.navigation;
@@ -73,63 +86,77 @@ function HeaderControls({ currentPath, courses, profile, term, activities, local
 
   return (
     <HStack gap={2} vAlign="center">
-      <ActivityCenter activities={activities} courses={courses} locale={locale} />
-      <span className="learning-frame-locale">
+      {isWorkspace && profile ? (
+        <ActivityCenter activities={activities} courses={courses} locale={locale} />
+      ) : null}
+      {profile ? (
+        <DropdownMenu
+          button={{
+            label: profile.displayName,
+            variant: "ghost",
+            icon: <UserRound size={17} aria-hidden="true" />,
+            children: <span className="account-label">{profile.displayName}</span>,
+          }}
+          items={[
+            { label: term ? `${term.label} · ${copy.student}` : copy.student, isDisabled: true },
+            { type: "divider" },
+            {
+              label: copy.support,
+              onClick: () =>
+                goTo(`${localizedPath(locale, routes.desk.path())}#announcements` as AppPath),
+            },
+            ...(features.finnish
+              ? [
+                  {
+                    label: languageOption.switchLabel,
+                    onClick: () => goTo(localizedPath(otherLocale, currentPath)),
+                  },
+                ]
+              : []),
+            {
+              label: copy.signOut,
+              onClick: signOut,
+            },
+          ]}
+          menuWidth={224}
+        />
+      ) : showSignIn ? (
+        <Button
+          href={localizedPath(locale, routes.login.path())}
+          icon={<UserRound size={17} aria-hidden="true" />}
+          label={messages.publicHome.signIn}
+          size="sm"
+          variant="primary"
+        />
+      ) : null}
+      <span className="header-locale">
         <LocaleSwitcher locale={locale} path={currentPath} />
       </span>
       <AppearanceMenu locale={locale} />
-      <DropdownMenu
-        button={{
-          label: profile.displayName,
-          variant: "ghost",
-          icon: <UserRound size={17} aria-hidden="true" />,
-          children: <span className="account-label">{profile.displayName}</span>,
-        }}
-        items={[
-          { label: `${term.label} · ${copy.student}`, isDisabled: true },
-          { type: "divider" },
-          {
-            label: copy.support,
-            onClick: () =>
-              goTo(`${localizedPath(locale, routes.desk.path())}#announcements` as AppPath),
-          },
-          ...(features.finnish
-            ? [
-                {
-                  label: languageOption.switchLabel,
-                  onClick: () => goTo(localizedPath(otherLocale, currentPath)),
-                },
-              ]
-            : []),
-          {
-            label: copy.signOut,
-            onClick: signOut,
-          },
-        ]}
-        menuWidth={224}
-      />
-      <Button
-        aria-controls="ainigma-mobile-navigation"
-        aria-expanded={isMobileNavOpen}
-        className="learning-mobile-nav-toggle"
-        data-testid="mobile-nav-toggle"
-        icon={<Menu size={20} aria-hidden="true" />}
-        isIconOnly
-        label={translateAstryx("@astryx.mobileNav.toggle.open")}
-        onClick={requestMobileNav}
-        variant="ghost"
-      />
+      {showMobileNav ? (
+        <Button
+          aria-controls="ainigma-mobile-navigation"
+          aria-expanded={isMobileNavOpen}
+          className="learning-mobile-nav-toggle"
+          data-testid="mobile-nav-toggle"
+          icon={<Menu size={20} aria-hidden="true" />}
+          isIconOnly
+          label={translateAstryx("@astryx.mobileNav.toggle.open")}
+          onClick={requestMobileNav}
+          variant="ghost"
+        />
+      ) : null}
     </HStack>
   );
 }
 
-export default function LearningHeaderControls(props: Props) {
+export default function HeaderControls(props: Props) {
   return (
     <InternationalizationProvider
       locale={getAstryxLocale(props.locale)}
       messages={{ "fi-FI": fiFI }}
     >
-      <HeaderControls {...props} />
+      <HeaderControlsContent {...props} />
     </InternationalizationProvider>
   );
 }

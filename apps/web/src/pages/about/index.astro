@@ -1,16 +1,18 @@
 ---
-import PublicInfoPage from "../../components/pages/PublicInfoPage";
-import SiteFooter from "../../components/layout/SiteFooter.astro";
-import BaseLayout from "../../layouts/BaseLayout.astro";
+import PublicInfoPage from "../../components/pages/PublicInfoPage.astro";
+import PublicLayout from "../../components/layout/PublicLayout.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
+import { routes } from "../../lib/routes";
 
 const locale = getLocale(Astro.currentLocale);
 const metadata = getMessages(locale).metadata;
 ---
 
-<BaseLayout title={metadata.aboutTitle} description={metadata.aboutDescription} {locale}>
+<PublicLayout
+  title={metadata.aboutTitle}
+  description={metadata.aboutDescription}
+  currentPath={routes.about.path()}
+  {locale}
+>
   <PublicInfoPage kind="about" {locale} />
-  <div class="public-footer-frame">
-    <SiteFooter {locale} />
-  </div>
-</BaseLayout>
+</PublicLayout>

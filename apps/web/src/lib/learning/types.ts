@@ -19,13 +19,7 @@ interface CourseOverviewFields {
   tone: CourseTone;
 }
 
-export interface PublicCourseInfo extends CourseOverviewFields {
-  courseDefinitionSlug: CourseDefinitionSlug;
-  courseDefinitionKey: CourseDefinitionKey;
-  catalogUrl?: ExternalUrl;
-}
-
-interface CourseSchedule {
+export interface CourseSchedule {
   startDate: string;
   endDate: string;
 }
@@ -70,7 +64,6 @@ export interface CourseDefinition extends CourseOverviewFields {
 
 export interface WeekInfo extends Omit<WeekDefinition, "tasks"> {
   href: AppPath;
-  status: CourseStatus;
   tasks: TaskInfo[];
 }
 
@@ -89,7 +82,21 @@ export interface NextActivity {
   savedLabel: string;
 }
 
-export interface CourseInfo extends CourseOverviewFields, CourseSchedule {
+export interface CourseLearnerState {
+  schedule: CourseSchedule;
+  progress: number;
+  status: CourseStatus;
+  earnedPoints: number;
+  availablePoints: number;
+  weekStatuses: Record<string, CourseStatus>;
+  nextActivity: NextActivity;
+}
+
+/**
+ * Canonical course view model used by the catalog, navigation, and learning pages.
+ * Learner-only state is present only after membership has been accepted.
+ */
+export interface CourseInfo extends CourseOverviewFields {
   offeringKey: CourseOfferingKey;
   courseDefinitionSlug: CourseDefinitionSlug;
   courseDefinitionKey: CourseDefinitionKey;
@@ -97,15 +104,10 @@ export interface CourseInfo extends CourseOverviewFields, CourseSchedule {
   navMark: string;
   href: AppPath;
   catalogUrl?: ExternalUrl;
-  tone: CourseTone;
-  progress: number;
-  status: CourseStatus;
-  earnedPoints: number;
-  availablePoints: number;
   weeks: WeekInfo[];
   pages: CoursePageInfo[];
   taskCount: number;
-  nextActivity: NextActivity;
+  learner?: CourseLearnerState;
 }
 
 export interface AgendaItem {

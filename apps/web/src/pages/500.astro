@@ -1,17 +1,19 @@
 ---
-import ErrorPage from "../components/pages/ErrorPage";
-import SiteFooter from "../components/layout/SiteFooter.astro";
-import BaseLayout from "../layouts/BaseLayout.astro";
+import ErrorPage from "../components/pages/ErrorPage.astro";
+import PublicLayout from "../components/layout/PublicLayout.astro";
 import { getLocale, getMessages } from "../lib/i18n";
+import { routes } from "../lib/routes";
 
 Astro.response.status = 500;
 const locale = getLocale(Astro.currentLocale);
 const title = getMessages(locale).errors.serverErrorTitle;
 ---
 
-<BaseLayout title={`${title} | Ainigma`} description={title} {locale}>
+<PublicLayout
+  title={`${title} | Ainigma`}
+  description={title}
+  currentPath={routes.status.path({ code: "500" })}
+  {locale}
+>
   <ErrorPage status={500} {locale} />
-  <div class="public-footer-frame">
-    <SiteFooter {locale} />
-  </div>
-</BaseLayout>
+</PublicLayout>

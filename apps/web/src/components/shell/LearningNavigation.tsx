@@ -27,12 +27,14 @@ import { localizedPath, routes, type AppPath } from "../../lib/routes";
 interface Props {
   currentPath: AppPath;
   courses: CourseInfo[];
+  isAuthenticated: boolean;
   locale: Locale;
 }
 
-function LearningNavigationContent({ currentPath, courses, locale }: Props) {
+function LearningNavigationContent({ currentPath, courses, isAuthenticated, locale }: Props) {
   const translateAstryx = useTranslator();
   const copy = getMessages(locale).navigation;
+  const hasMemberCourses = courses.some((course) => course.learner);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -108,9 +110,11 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
             }
           : {})}
         endContent={
-          <Text type="supporting" color="secondary" hasTabularNumbers>
-            {course.progress}%
-          </Text>
+          course.learner ? (
+            <Text type="supporting" color="secondary" hasTabularNumbers>
+              {course.learner.progress}%
+            </Text>
+          ) : undefined
         }
         href={localizedPath(locale, course.href)}
         icon={
@@ -176,28 +180,35 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
 
   const navigationSections = (
     <>
-      <SideNavSection title={copy.workspace} isHeaderHidden>
-        <SideNavItem
-          href={localizedPath(locale, routes.desk.path())}
-          icon={Home}
-          isSelected={currentPath === routes.desk.path()}
-          label={copy.desk}
-        />
-        <SideNavItem
-          href={localizedPath(locale, routes.activity.path())}
-          icon={Bell}
-          isSelected={currentPath === routes.activity.path()}
-          label={copy.activity}
-        />
-        <SideNavItem
-          href={localizedPath(locale, routes.announcements.path())}
-          icon={Megaphone}
-          isSelected={currentPath === routes.announcements.path()}
-          label={copy.announcements}
-        />
-      </SideNavSection>
+      {isAuthenticated ? (
+        <SideNavSection title={copy.workspace} isHeaderHidden>
+          <SideNavItem
+            href={localizedPath(locale, routes.desk.path())}
+            icon={Home}
+            isSelected={currentPath === routes.desk.path()}
+            label={copy.desk}
+          />
+          <SideNavItem
+            href={localizedPath(locale, routes.activity.path())}
+            icon={Bell}
+            isSelected={currentPath === routes.activity.path()}
+            label={copy.activity}
+          />
+          <SideNavItem
+            href={localizedPath(locale, routes.announcements.path())}
+            icon={Megaphone}
+            isSelected={currentPath === routes.announcements.path()}
+            label={copy.announcements}
+          />
+        </SideNavSection>
+      ) : null}
 
-      <SideNavSection title={copy.courses} subtitle={`${courses.length} ${copy.activeCourses}`}>
+      <SideNavSection
+        title={hasMemberCourses ? copy.courses : copy.availableCoursesTitle}
+        subtitle={`${courses.length} ${
+          hasMemberCourses ? copy.activeCourses : copy.availableCourses
+        }`}
+      >
         {courses.map((course) => courseNavigation(course))}
       </SideNavSection>
     </>
@@ -223,7 +234,10 @@ function LearningNavigationContent({ currentPath, courses, locale }: Props) {
               header={
                 <TopNavHeading
                   heading="Ainigma"
-                  headingHref={localizedPath(locale, routes.desk.path())}
+                  headingHref={localizedPath(
+                    locale,
+                    isAuthenticated ? routes.desk.path() : routes.home.path(),
+                  )}
                   logo={<NavIcon icon={<BookOpenCheck size={17} aria-hidden="true" />} />}
                   superheading={copy.university}
                 />

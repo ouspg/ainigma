@@ -1,8 +1,8 @@
 ---
-import ErrorPage, { type ErrorStatus } from "../../components/pages/ErrorPage";
-import SiteFooter from "../../components/layout/SiteFooter.astro";
-import BaseLayout from "../../layouts/BaseLayout.astro";
+import ErrorPage, { type ErrorStatus } from "../../components/pages/ErrorPage.astro";
+import PublicLayout from "../../components/layout/PublicLayout.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
+import { routes } from "../../lib/routes";
 
 export const prerender = false;
 
@@ -22,9 +22,11 @@ const title =
       : messages.errors.notFoundTitle;
 ---
 
-<BaseLayout title={`${title} | Ainigma`} description={title} {locale}>
+<PublicLayout
+  title={`${title} | Ainigma`}
+  description={title}
+  currentPath={routes.status.path({ code: String(status) })}
+  {locale}
+>
   <ErrorPage {status} {locale} />
-  <div class="public-footer-frame">
-    <SiteFooter {locale} />
-  </div>
-</BaseLayout>
+</PublicLayout>

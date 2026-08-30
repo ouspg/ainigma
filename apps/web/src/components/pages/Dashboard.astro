@@ -1,0 +1,258 @@
+---
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
+import { Link } from "@astryxdesign/core/Link";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { ArrowRight, ChevronRight, Clock3 } from "lucide-react";
+import DashboardAgenda from "../islands/DashboardAgenda";
+import CourseUpdatesList from "./CourseUpdatesList.astro";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { getCourseIcon } from "../../lib/learning/course-icons";
+import type { CourseInfo, CourseStatus, LearningWorkspace } from "../../lib/learning/types";
+import { localizedPath, routes } from "../../lib/routes";
+
+interface Props {
+  availableCourses: CourseInfo[];
+  workspace: LearningWorkspace;
+  locale: Locale;
+}
+
+const statusVariants: Record<CourseStatus, "neutral" | "accent" | "success"> = {
+  "not-started": "neutral",
+  "in-progress": "accent",
+  completed: "success",
+};
+
+function formatCourseDate(value: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale === "fi" ? "fi-FI" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+const { availableCourses, workspace, locale } = Astro.props;
+const copy = getMessages(locale).dashboard;
+const focusCourse =
+  workspace.courses.find((course) => course.learner?.status === "in-progress") ??
+  workspace.courses[0];
+const focus = focusCourse?.learner ? { course: focusCourse, learner: focusCourse.learner } : null;
+---
+
+<VStack className="dashboard-page" gap={8} padding={8}>
+  <VStack as="header" className="dashboard-header" gap={2}>
+    <Text className="page-eyebrow" type="supporting" color="secondary" weight="medium">
+      {focus
+        ? `${workspace.term.dateLabel} · ${copy.week} ${workspace.term.currentWeek}`
+        : copy.courseProgress}
+    </Text>
+    <Heading level={1}>
+      {copy.welcome}{" "}{workspace.profile.firstName}.
+    </Heading>
+    <Text type="body" color="secondary">
+      {focus ? copy.welcomeText : copy.browseCoursesText}
+    </Text>
+  </VStack>
+
+  {focus ? (
+    <Layout height="auto">
+      <LayoutPanel
+        slot="end"
+        className="dashboard-planner-panel"
+        isScrollable={false}
+        label={copy.studyOverview}
+        padding={0}
+        width={320}
+      >
+        <VStack as="section" id="announcements" gap={3}>
+          <VStack gap={1}>
+            <Link href={localizedPath(locale, routes.announcements.path())}>
+              <Heading level={2}>{copy.recentUpdates}</Heading>
+            </Link>
+            <Text type="supporting" color="secondary">
+              {copy.activeCoursesSource}
+            </Text>
+          </VStack>
+          <CourseUpdatesList
+            announcements={workspace.announcements}
+            courses={workspace.courses}
+            {locale}
+          />
+        </VStack>
+      </LayoutPanel>
+
+      <LayoutContent isScrollable={false} label={copy.continueLearning} padding={0}>
+        <VStack className="dashboard-main-column" gap={8}>
+          <VStack as="section" aria-labelledby="continue-heading" gap={3}>
+            <HStack gap={3} vAlign="center">
+              <Heading id="continue-heading" level={2}>
+                {copy.continueLearning}
+              </Heading>
+              <StackItem size="fill" />
+              <Text type="supporting" color="secondary">
+                {focus.learner.nextActivity.savedLabel}
+              </Text>
+            </HStack>
+
+            <Card className="continue-card" padding={6}>
+              <VStack gap={5}>
+                <VStack gap={2}>
+                  <HStack gap={2} vAlign="center" wrap="wrap">
+                    <span class={`course-swatch tone-${focus.course.tone}`} aria-hidden="true"></span>
+                    <Text type="supporting" color="secondary" weight="medium">
+                      {focus.course.code} · {focus.learner.nextActivity.eyebrow}
+                    </Text>
+                  </HStack>
+                  <Heading level={3}>{focus.learner.nextActivity.title}</Heading>
+                  <Text type="body" color="secondary">
+                    {focus.learner.nextActivity.description}
+                  </Text>
+                </VStack>
+
+                <VStack gap={2}>
+                  <HStack gap={3} vAlign="center">
+                    <Text type="supporting" color="secondary">
+                      {focus.learner.nextActivity.completedSteps} of{" "}
+                      {focus.learner.nextActivity.totalSteps}{" "}{copy.checkpoints}
+                    </Text>
+                    <StackItem size="fill" />
+                    <HStack gap={1} vAlign="center">
+                      <Clock3 size={14} aria-hidden="true" />
+                      <Text type="supporting" color="secondary">
+                        {copy.aboutMinutes}{" "}{focus.learner.nextActivity.estimatedMinutes} min
+                      </Text>
+                    </HStack>
+                  </HStack>
+                  <ProgressBar
+                    isLabelHidden
+                    label={`${focus.learner.nextActivity.title} ${copy.progress}`}
+                    max={focus.learner.nextActivity.totalSteps}
+                    value={focus.learner.nextActivity.completedSteps}
+                  />
+                </VStack>
+
+                <HStack gap={3} vAlign="center" wrap="wrap">
+                  <Button
+                    href={localizedPath(locale, focus.learner.nextActivity.href)}
+                    label={copy.resume}
+                    size="lg"
+                    variant="primary"
+                  >
+                    <ArrowRight slot="endContent" size={16} />
+                  </Button>
+                  <Button
+                    href={localizedPath(locale, focus.course.href)}
+                    label={copy.viewCourse}
+                    size="lg"
+                    variant="ghost"
+                  />
+                </HStack>
+              </VStack>
+            </Card>
+          </VStack>
+
+          <DashboardAgenda
+            client:load
+            agenda={workspace.agenda}
+            courses={workspace.courses}
+            {locale}
+          />
+
+          <VStack as="section" id="courses" aria-labelledby="courses-heading" gap={3}>
+            <VStack gap={1}>
+              <Heading id="courses-heading" level={2}>
+                {copy.courseProgress}
+              </Heading>
+              <Text type="supporting" color="secondary">
+                {workspace.term.label} · {workspace.courses.length}{" "}{copy.activeEnrollments}
+              </Text>
+            </VStack>
+            <List className="course-list" density="spacious" hasDividers>
+              <Text slot="header" className="visually-hidden">{copy.enrolledCourses}</Text>
+              {workspace.courses.map((course) => {
+                const CourseIcon = getCourseIcon(course.courseDefinitionSlug);
+                const learner = course.learner;
+                if (!learner) return null;
+
+                return (
+                  <ListItem href={localizedPath(locale, course.href)} label={course.title}>
+                    <VStack slot="description" gap={0.5}>
+                      <Text type="supporting" color="secondary" maxLines={1}>
+                        {course.code} · {course.summary}
+                      </Text>
+                      <Text type="supporting" color="secondary">
+                        <span class="visually-hidden">{copy.courseDates}: </span>
+                        <time datetime={learner.schedule.startDate}>
+                          {formatCourseDate(learner.schedule.startDate, locale)}
+                        </time>{" "}
+                        –{" "}
+                        <time datetime={learner.schedule.endDate}>
+                          {formatCourseDate(learner.schedule.endDate, locale)}
+                        </time>
+                      </Text>
+                    </VStack>
+                    <VStack slot="endContent" className="course-progress-cell" gap={1}>
+                      <HStack gap={2} vAlign="center">
+                        <StatusDot
+                          label={copy.status[learner.status]}
+                          variant={statusVariants[learner.status]}
+                        />
+                        <Text type="supporting" color="secondary">
+                          {copy.status[learner.status]}
+                        </Text>
+                        <StackItem size="fill" />
+                        <Text type="supporting" hasTabularNumbers>
+                          {learner.progress}%
+                        </Text>
+                      </HStack>
+                      <ProgressBar
+                        isLabelHidden
+                        label={`${course.title} ${copy.progress}`}
+                        value={learner.progress}
+                        variant={learner.progress === 100 ? "success" : "accent"}
+                      />
+                    </VStack>
+                    <Text slot="label" type="large" weight="semibold">
+                      {course.title}
+                    </Text>
+                    <CourseIcon slot="startContent" size={20} aria-hidden="true" />
+                  </ListItem>
+                );
+              })}
+            </List>
+          </VStack>
+        </VStack>
+      </LayoutContent>
+    </Layout>
+  ) : (
+    <VStack as="section" aria-labelledby="browse-courses-heading" gap={3}>
+      <Heading id="browse-courses-heading" level={2}>
+        {copy.browseCourses}
+      </Heading>
+      <List className="course-list" density="spacious" hasDividers>
+        <Text slot="header" className="visually-hidden">{copy.enrolledCourses}</Text>
+        {availableCourses.map((course) => {
+          const CourseIcon = getCourseIcon(course.courseDefinitionSlug);
+          return (
+            <ListItem href={localizedPath(locale, course.href)} label={course.title}>
+              <Text slot="description" type="supporting" color="secondary">
+                {course.code} · {course.summary}
+              </Text>
+              <ChevronRight slot="endContent" size={17} aria-hidden="true" />
+              <Text slot="label" type="large" weight="semibold">
+                {course.title}
+              </Text>
+              <CourseIcon slot="startContent" size={20} aria-hidden="true" />
+            </ListItem>
+          );
+        })}
+      </List>
+    </VStack>
+  )}
+</VStack>

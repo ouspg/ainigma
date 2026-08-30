@@ -1,22 +1,24 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { TextInput, type TextInputStatus } from "@astryxdesign/core/TextInput";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { submitChallenge } from "../../lib/challenges/client";
 import type { FlagChallengeData } from "../../lib/challenges/types";
-import { mockChallengeEvaluator } from "../../lib/challenges/mock-evaluator";
+import type { CourseOfferingKey } from "../../lib/learning/identifiers";
 import { readActivityProgress, writeActivityProgress } from "../../lib/progress/activity-progress";
 
 interface Props {
   taskId: string;
   challenge: FlagChallengeData;
+  offeringKey: CourseOfferingKey;
 }
 
 type Result = "idle" | "incorrect" | "correct";
 
-export default function FlagChallengeIsland({ taskId, challenge }: Props) {
+export default function FlagChallengeIsland({ taskId, challenge, offeringKey }: Props) {
   const [value, setValue] = useState("");
   const [result, setResult] = useState<Result>("idle");
   const [message, setMessage] = useState("");
@@ -33,7 +35,7 @@ export default function FlagChallengeIsland({ taskId, challenge }: Props) {
         ? { type: "error", message }
         : undefined;
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!value.trim()) {
       setResult("incorrect");
@@ -41,7 +43,13 @@ export default function FlagChallengeIsland({ taskId, challenge }: Props) {
       return;
     }
     setIsSubmitting(true);
-    const evaluation = await mockChallengeEvaluator.evaluateFlag(taskId, value);
+    const evaluation = await submitChallenge(offeringKey, { type: "flag", taskId, value });
+    if (!evaluation) {
+      setResult("incorrect");
+      setMessage("The activity is temporarily unavailable.");
+      setIsSubmitting(false);
+      return;
+    }
     setResult(evaluation.isCorrect ? "correct" : "incorrect");
     setMessage(evaluation.message);
     setIsSubmitting(false);

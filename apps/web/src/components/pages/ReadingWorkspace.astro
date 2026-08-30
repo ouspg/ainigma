@@ -1,0 +1,126 @@
+---
+import { Button } from "@astryxdesign/core/Button";
+import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
+import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { ArrowLeft, ArrowRight, Clock3 } from "lucide-react";
+import type { OutlineSection } from "../../lib/learning/catalog";
+import { getMessages, type Locale } from "../../lib/i18n";
+import { localizedPath, type AppPath } from "../../lib/routes";
+
+interface ReadingPageLink {
+  href: AppPath;
+  label: string;
+}
+
+interface Props {
+  eyebrow: string;
+  title: string;
+  summary: string;
+  meta?: string[];
+  outline?: OutlineSection[];
+  previous?: ReadingPageLink;
+  next?: ReadingPageLink;
+  locale: Locale;
+}
+
+const {
+  eyebrow,
+  title,
+  summary,
+  meta = [],
+  outline = [],
+  previous,
+  next,
+  locale,
+} = Astro.props;
+const copy = getMessages(locale).reading;
+---
+
+<VStack className="reading-workspace" gap={8} padding={8}>
+  <VStack as="header" className="reading-header" gap={3}>
+    <Text className="page-eyebrow" type="supporting" color="secondary" weight="medium">
+      {eyebrow}
+    </Text>
+    <Heading className="reading-title" level={1}>
+      {title}
+    </Heading>
+    <Text type="large" color="secondary">
+      {summary}
+    </Text>
+    {meta.length > 0 && (
+      <HStack gap={3} vAlign="center" wrap="wrap">
+        {meta.map((item, index) => (
+          <HStack gap={1} vAlign="center">
+            {index === 0 && <Clock3 size={14} aria-hidden="true" />}
+            <Text type="supporting" color="secondary">
+              {item}
+            </Text>
+          </HStack>
+        ))}
+      </HStack>
+    )}
+  </VStack>
+
+  <Layout className="reading-layout" height="auto">
+    {outline.length > 0 ? (
+      <LayoutPanel
+        slot="end"
+        className="reading-outline-panel"
+        isScrollable={false}
+        label={copy.onThisPage}
+        padding={0}
+        width={240}
+      >
+        <nav class="outline-nav" aria-label={copy.onThisPage}>
+          <VStack gap={2}>
+            <Text type="supporting" color="secondary" weight="medium">
+              {copy.onThisPage}
+            </Text>
+            <VStack gap={0}>
+              {outline.map((section) => (
+                <a
+                  class={`outline-link${section.depth === 3 ? " is-nested" : ""}`}
+                  href={`#${section.slug}`}
+                >
+                  {section.text}
+                </a>
+              ))}
+            </VStack>
+          </VStack>
+        </nav>
+      </LayoutPanel>
+    ) : null}
+    <LayoutContent isScrollable={false} label={copy.material} padding={0}>
+      <article class="reading-prose"><slot /></article>
+
+      {(previous || next) && (
+        <nav class="lesson-navigation" aria-label={copy.navigation}>
+          <HStack gap={3} vAlign="center" wrap="wrap">
+            {previous ? (
+              <Button
+                href={localizedPath(locale, previous.href)}
+                label={previous.label}
+                variant="secondary"
+              >
+                <ArrowLeft slot="icon" size={16} />
+              </Button>
+            ) : (
+              <span />
+            )}
+            <StackItem size="fill" />
+            {next ? (
+              <Button
+                href={localizedPath(locale, next.href)}
+                label={next.label}
+                variant="primary"
+              >
+                <ArrowRight slot="endContent" size={16} />
+              </Button>
+            ) : null}
+          </HStack>
+        </nav>
+      )}
+    </LayoutContent>
+  </Layout>
+</VStack>

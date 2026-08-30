@@ -1,22 +1,23 @@
 ---
-import BaseLayout from "../layouts/BaseLayout.astro";
-import PublicHomePage from "../components/pages/PublicHomePage";
-import SiteFooter from "../components/layout/SiteFooter.astro";
-import { getPublicCourseCatalog } from "../lib/learning/catalog";
+import PublicLayout from "../components/layout/PublicLayout.astro";
+import PublicHomePage from "../components/pages/PublicHomePage.astro";
+import { buildCourseCatalog } from "../lib/learning/catalog";
 import { getLocale, getMessages } from "../lib/i18n";
+import { routes } from "../lib/routes";
 
-const courses = getPublicCourseCatalog();
+export const prerender = false;
+
+const courses = buildCourseCatalog(Astro.locals.availableCourseOfferings ?? []);
 const locale = getLocale(Astro.currentLocale);
 const metadata = getMessages(locale).metadata;
 ---
 
-<BaseLayout
+<PublicLayout
   title={metadata.homeTitle}
   description={metadata.homeDescription}
+  currentPath={routes.home.path()}
   {locale}
+  {...(Astro.locals.profile ? { profile: Astro.locals.profile } : {})}
 >
   <PublicHomePage {courses} {locale} />
-  <div class="public-footer-frame">
-    <SiteFooter {locale} />
-  </div>
-</BaseLayout>
+</PublicLayout>

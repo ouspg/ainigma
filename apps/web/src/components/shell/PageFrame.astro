@@ -1,0 +1,70 @@
+---
+import HeaderControls from "./HeaderControls";
+import LearningNavigation from "./LearningNavigation";
+import PageFrameCore from "./PageFrameCore";
+import type {
+  AcademicTerm,
+  CourseInfo,
+  LearnerActivity,
+  StudentProfile,
+} from "../../lib/learning/types";
+import type { Locale } from "../../lib/i18n";
+import { routes, type AppPath } from "../../lib/routes";
+
+interface Props {
+  activities?: LearnerActivity[];
+  courses?: CourseInfo[];
+  currentPath: AppPath;
+  locale: Locale;
+  profile?: StudentProfile;
+  term?: AcademicTerm;
+}
+
+const {
+  activities = [],
+  courses,
+  currentPath,
+  locale,
+  profile,
+  term,
+} = Astro.props;
+const hasNavigation = courses !== undefined;
+const isAuthenticated = Boolean(profile);
+const isHome = currentPath === routes.home.path();
+---
+
+<PageFrameCore
+  {hasNavigation}
+  {isAuthenticated}
+  {isHome}
+  {locale}
+>
+  <Fragment slot="header-controls">
+    <HeaderControls
+      client:load
+      transition:persist="header-controls"
+      {activities}
+      courses={courses ?? []}
+      {currentPath}
+      isWorkspace={hasNavigation && isAuthenticated}
+      {locale}
+      {...(profile ? { profile } : {})}
+      showMobileNav={hasNavigation}
+      showSignIn={isHome || (hasNavigation && !isAuthenticated)}
+      {...(term ? { term } : {})}
+    />
+  </Fragment>
+  {hasNavigation ? (
+    <Fragment slot="side-nav">
+      <LearningNavigation
+        client:load
+        transition:persist="learning-navigation"
+        courses={courses ?? []}
+        {currentPath}
+        {isAuthenticated}
+        {locale}
+      />
+    </Fragment>
+  ) : null}
+  <slot />
+</PageFrameCore>

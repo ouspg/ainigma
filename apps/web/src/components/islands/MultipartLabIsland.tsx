@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Divider } from "@astryxdesign/core/Divider";
@@ -7,16 +7,18 @@ import { TextInput, type TextInputStatus } from "@astryxdesign/core/TextInput";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
+import { submitChallenge } from "../../lib/challenges/client";
 import type { MultipartChallengeData } from "../../lib/challenges/types";
-import { mockChallengeEvaluator } from "../../lib/challenges/mock-evaluator";
+import type { CourseOfferingKey } from "../../lib/learning/identifiers";
 import { readActivityProgress, writeActivityProgress } from "../../lib/progress/activity-progress";
 
 interface Props {
   taskId: string;
   challenge: MultipartChallengeData;
+  offeringKey: CourseOfferingKey;
 }
 
-export default function MultipartLabIsland({ taskId, challenge }: Props) {
+export default function MultipartLabIsland({ taskId, challenge, offeringKey }: Props) {
   const [completed, setCompleted] = useState<boolean[]>(() => challenge.steps.map(() => false));
   const [values, setValues] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<Record<string, { isCorrect: boolean; message: string }>>(
@@ -44,15 +46,17 @@ export default function MultipartLabIsland({ taskId, challenge }: Props) {
     });
   }, [challenge.steps, completed, completedSteps, isComplete, isProgressReady, taskId]);
 
-  const checkStep = async (index: number, event: FormEvent<HTMLFormElement>) => {
+  const checkStep = async (index: number, event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const step = challenge.steps[index];
     if (!step?.requiresAnswer) return;
-    const evaluation = await mockChallengeEvaluator.evaluateStep(
+    const evaluation = await submitChallenge(offeringKey, {
+      type: "step",
       taskId,
-      step.id,
-      values[step.id] ?? "",
-    );
+      stepId: step.id,
+      value: values[step.id] ?? "",
+    });
+    if (!evaluation) return;
     setFeedback((current) => ({ ...current, [step.id]: evaluation }));
     if (evaluation.isCorrect) {
       setCompleted((current) =>

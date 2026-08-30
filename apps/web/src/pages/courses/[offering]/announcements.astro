@@ -1,32 +1,17 @@
 ---
 import { render } from "astro:content";
-import BaseLayout from "../../../layouts/BaseLayout.astro";
-import LearningFrame from "../../../components/shell/LearningFrame.astro";
-import ReadingWorkspace from "../../../components/pages/ReadingWorkspace";
-import {
-  buildOutlineSections,
-  getLearningPageData,
-} from "../../../lib/learning/catalog";
+import CourseReadingLayout from "../../../components/layout/CourseReadingLayout.astro";
+import { buildOutlineSections } from "../../../lib/learning/catalog";
 import { getPublishedCourseEntry } from "../../../lib/learning/content-entry";
 import { getLocale } from "../../../lib/i18n";
-import { courseOfferingKeyFromParam } from "../../../lib/learning/identifiers";
+import { loadCoursePageData } from "../../../lib/learning/page-data";
 import { routes } from "../../../lib/routes";
 
 export const prerender = false;
 
-const offeringKey = courseOfferingKeyFromParam(Astro.params.offering);
-const authorizedCourseDefinitionKey = Astro.locals.authorizedCourseOffering?.courseDefinitionKey;
-const authorizedCourseDefinitionReleaseId =
-  Astro.locals.authorizedCourseOffering?.courseDefinitionReleaseId;
-if (!offeringKey || !authorizedCourseDefinitionKey || !authorizedCourseDefinitionReleaseId) {
-  return new Response("Not found", { status: 404 });
-}
-const { course, workspace } = await getLearningPageData(
-  Astro.locals.profile!,
-  offeringKey,
-  authorizedCourseDefinitionKey,
-  authorizedCourseDefinitionReleaseId,
-);
+const page = await loadCoursePageData(Astro.locals);
+if (!page) return new Response("Not found", { status: 404 });
+const { course } = page;
 const entry = await getPublishedCourseEntry(`${course.courseDefinitionSlug}/announcements`);
 if (!entry || entry.data.kind !== "course-page" || entry.data.page !== "announcements") {
   return new Response("Not found", { status: 404 });
@@ -37,24 +22,15 @@ const currentPath = routes.coursePage.path({ offeringKey: course.offeringKey, pa
 const locale = getLocale(Astro.currentLocale);
 ---
 
-<BaseLayout title={`${entry.data.title} | ${course.title}`} description={entry.data.summary} {locale}>
-  <LearningFrame
-    {currentPath}
-    courses={workspace.courses}
-    profile={workspace.profile}
-    term={workspace.term}
-    activities={workspace.activity}
-    {locale}
-  >
-    <ReadingWorkspace
-      eyebrow={`${course.code} · Course updates`}
-      title={entry.data.title}
-      summary={entry.data.summary}
-      {locale}
-      {outline}
-      previous={{ href: course.href, label: "Course overview" }}
-    >
-      <Content />
-    </ReadingWorkspace>
-  </LearningFrame>
-</BaseLayout>
+<CourseReadingLayout
+  eyebrow={`${course.code} · Course updates`}
+  title={entry.data.title}
+  summary={entry.data.summary}
+  {currentPath}
+  {locale}
+  {outline}
+  {page}
+  previous={{ href: course.href, label: "Course overview" }}
+>
+  <Content />
+</CourseReadingLayout>

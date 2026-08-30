@@ -16,8 +16,8 @@ export type Database = {
           created_from_access_request_id: string | null
           profile_id: string
           revoked_at: string | null
-          role: string
-          status: string
+          role: "owner" | "instructor" | "learner"
+          status: "active" | "suspended" | "revoked"
           suspended_at: string | null
         }
         Insert: {
@@ -26,8 +26,8 @@ export type Database = {
           created_from_access_request_id?: string | null
           profile_id: string
           revoked_at?: string | null
-          role: string
-          status?: string
+          role: "owner" | "instructor" | "learner"
+          status?: "active" | "suspended" | "revoked"
           suspended_at?: string | null
         }
         Update: {
@@ -36,8 +36,8 @@ export type Database = {
           created_from_access_request_id?: string | null
           profile_id?: string
           revoked_at?: string | null
-          role?: string
-          status?: string
+          role?: "owner" | "instructor" | "learner"
+          status?: "active" | "suspended" | "revoked"
           suspended_at?: string | null
         }
         Relationships: [
@@ -64,12 +64,12 @@ export type Database = {
           course_definition_release_id: string
           created_at: string
           ends_at: string | null
-          enrollment_mode: string
+          enrollment_mode: "approval_required" | "allowlist_auto" | "closed"
           external_url: string | null
           id: string
           offering_key: string
           starts_at: string | null
-          status: string
+          status: "draft" | "published" | "archived"
           updated_at: string
         }
         Insert: {
@@ -78,12 +78,12 @@ export type Database = {
           course_definition_release_id: string
           created_at?: string
           ends_at?: string | null
-          enrollment_mode?: string
+          enrollment_mode?: "approval_required" | "allowlist_auto" | "closed"
           external_url?: string | null
           id?: string
           offering_key: string
           starts_at?: string | null
-          status?: string
+          status?: "draft" | "published" | "archived"
           updated_at?: string
         }
         Update: {
@@ -92,12 +92,12 @@ export type Database = {
           course_definition_release_id?: string
           created_at?: string
           ends_at?: string | null
-          enrollment_mode?: string
+          enrollment_mode?: "approval_required" | "allowlist_auto" | "closed"
           external_url?: string | null
           id?: string
           offering_key?: string
           starts_at?: string | null
-          status?: string
+          status?: "draft" | "published" | "archived"
           updated_at?: string
         }
         Relationships: []
@@ -161,19 +161,25 @@ export type Database = {
         Args: {
           p_authorization_filter?: string
           p_offering_key: string
-          p_status?: string
+          p_status?: "pending" | "approved" | "rejected" | "cancelled"
         }
         Returns: {
           authorization_status: string
           decided_at: string
           display_name: string
-          external_access_state: string
+          external_access_state:
+            | "not_started"
+            | "invitation_pending"
+            | "sso_required"
+            | "active"
+            | "failed"
+            | "revoked"
           external_user_handle: string
           offering_key: string
           reason: string
           request_id: string
           requested_at: string
-          status: string
+          status: "pending" | "approved" | "rejected" | "cancelled"
           verified_email: string
         }[]
       }
@@ -183,8 +189,8 @@ export type Database = {
           created_at: string
           display_name: string
           revoked_at: string
-          role: string
-          status: string
+          role: "owner" | "instructor" | "learner"
+          status: "active" | "suspended" | "revoked"
           suspended_at: string
         }[]
       }
@@ -192,12 +198,18 @@ export type Database = {
         Args: never
         Returns: {
           decided_at: string
-          external_access_state: string
+          external_access_state:
+            | "not_started"
+            | "invitation_pending"
+            | "sso_required"
+            | "active"
+            | "failed"
+            | "revoked"
           offering_key: string
           reason: string
           request_id: string
           requested_at: string
-          status: string
+          status: "pending" | "approved" | "rejected" | "cancelled"
         }[]
       }
       list_my_courses: { Args: never; Returns: Json }

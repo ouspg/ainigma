@@ -1,0 +1,258 @@
+---
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Layout, LayoutContent, LayoutPanel } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { HStack, VStack } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import {
+  ArrowRight,
+  BookMarked,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  Circle,
+  Clock3,
+  ExternalLink,
+} from "lucide-react";
+import CourseAccessGate from "../content/CourseAccessGate.astro";
+import type { CourseAccessState } from "../../lib/auth/course-access";
+import { getMessages, type Locale } from "../../lib/i18n";
+import type { CourseInfo, CourseStatus } from "../../lib/learning/types";
+import { localizedPath } from "../../lib/routes";
+
+interface Props {
+  accessState: CourseAccessState;
+  course: CourseInfo;
+  locale: Locale;
+}
+
+const statusVariants: Record<CourseStatus, "neutral" | "accent" | "success"> = {
+  "not-started": "neutral",
+  "in-progress": "accent",
+  completed: "success",
+};
+
+const { accessState, course, locale } = Astro.props;
+const learner = course.learner;
+const completedWeeks = learner
+  ? course.weeks.filter((week) => learner.weekStatuses[week.slug] === "completed").length
+  : 0;
+const copy = getMessages(locale).course;
+const labels = copy.status;
+---
+
+<VStack className="course-workspace" gap={8} padding={8}>
+  <VStack as="header" className="course-header" gap={3}>
+    <HStack gap={2} vAlign="center" wrap="wrap">
+      <Text className="page-eyebrow" type="supporting" color="secondary" weight="medium">
+        {course.code} · {copy.workspace}
+      </Text>
+      {learner ? (
+        <>
+          <StatusDot label={labels[learner.status]} variant={statusVariants[learner.status]} />
+          <Text type="supporting" color="secondary">
+            {labels[learner.status]}
+          </Text>
+        </>
+      ) : null}
+    </HStack>
+    <Heading className="course-title" level={1}>
+      {course.title}
+    </Heading>
+    <Text type="large" color="secondary">
+      {course.summary}
+    </Text>
+  </VStack>
+
+  <Layout className="course-overview-layout" height="auto">
+    {learner ? (
+      <LayoutPanel
+        slot="end"
+        className="course-overview-panel"
+        isScrollable={false}
+        label={copy.details}
+        padding={0}
+        width={240}
+      >
+        <VStack gap={6}>
+          <Card padding={5}>
+            <VStack gap={4}>
+              <VStack gap={1}>
+                <Text type="supporting" color="secondary" weight="medium">
+                  {copy.record}
+                </Text>
+                <Heading level={2}>{copy.progress}</Heading>
+              </VStack>
+              <HStack gap={2} vAlign="end">
+                <Text className="term-percentage" type="display-3" hasTabularNumbers>
+                  {learner.progress}%
+                </Text>
+                <Text type="supporting" color="secondary">
+                  {copy.complete}
+                </Text>
+              </HStack>
+              <ProgressBar
+                isLabelHidden
+                label={`${course.title} completion`}
+                value={learner.progress}
+              />
+              <Divider />
+              <HStack gap={4}>
+                <VStack gap={0.5}>
+                  <Text type="large" hasTabularNumbers>
+                    {learner.earnedPoints}
+                  </Text>
+                  <Text type="supporting" color="secondary">
+                    {copy.points}
+                  </Text>
+                </VStack>
+                <VStack gap={0.5}>
+                  <Text type="large" hasTabularNumbers>
+                    {completedWeeks}/{course.weeks.length}
+                  </Text>
+                  <Text type="supporting" color="secondary">
+                    {copy.weeks}
+                  </Text>
+                </VStack>
+              </HStack>
+            </VStack>
+          </Card>
+
+          {(course.pages.length > 0 || course.catalogUrl) && (
+            <VStack as="section" gap={3}>
+              <Heading level={2}>{copy.links}</Heading>
+              <List density="compact" hasDividers>
+                <Text slot="header" className="visually-hidden">{copy.courseLinks}</Text>
+                {course.pages.map((page) => (
+                  <ListItem
+                    href={localizedPath(locale, page.href)}
+                    label={page.label}
+                  >
+                    <BookMarked slot="startContent" size={17} aria-hidden="true" />
+                    <ChevronRight slot="endContent" size={16} aria-hidden="true" />
+                  </ListItem>
+                ))}
+                {course.catalogUrl ? (
+                  <ListItem
+                    href={course.catalogUrl}
+                    label={copy.peppi}
+                    target="_blank"
+                  >
+                    <CalendarDays slot="startContent" size={17} aria-hidden="true" />
+                    <ExternalLink slot="endContent" size={15} aria-hidden="true" />
+                  </ListItem>
+                ) : null}
+              </List>
+            </VStack>
+          )}
+        </VStack>
+      </LayoutPanel>
+    ) : null}
+
+    <LayoutContent isScrollable={false} label={copy.overview} padding={0}>
+      <VStack gap={8}>
+        <VStack as="section" aria-labelledby="next-activity-heading" gap={3}>
+          <Heading id="next-activity-heading" level={2}>
+            {copy.next}
+          </Heading>
+          {learner ? (
+            <Card className="continue-card" padding={5}>
+              <VStack gap={4}>
+                <VStack gap={1}>
+                  <Text type="supporting" color="secondary" weight="medium">
+                    {learner.nextActivity.eyebrow}
+                  </Text>
+                  <Heading level={3}>{learner.nextActivity.title}</Heading>
+                  <Text type="body" color="secondary">
+                    {learner.nextActivity.description}
+                  </Text>
+                </VStack>
+                <HStack gap={3} vAlign="center" wrap="wrap">
+                  <Button
+                    href={localizedPath(locale, learner.nextActivity.href)}
+                    label={learner.progress > 0 ? copy.continue : copy.start}
+                    variant="primary"
+                  >
+                    <ArrowRight slot="endContent" size={16} />
+                  </Button>
+                  <HStack gap={1} vAlign="center">
+                    <Clock3 size={14} aria-hidden="true" />
+                    <Text type="supporting" color="secondary">
+                      {learner.nextActivity.estimatedMinutes}{" "}{copy.minutes}
+                    </Text>
+                  </HStack>
+                </HStack>
+              </VStack>
+            </Card>
+          ) : (
+            <CourseAccessGate
+              {accessState}
+              {locale}
+              nextPath={course.href}
+              offeringKey={course.offeringKey}
+            />
+          )}
+        </VStack>
+
+        {course.weeks.length > 0 && (
+          <VStack as="section" aria-labelledby="course-map-heading" gap={3}>
+            <VStack gap={1}>
+              <Heading id="course-map-heading" level={2}>
+                {copy.map}
+              </Heading>
+              <Text type="supporting" color="secondary">
+                {copy.mapDescription}
+              </Text>
+            </VStack>
+            <nav class="course-map" aria-label={copy.map}>
+              {course.weeks.map((week) => {
+                const weekStatus = learner?.weekStatuses[week.slug];
+                return (
+                  <a class="course-map-row" href={localizedPath(locale, week.href)}>
+                    <HStack gap={4} vAlign="start">
+                      {weekStatus ? (
+                        <span class={`week-state is-${weekStatus}`} aria-hidden="true">
+                          {weekStatus === "completed" ? <Check size={16} /> : <Circle size={13} />}
+                        </span>
+                      ) : null}
+                      <VStack gap={1}>
+                        <Text type="supporting" color="secondary" weight="medium">
+                          {copy.week}{" "}{week.number}
+                        </Text>
+                        <Heading level={3}>{week.title}</Heading>
+                        <Text type="supporting" color="secondary">
+                          {week.summary}
+                        </Text>
+                      </VStack>
+                    </HStack>
+                    <VStack className="course-map-meta" gap={1} hAlign="end">
+                      {weekStatus ? (
+                        <Text type="supporting" weight="medium">
+                          {labels[weekStatus]}
+                        </Text>
+                      ) : null}
+                      <Text type="supporting" color="secondary">
+                        {week.tasks.length}{" "}{week.tasks.length === 1 ? copy.activity : copy.activities}
+                      </Text>
+                    </VStack>
+                  </a>
+                );
+              })}
+            </nav>
+          </VStack>
+        )}
+
+        <VStack as="section" aria-labelledby="about-course-heading" gap={4}>
+          <Heading id="about-course-heading" level={2}>
+            {copy.about}
+          </Heading>
+          <article class="course-prose"><slot /></article>
+        </VStack>
+      </VStack>
+    </LayoutContent>
+  </Layout>
+</VStack>

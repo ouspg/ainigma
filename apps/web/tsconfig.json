@@ -10,7 +10,7 @@
     "jsxImportSource": "react",
     "types": ["node"],
     "paths": {
-      "@course-components/*": ["./src/components/content/*"],
-    },
-  },
+      "@course-components/*": ["./src/components/content/*"]
+    }
+  }
 }

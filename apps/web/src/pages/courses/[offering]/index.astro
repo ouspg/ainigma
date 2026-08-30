@@ -1,28 +1,16 @@
 ---
 import { render } from "astro:content";
-import BaseLayout from "../../../layouts/BaseLayout.astro";
-import LearningFrame from "../../../components/shell/LearningFrame.astro";
-import CourseOverview from "../../../components/pages/CourseOverview";
-import { getLearningPageData } from "../../../lib/learning/catalog";
+import LearningLayout from "../../../components/layout/LearningLayout.astro";
+import CourseOverview from "../../../components/pages/CourseOverview.astro";
 import { getPublishedCourseEntry } from "../../../lib/learning/content-entry";
 import { getLocale } from "../../../lib/i18n";
-import { courseOfferingKeyFromParam } from "../../../lib/learning/identifiers";
+import { loadCoursePageData } from "../../../lib/learning/page-data";
 
 export const prerender = false;
 
-const offeringKey = courseOfferingKeyFromParam(Astro.params.offering);
-const authorizedCourseDefinitionKey = Astro.locals.authorizedCourseOffering?.courseDefinitionKey;
-const authorizedCourseDefinitionReleaseId =
-  Astro.locals.authorizedCourseOffering?.courseDefinitionReleaseId;
-if (!offeringKey || !authorizedCourseDefinitionKey || !authorizedCourseDefinitionReleaseId) {
-  return new Response("Not found", { status: 404 });
-}
-const { course, workspace } = await getLearningPageData(
-  Astro.locals.profile!,
-  offeringKey,
-  authorizedCourseDefinitionKey,
-  authorizedCourseDefinitionReleaseId,
-);
+const page = await loadCoursePageData(Astro.locals);
+if (!page) return new Response("Not found", { status: 404 });
+const { accessState, course } = page;
 const entry = await getPublishedCourseEntry(course.courseDefinitionSlug);
 if (!entry || entry.data.kind !== "course") {
   return new Response("Not found", { status: 404 });
@@ -31,17 +19,14 @@ const { Content } = await render(entry);
 const locale = getLocale(Astro.currentLocale);
 ---
 
-<BaseLayout title={`${course.title} | Ainigma`} description={course.summary} {locale}>
-  <LearningFrame
-    currentPath={course.href}
-    courses={workspace.courses}
-    profile={workspace.profile}
-    term={workspace.term}
-    activities={workspace.activity}
-    {locale}
-  >
-    <CourseOverview {course} {locale}>
-      <Content />
-    </CourseOverview>
-  </LearningFrame>
-</BaseLayout>
+<LearningLayout
+  title={`${course.title} | Ainigma`}
+  description={course.summary}
+  currentPath={course.href}
+  frame={page}
+  {locale}
+>
+  <CourseOverview {course} {accessState} {locale}>
+    <Content />
+  </CourseOverview>
+</LearningLayout>

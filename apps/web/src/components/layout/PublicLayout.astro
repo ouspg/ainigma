@@ -1,0 +1,41 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteFooter from "./SiteFooter.astro";
+import PageFrame from "../shell/PageFrame.astro";
+import type { Locale } from "../../lib/i18n";
+import type { StudentProfile } from "../../lib/learning/types";
+import type { AppPath } from "../../lib/routes";
+
+interface Props {
+  currentPath: AppPath;
+  description: string;
+  locale: Locale;
+  profile?: StudentProfile;
+  title: string;
+  variant?: "default" | "login";
+}
+
+const {
+  currentPath,
+  description,
+  locale,
+  profile,
+  title,
+  variant = "default",
+} = Astro.props;
+---
+
+<BaseLayout {title} {description} {locale}>
+  <div class:list={["site-page-frame", variant === "login" && "login-page-frame"]}>
+    <PageFrame
+      {currentPath}
+      {locale}
+      {...(profile ? { profile } : {})}
+    >
+      <slot />
+    </PageFrame>
+    <div class="public-footer-frame">
+      <SiteFooter {locale} />
+    </div>
+  </div>
+</BaseLayout>

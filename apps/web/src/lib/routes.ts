@@ -160,23 +160,33 @@ export const routes = {
   },
 } as const;
 
+/** API paths used by both server-rendered forms and interactive islands. */
+export const apiRoutes = {
+  courseAccessRequest: {
+    path: ({ offeringKey }: { offeringKey: CourseOfferingKey }) =>
+      asAppPath(`/api/courses/${encodeSegment(offeringKey)}/access-request`),
+  },
+  courseChallenge: {
+    path: ({ offeringKey }: { offeringKey: CourseOfferingKey }) =>
+      asAppPath(`/api/courses/${encodeSegment(offeringKey)}/challenge`),
+  },
+} as const;
+
 export type RouteId = keyof typeof routes;
-export type RouteAccess = "public" | "guestOnly" | "protocol" | "authenticated" | "courseMember";
+export type RouteAccess = "public" | "guestOnly" | "protocol" | "authenticated" | "coursePublic";
 
 /**
- * The complete page-access review surface. Course content remains membership-gated for now;
- * moving it to `public` later must be paired with removing learner data from the course shell.
+ * Course material is public. Its interactive controls and learner data remain membership-gated.
  */
 export const routeAccessGroups = {
   public: ["home", "about", "privacy", "status"],
   guestOnly: ["login"],
   protocol: ["authStart", "authCallback", "authLocal"],
   authenticated: ["desk", "activity", "announcements"],
-  courseMember: ["course", "coursePage", "courseWeek", "courseTask"],
+  coursePublic: ["course", "coursePage", "courseWeek", "courseTask"],
 } as const satisfies Record<RouteAccess, readonly RouteId[]>;
 
-/** Routes rendered inside the account-aware learning shell. Kept separate from access policy so
- * course pages can later become public without accidentally inheriting learner-only UI or data. */
+/** Routes that render inside the account-aware learning shell for authenticated learners. */
 export const learnerShellRouteIds = [
   "desk",
   "activity",

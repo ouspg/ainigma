@@ -21,16 +21,12 @@ export const POST: APIRoute = async ({ cookies, redirect, request }) => {
   const requestUrl = new URL(request.url);
   const origin = request.headers.get("Origin");
   if (origin !== requestUrl.origin) {
-    return markPrivateNoStore(
-      new Response("Invalid login request", { status: 403 }),
-    );
+    return markPrivateNoStore(new Response("Invalid login request", { status: 403 }));
   }
 
   const formData = await request.formData();
   const submittedNext = formData.get("next");
-  const next = safeNextPath(
-    typeof submittedNext === "string" ? submittedNext : null,
-  );
+  const next = safeNextPath(typeof submittedNext === "string" ? submittedNext : null);
   const callbackUrl = new URL(routes.authCallback.path(), requestUrl.origin);
   callbackUrl.searchParams.set("next", next);
 

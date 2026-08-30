@@ -25,9 +25,9 @@ describe("private route cache policy", () => {
     const outcomes: Array<[AppRouteMatch["access"], Response]> = [
       ["guestOnly", new Response(null, { headers: { Location: "/desk/" }, status: 302 })],
       ["authenticated", new Response(null, { headers: { Location: "/login/" }, status: 302 })],
-      ["courseMember", new Response("Forbidden", { status: 403 })],
-      ["courseMember", new Response("Not found", { status: 404 })],
-      ["courseMember", new Response("Unavailable", { status: 503 })],
+      ["coursePublic", new Response("Forbidden", { status: 403 })],
+      ["coursePublic", new Response("Not found", { status: 404 })],
+      ["coursePublic", new Response("Unavailable", { status: 503 })],
     ];
 
     for (const [access, authorizationResponse] of outcomes) {
@@ -60,7 +60,7 @@ describe("private route cache policy", () => {
         return new Response("Not found", { status: 404 });
       }),
       async () => new Response("Not found", { status: 404 }),
-      route("courseMember"),
+      route("coursePublic"),
       async () => null,
     );
 

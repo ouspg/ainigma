@@ -1,0 +1,30 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PageFrame from "../shell/PageFrame.astro";
+import type { Locale } from "../../lib/i18n";
+import type { LearningShellContext } from "../../lib/learning/catalog";
+import type { AppPath } from "../../lib/routes";
+
+interface Props {
+  currentPath: AppPath;
+  description: string;
+  frame: LearningShellContext;
+  locale: Locale;
+  title: string;
+}
+
+const { currentPath, description, frame, locale, title } = Astro.props;
+const { workspace } = frame;
+---
+
+<BaseLayout {title} {description} {locale}>
+  <PageFrame
+    activities={workspace?.activity ?? []}
+    courses={frame.navigationCourses}
+    {currentPath}
+    {locale}
+    {...(workspace ? { profile: workspace.profile, term: workspace.term } : {})}
+  >
+    <slot />
+  </PageFrame>
+</BaseLayout>

@@ -35,7 +35,3 @@ export function resolveFeatureFlags(environment: FeatureEnvironment): FeatureFla
 }
 
 export const features = resolveFeatureFlags(import.meta.env ?? {});
-
-export function isFeatureEnabled(feature: FeatureName): boolean {
-  return features[feature];
-}

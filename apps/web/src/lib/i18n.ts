@@ -50,7 +50,7 @@ export interface AppMessages {
     accessSectionLabel: string;
     access: string;
     accessText: string;
-    openLearningDesk: string;
+    viewCourse: string;
     peppi: string;
     peppiCourse: string;
     opensInNewTab: string;
@@ -106,7 +106,9 @@ export interface AppMessages {
     announcements: string;
     activity: string;
     courses: string;
+    availableCoursesTitle: string;
     activeCourses: string;
+    availableCourses: string;
     support: string;
     colorMode: string;
     toggleColorMode: string;
@@ -152,6 +154,10 @@ export interface AppMessages {
     activity: string;
     activities: string;
     about: string;
+    accessGate: Record<
+      "anonymous" | "empty" | "pending" | "accepted",
+      { eyebrow: string; title: string; description: string; action: string }
+    >;
   };
   reading: {
     onThisPage: string;
@@ -170,8 +176,6 @@ export interface AppMessages {
     recentUpdates: string;
     activeCoursesSource: string;
     courseUpdates: string;
-    progressNote: string;
-    progressNoteText: string;
     welcome: string;
     welcomeText: string;
     continueLearning: string;
@@ -190,6 +194,8 @@ export interface AppMessages {
     activeEnrollments: string;
     enrolledCourses: string;
     courseDates: string;
+    browseCourses: string;
+    browseCoursesText: string;
   };
 }
 
@@ -243,7 +249,7 @@ const en: AppMessages = {
     access: "Access",
     accessText:
       "Use the GitHub account linked to your university email. To access courses, authenticate through the University of Oulu GitHub Enterprise SSO. If an expected course is missing, contact the course staff.",
-    openLearningDesk: "Open learning desk",
+    viewCourse: "View course",
     peppi: "Peppi study guide",
     peppiCourse: "Peppi",
     opensInNewTab: "(opens in a new tab)",
@@ -305,7 +311,9 @@ const en: AppMessages = {
     announcements: "Course updates",
     activity: "Activity",
     courses: "My courses",
+    availableCoursesTitle: "Available courses",
     activeCourses: "active courses",
+    availableCourses: "available courses",
     support: "Learning support",
     colorMode: "Color mode",
     toggleColorMode: "Toggle light and dark mode",
@@ -358,6 +366,33 @@ const en: AppMessages = {
     activity: "activity",
     activities: "activities",
     about: "About this course",
+    accessGate: {
+      anonymous: {
+        eyebrow: "Interactive activity",
+        title: "Sign in required",
+        description: "Sign in with your university account to use this interactive activity.",
+        action: "Sign in to continue",
+      },
+      empty: {
+        eyebrow: "Interactive activity",
+        title: "Course access required",
+        description: "Request access to this course before starting its interactive activities.",
+        action: "Request course access",
+      },
+      pending: {
+        eyebrow: "Interactive activity",
+        title: "Access request pending",
+        description:
+          "Course staff must accept your request before this interactive activity opens.",
+        action: "Request pending",
+      },
+      accepted: {
+        eyebrow: "Interactive activity",
+        title: "Interactive activity",
+        description: "",
+        action: "",
+      },
+    },
   },
   reading: {
     onThisPage: "On this page",
@@ -376,9 +411,6 @@ const en: AppMessages = {
     recentUpdates: "Recent updates",
     activeCoursesSource: "From your active courses",
     courseUpdates: "Course updates",
-    progressNote: "A note on progress",
-    progressNoteText:
-      "Progress reflects completed learning activities. Points remain visible separately so completion and grading never blur together.",
     welcome: "Welcome back,",
     welcomeText: "Continue where you left off or review what needs attention this week.",
     continueLearning: "Continue learning",
@@ -397,6 +429,9 @@ const en: AppMessages = {
     activeEnrollments: "active enrollments",
     enrolledCourses: "Enrolled courses",
     courseDates: "Course dates",
+    browseCourses: "Browse courses",
+    browseCoursesText:
+      "Published course materials are available to everyone. Request access when you are ready to use the interactive activities.",
   },
 };
 
@@ -450,7 +485,7 @@ const fi: AppMessages = {
     access: "Käyttöoikeus",
     accessText:
       "Opiskelijat kirjautuvat kurssilleen ilmoittautumiseen liitetyllä GitHub-tunnuksella. Jos odottamasi kurssi ei ole käytettävissä, ota yhteyttä kurssin henkilökuntaan.",
-    openLearningDesk: "Avaa oppimisnäkymä",
+    viewCourse: "Näytä kurssi",
     peppi: "Peppi-opas",
     peppiCourse: "Peppi",
     opensInNewTab: "(avautuu uuteen välilehteen)",
@@ -509,7 +544,9 @@ const fi: AppMessages = {
     announcements: "Kurssipäivitykset",
     activity: "Tapahtumat",
     courses: "Kurssini",
+    availableCoursesTitle: "Saatavilla olevat kurssit",
     activeCourses: "aktiivista kurssia",
+    availableCourses: "saatavilla olevaa kurssia",
     support: "Oppimisen tuki",
     colorMode: "Väritila",
     toggleColorMode: "Vaihda vaalean ja tumman tilan välillä",
@@ -563,6 +600,32 @@ const fi: AppMessages = {
     activity: "tehtävä",
     activities: "tehtävää",
     about: "Tietoa kurssista",
+    accessGate: {
+      anonymous: {
+        eyebrow: "Interaktiivinen tehtävä",
+        title: "Kirjautuminen vaaditaan",
+        description: "Kirjaudu yliopistotunnuksellasi käyttääksesi tätä interaktiivista tehtävää.",
+        action: "Kirjaudu jatkaaksesi",
+      },
+      empty: {
+        eyebrow: "Interaktiivinen tehtävä",
+        title: "Kurssin käyttöoikeus vaaditaan",
+        description: "Pyydä kurssin käyttöoikeutta ennen interaktiivisten tehtävien aloittamista.",
+        action: "Pyydä kurssin käyttöoikeutta",
+      },
+      pending: {
+        eyebrow: "Interaktiivinen tehtävä",
+        title: "Käyttöoikeuspyyntö odottaa",
+        description: "Kurssin henkilökunnan on hyväksyttävä pyyntösi ennen tehtävän avaamista.",
+        action: "Pyyntö odottaa",
+      },
+      accepted: {
+        eyebrow: "Interaktiivinen tehtävä",
+        title: "Interaktiivinen tehtävä",
+        description: "",
+        action: "",
+      },
+    },
   },
   reading: {
     onThisPage: "Tällä sivulla",
@@ -581,9 +644,6 @@ const fi: AppMessages = {
     recentUpdates: "Viimeisimmät päivitykset",
     activeCoursesSource: "Aktiivisilta kursseilta",
     courseUpdates: "Kurssipäivitykset",
-    progressNote: "Huomio edistymisestä",
-    progressNoteText:
-      "Edistyminen perustuu suoritettuihin oppimistehtäviin. Pisteet näytetään erikseen, jotta suorittaminen ja arviointi eivät sekoitu.",
     welcome: "Tervetuloa takaisin,",
     welcomeText: "Jatka siitä, mihin jäit, tai tarkista tämän viikon tehtävät.",
     continueLearning: "Jatka opiskelua",
@@ -602,6 +662,9 @@ const fi: AppMessages = {
     activeEnrollments: "aktiivista ilmoittautumista",
     enrolledCourses: "Ilmoittautuneet kurssit",
     courseDates: "Kurssin ajankohta",
+    browseCourses: "Selaa kursseja",
+    browseCoursesText:
+      "Julkaistut kurssimateriaalit ovat kaikkien saatavilla. Pyydä käyttöoikeutta, kun haluat käyttää interaktiivisia tehtäviä.",
   },
 };
 

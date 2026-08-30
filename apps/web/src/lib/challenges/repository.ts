@@ -1,8 +1,20 @@
 import { z } from "astro/zod";
 import rawChallenges from "../../data/challenges.json";
+import {
+  isCourseDefinitionKey,
+  parseCourseDefinitionKey,
+  type CourseDefinitionKey,
+} from "../learning/identifiers";
+import type { ChallengeSubmission } from "./submission";
 import type { FlagChallengeData, MultipartChallengeData, MultipartStepData } from "./types";
 
+const courseDefinitionKeySchema = z
+  .string()
+  .refine(isCourseDefinitionKey)
+  .transform(parseCourseDefinitionKey);
+
 const flagSchema = z.object({
+  courseDefinitionKey: courseDefinitionKeySchema,
   type: z.literal("flag"),
   title: z.string().min(1),
   description: z.string().min(1),
@@ -27,6 +39,7 @@ const multipartStepSchema = z.object({
 });
 
 const multipartSchema = z.object({
+  courseDefinitionKey: courseDefinitionKeySchema,
   type: z.literal("multipart"),
   title: z.string().min(1),
   description: z.string().min(1),
@@ -37,14 +50,26 @@ const challenges = z
   .record(z.string(), z.discriminatedUnion("type", [flagSchema, multipartSchema]))
   .parse(rawChallenges);
 
-function getChallenge(activityId: string) {
+export type ChallengeEvaluation =
+  | { isCorrect: boolean; message?: string }
+  | { error: "challenge_not_found" | "challenge_step_not_found" };
+
+function findChallenge(courseDefinitionKey: CourseDefinitionKey, activityId: string) {
   const challenge = challenges[activityId];
+  return challenge?.courseDefinitionKey === courseDefinitionKey ? challenge : undefined;
+}
+
+function getChallenge(courseDefinitionKey: CourseDefinitionKey, activityId: string) {
+  const challenge = findChallenge(courseDefinitionKey, activityId);
   if (!challenge) throw new Error(`Unknown challenge: ${activityId}`);
   return challenge;
 }
 
-export function getFlagChallenge(activityId: string): FlagChallengeData {
-  const challenge = getChallenge(activityId);
+export function getFlagChallenge(
+  courseDefinitionKey: CourseDefinitionKey,
+  activityId: string,
+): FlagChallengeData {
+  const challenge = getChallenge(courseDefinitionKey, activityId);
   if (challenge.type !== "flag") {
     throw new Error(`Challenge ${activityId} is not a flag challenge`);
   }
@@ -57,8 +82,11 @@ export function getFlagChallenge(activityId: string): FlagChallengeData {
   };
 }
 
-export function getMultipartChallenge(activityId: string): MultipartChallengeData {
-  const challenge = getChallenge(activityId);
+export function getMultipartChallenge(
+  courseDefinitionKey: CourseDefinitionKey,
+  activityId: string,
+): MultipartChallengeData {
+  const challenge = getChallenge(courseDefinitionKey, activityId);
   if (challenge.type !== "multipart") {
     throw new Error(`Challenge ${activityId} is not a multipart challenge`);
   }
@@ -76,5 +104,38 @@ export function getMultipartChallenge(activityId: string): MultipartChallengeDat
       ...(step.inputLabel ? { inputLabel: step.inputLabel } : {}),
       ...(step.placeholder ? { placeholder: step.placeholder } : {}),
     })),
+  };
+}
+
+export function evaluateChallengeSubmission(
+  courseDefinitionKey: CourseDefinitionKey,
+  submission: ChallengeSubmission,
+): ChallengeEvaluation {
+  const challenge = findChallenge(courseDefinitionKey, submission.taskId);
+  if (!challenge) return { error: "challenge_not_found" };
+
+  if (submission.type === "flag") {
+    if (challenge.type !== "flag") return { error: "challenge_not_found" };
+    const isCorrect = submission.value.trim().toUpperCase() === challenge.answer.toUpperCase();
+    return {
+      isCorrect,
+      message: isCorrect ? challenge.successMessage : challenge.errorMessage,
+    };
+  }
+
+  const step =
+    challenge.type === "multipart"
+      ? challenge.steps.find((candidate) => candidate.id === submission.stepId)
+      : undefined;
+  if (!step) return { error: "challenge_step_not_found" };
+
+  const isCorrect = step.answer === undefined || submission.value.trim() === step.answer;
+  return {
+    isCorrect,
+    ...(isCorrect
+      ? { message: step.successMessage ?? "Checkpoint complete." }
+      : step.errorMessage
+        ? { message: step.errorMessage }
+        : {}),
   };
 }

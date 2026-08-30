@@ -1,0 +1,47 @@
+---
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { VStack } from "@astryxdesign/core/Stack";
+import { Heading, Text } from "@astryxdesign/core/Text";
+import { KeyRound } from "lucide-react";
+import type { CourseAccessState } from "../../lib/auth/course-access";
+import { getMessages, type Locale } from "../../lib/i18n";
+import type { CourseOfferingKey } from "../../lib/learning/identifiers";
+import { apiRoutes, localizedPath, routes } from "../../lib/routes";
+
+interface Props {
+  accessState: CourseAccessState;
+  offeringKey: CourseOfferingKey;
+  nextPath?: string;
+  locale?: Locale;
+}
+
+const { accessState, offeringKey, nextPath, locale = "en" } = Astro.props;
+const copy = getMessages(locale).course.accessGate[accessState];
+const isAnonymous = accessState === "anonymous";
+const loginPath = localizedPath(locale, routes.login.path());
+const loginHref = nextPath ? `${loginPath}?next=${encodeURIComponent(nextPath)}` : loginPath;
+---
+
+<Card className="course-access-gate" padding={5}>
+  <VStack gap={3}>
+    <VStack gap={1}>
+      <Text type="supporting" color="secondary" weight="medium">
+        {copy.eyebrow}
+      </Text>
+      <Heading level={3}>{copy.title}</Heading>
+      <Text type="body" color="secondary">
+        {copy.description}
+      </Text>
+    </VStack>
+    {isAnonymous ? (
+      <Button href={loginHref} label={copy.action} variant="primary">
+        <KeyRound slot="icon" size={16} aria-hidden="true" />
+      </Button>
+    ) : accessState === "empty" ? (
+      <form action={apiRoutes.courseAccessRequest.path({ offeringKey })} method="post">
+        <Button label={copy.action} type="submit" variant="primary" />
+      </form>
+    ) : null}
+  </VStack>
+</Card>

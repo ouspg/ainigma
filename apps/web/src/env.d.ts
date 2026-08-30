@@ -1,7 +1,11 @@
 /// <reference types="astro/client" />
 
 import type { StudentProfile } from "./lib/learning/types";
-import type { AuthorizedCourseOffering } from "./lib/auth/course-access";
+import type {
+  AvailableCourseOffering,
+  CourseAccessState,
+  CourseMembership,
+} from "./lib/auth/course-access";
 
 declare global {
   namespace App {
@@ -9,7 +13,10 @@ declare global {
       traceId?: string;
       userId?: string;
       profile?: StudentProfile;
-      authorizedCourseOffering?: AuthorizedCourseOffering;
+      courseMemberships?: CourseMembership[];
+      courseAccessState?: CourseAccessState;
+      availableCourseOffering?: AvailableCourseOffering;
+      availableCourseOfferings?: AvailableCourseOffering[];
     }
   }
 }

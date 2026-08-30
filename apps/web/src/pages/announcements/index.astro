@@ -1,37 +1,34 @@
 ---
-import CourseUpdatesList from "../../components/pages/CourseUpdatesList";
-import HistoryPageLayout from "../../components/pages/HistoryPageLayout";
-import LearningFrame from "../../components/shell/LearningFrame.astro";
-import BaseLayout from "../../layouts/BaseLayout.astro";
+import CourseUpdatesList from "../../components/pages/CourseUpdatesList.astro";
+import HistoryPageLayout from "../../components/pages/HistoryPageLayout.astro";
+import LearningLayout from "../../components/layout/LearningLayout.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
-import { getLearningWorkspace } from "../../lib/learning/catalog";
+import { loadLearningShellData } from "../../lib/learning/page-data";
 import { routes } from "../../lib/routes";
 
 export const prerender = false;
 
-const workspace = await getLearningWorkspace(Astro.locals.profile);
+const shell = await loadLearningShellData(Astro.locals);
+const { workspace } = shell;
 const locale = getLocale(Astro.currentLocale);
 const copy = getMessages(locale);
 ---
 
-<BaseLayout
+<LearningLayout
   title={`${copy.navigation.announcements} | Ainigma`}
   description={copy.dashboard.activeCoursesSource}
+  currentPath={routes.announcements.path()}
+  frame={shell}
   {locale}
 >
-  <LearningFrame
-    currentPath={routes.announcements.path()}
-    courses={workspace.courses}
-    profile={workspace.profile}
-    term={workspace.term}
-    activities={workspace.activity}
-    {locale}
+  <HistoryPageLayout
+    title={copy.navigation.announcements}
+    description={copy.dashboard.activeCoursesSource}
   >
-    <HistoryPageLayout
-      title={copy.navigation.announcements}
-      description={copy.dashboard.activeCoursesSource}
-    >
-      <CourseUpdatesList announcements={workspace.announcements} courses={workspace.courses} {locale} />
-    </HistoryPageLayout>
-  </LearningFrame>
-</BaseLayout>
+    <CourseUpdatesList
+      announcements={workspace.announcements}
+      courses={workspace.courses}
+      {locale}
+    />
+  </HistoryPageLayout>
+</LearningLayout>

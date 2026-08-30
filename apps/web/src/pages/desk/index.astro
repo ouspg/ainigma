@@ -1,31 +1,28 @@
 ---
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import LearningFrame from "../../components/shell/LearningFrame.astro";
-import DashboardIsland from "../../components/islands/DashboardIsland";
-import { getLearningWorkspace } from "../../lib/learning/catalog";
+import LearningLayout from "../../components/layout/LearningLayout.astro";
+import Dashboard from "../../components/pages/Dashboard.astro";
 import { getLocale, getMessages } from "../../lib/i18n";
+import { loadLearningShellData } from "../../lib/learning/page-data";
 import { routes } from "../../lib/routes";
 
 export const prerender = false;
 
-const workspace = await getLearningWorkspace(Astro.locals.profile);
+const shell = await loadLearningShellData(Astro.locals);
+const { workspace } = shell;
 const locale = getLocale(Astro.currentLocale);
 const metadata = getMessages(locale).metadata;
 ---
 
-<BaseLayout
+<LearningLayout
   title={metadata.deskTitle}
   description={metadata.deskDescription}
+  currentPath={routes.desk.path()}
+  frame={shell}
   {locale}
 >
-  <LearningFrame
-    currentPath={routes.desk.path()}
-    courses={workspace.courses}
-    profile={workspace.profile}
-    term={workspace.term}
-    activities={workspace.activity}
+  <Dashboard
+    availableCourses={shell.availableCourses}
+    {workspace}
     {locale}
-  >
-    <DashboardIsland client:load {workspace} {locale} />
-  </LearningFrame>
-</BaseLayout>
+  />
+</LearningLayout>

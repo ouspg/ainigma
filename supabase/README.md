@@ -11,15 +11,15 @@ The concise schema map and course-identity glossary live in [`schemas/README.md`
 From the repository root:
 
 ```sh
-./node_modules/.bin/supabase --version
-./node_modules/.bin/supabase start
-./node_modules/.bin/supabase db reset --local --yes
-./node_modules/.bin/supabase test db --local
-./node_modules/.bin/supabase migration list --local
+npx supabase --version
+npx supabase start
+npx supabase db reset --local --yes
+npx supabase test db --local
+npx supabase migration list --local
 npm run supabase:types
 ```
 
-Stop it with `./node_modules/.bin/supabase stop`.
+Stop it with `npx supabase stop`.
 
 ## Local GitHub authentication
 
@@ -42,9 +42,9 @@ The client secret belongs only in the root `.env`; never put it in an `apps/web/
 variable. Restart the local stack after changing provider configuration or credentials:
 
 ```sh
-./node_modules/.bin/supabase stop
-./node_modules/.bin/supabase start
-./node_modules/.bin/supabase status --output env
+npx supabase stop
+npx supabase start
+npx supabase status --output env
 ```
 
 The web login requests GitHub's read-only `user:email` scope because a public GitHub profile may
@@ -94,7 +94,7 @@ redeems it through `/auth/callback`. The Admin key stays server-side. Resetting 
 recreates all seven personas and their course states:
 
 ```sh
-./node_modules/.bin/supabase db reset --local --yes
+npx supabase db reset --local --yes
 ```
 
 Set `PUBLIC_AUTH_MODE=github` or remove it when you want the normal GitHub button again. Local mode
@@ -116,7 +116,7 @@ changing either file:
 
 ```sh
 npm run supabase:fixtures
-./node_modules/.bin/supabase db reset --local --yes
+npx supabase db reset --local --yes
 ```
 
 Use `migration up --local` when you only want to apply pending migrations without resetting local
@@ -129,7 +129,7 @@ when changing tables, functions, policies, privileges, or other database objects
 versioned migration from the declared state:
 
 ```sh
-./node_modules/.bin/supabase db schema declarative sync \
+npx supabase db schema declarative sync \
   --name describe_the_change \
   --no-apply \
   --strict-coverage
@@ -150,7 +150,7 @@ The custom database roles are managed in `roles.sql`. Include them when pushing 
 project:
 
 ```sh
-./node_modules/.bin/supabase db push --linked --include-roles
+npx supabase db push --linked --include-roles
 ```
 
 ## Future schema changes
@@ -162,11 +162,11 @@ project:
 4. Verify the complete chain and regenerate the web client's database types:
 
 ```sh
-./node_modules/.bin/supabase db reset --local --yes
-./node_modules/.bin/supabase test db --local
-./node_modules/.bin/supabase db lint --local --fail-on error
-./node_modules/.bin/supabase db advisors --local --type security --level info
-./node_modules/.bin/supabase db schema declarative sync \
+npx supabase db reset --local --yes
+npx supabase test db --local
+npx supabase db lint --local --fail-on error
+npx supabase db advisors --local --type security --level info
+npx supabase db schema declarative sync \
   --no-apply --no-cache --strict-coverage
 npm run supabase:types
 ```
@@ -196,8 +196,8 @@ setting, not a Cloud project setting. For a hosted project, disable **Automatica
 tables and functions** in Dashboard → Integrations → Data API, then push the migration:
 
 ```sh
-./node_modules/.bin/supabase link --project-ref <PROJECT_REF>
-./node_modules/.bin/supabase db push --linked --include-roles
+npx supabase link --project-ref <PROJECT_REF>
+npx supabase db push --linked --include-roles
 ```
 
 Do not use `--include-seed` for Cloud or production. For the NixOS self-host, apply the same
@@ -211,12 +211,12 @@ changing it. Keep ports 5432/6543 restricted to an administrator CIDR or use an 
 Run these once for a new checkout/project, then use `db push` for releases:
 
 ```sh
-./node_modules/.bin/supabase login
-./node_modules/.bin/supabase link --project-ref "$SUPABASE_PROJECT_REF"
-./node_modules/.bin/supabase migration list --linked
-./node_modules/.bin/supabase db push --linked --include-roles --dry-run
-./node_modules/.bin/supabase db push --linked --include-roles
-./node_modules/.bin/supabase migration list --linked
+npx supabase login
+npx supabase link --project-ref "$SUPABASE_PROJECT_REF"
+npx supabase migration list --linked
+npx supabase db push --linked --include-roles --dry-run
+npx supabase db push --linked --include-roles
+npx supabase migration list --linked
 ```
 
 Do not pass `--include-seed` for production. `seed.sql` is for local/test data.
@@ -230,17 +230,17 @@ default privileges. Effective privileges include access inherited through `PUBLI
 
 ```sh
 # Local database
-./node_modules/.bin/supabase db query --local --file supabase/audit_access.sql
+npx supabase db query --local --file supabase/audit_access.sql
 
 # Linked remote database
-./node_modules/.bin/supabase db query --linked --file supabase/audit_access.sql
+npx supabase db query --linked --file supabase/audit_access.sql
 
 # Supabase security advisors
-./node_modules/.bin/supabase db advisors --local --type security --level info
-./node_modules/.bin/supabase db advisors --linked --type security --level info
+npx supabase db advisors --local --type security --level info
+npx supabase db advisors --linked --type security --level info
 
 # Role definitions and API-exposed schemas
-./node_modules/.bin/supabase db dump --local --role-only
+npx supabase db dump --local --role-only
 rg -n '^\[api\]|^schemas\s*=' supabase/config.toml
 ```
 

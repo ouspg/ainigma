@@ -273,7 +273,7 @@ set role ainigma_maintenance;
 select private.add_course_membership(
   (current_setting('ainigma_seed.offering_ids')::jsonb ->> replace(membership ->> 'offeringKey', '-', '_'))::uuid,
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> (persona ->> 'key'))::uuid,
-  (membership ->> 'role')::private.course_membership_role,
+  membership ->> 'role',
   (current_setting('ainigma_seed.profile_ids')::jsonb ->> 'owner')::uuid,
   'development seed ' || (persona ->> 'key')
 )

@@ -3279,15 +3279,15 @@ grant execute on function "private"."can_view_profile"(uuid) to "authenticated";
 
 revoke all on function "private"."claim_course_repository_provisioning"(integer, uuid, uuid) from public;
 
-grant execute on function "private"."claim_course_repository_provisioning"(integer, uuid, uuid) to "ainigma_maintenance";
+grant execute on function "private"."claim_course_repository_provisioning"(integer, uuid, uuid) to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."complete_course_repository_provisioning"(uuid, uuid, uuid, text, text, text) from public;
 
-grant execute on function "private"."complete_course_repository_provisioning"(uuid, uuid, uuid, text, text, text) to "ainigma_maintenance";
+grant execute on function "private"."complete_course_repository_provisioning"(uuid, uuid, uuid, text, text, text) to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."confirm_external_course_access"(uuid, uuid, text, text, text, text, text) from public;
 
-grant execute on function "private"."confirm_external_course_access"(uuid, uuid, text, text, text, text, text) to "ainigma_maintenance";
+grant execute on function "private"."confirm_external_course_access"(uuid, uuid, text, text, text, text, text) to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."current_profile_id"() from public;
 
@@ -3307,7 +3307,7 @@ grant execute on function "private"."has_course_role"(uuid, private.course_membe
 
 revoke all on function "private"."list_external_course_access_to_reconcile"() from public;
 
-grant execute on function "private"."list_external_course_access_to_reconcile"() to "ainigma_maintenance";
+grant execute on function "private"."list_external_course_access_to_reconcile"() to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."reconcile_auth_identities"() from public;
 
@@ -3319,23 +3319,29 @@ grant execute on function "private"."reconcile_auth_users"() to "ainigma_mainten
 
 revoke all on function "private"."record_course_repository_provisioning_failure"(uuid, uuid, uuid, text, boolean) from public;
 
-grant execute on function "private"."record_course_repository_provisioning_failure"(uuid, uuid, uuid, text, boolean) to "ainigma_maintenance";
+grant execute
+  on function "private"."record_course_repository_provisioning_failure"(uuid, uuid, uuid, text, boolean)
+  to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."record_external_course_access_check_failure"(uuid, uuid, text) from public;
 
-grant execute on function "private"."record_external_course_access_check_failure"(uuid, uuid, text) to "ainigma_maintenance";
+grant execute on function "private"."record_external_course_access_check_failure"(uuid, uuid, text) to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."record_external_course_access_invitation"(uuid, uuid, private.external_invitation_method, text, text) from public;
 
-grant execute on function "private"."record_external_course_access_invitation"(uuid, uuid, private.external_invitation_method, text, text) to "ainigma_maintenance";
+grant execute
+  on function "private"."record_external_course_access_invitation"(uuid, uuid, private.external_invitation_method, text, text)
+  to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."record_external_course_access_membership_absence"(uuid, uuid) from public;
 
-grant execute on function "private"."record_external_course_access_membership_absence"(uuid, uuid) to "ainigma_maintenance";
+grant execute on function "private"."record_external_course_access_membership_absence"(uuid, uuid) to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."record_external_course_access_status"(uuid, uuid, private.external_course_access_state, text) from public;
 
-grant execute on function "private"."record_external_course_access_status"(uuid, uuid, private.external_course_access_state, text) to "ainigma_maintenance";
+grant execute
+  on function "private"."record_external_course_access_status"(uuid, uuid, private.external_course_access_state, text)
+  to "ainigma_external_provisioning_worker", "ainigma_maintenance";
 
 revoke all on function "private"."register_course_definition_release"(text, text, text, text) from public;
 
@@ -3468,6 +3474,10 @@ revoke all on function "public"."update_my_profile"(text) from "ainigma_function
 grant execute on function "public"."update_my_profile"(text) to "ainigma_function_owner";
 
 grant execute on function "public"."update_my_profile"(text) to "authenticated";
+
+revoke all on schema "private" from "ainigma_external_provisioning_worker";
+
+grant usage on schema "private" to "ainigma_external_provisioning_worker";
 
 revoke all on schema "private" from "ainigma_maintenance";
 

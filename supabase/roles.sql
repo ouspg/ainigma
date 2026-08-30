@@ -12,11 +12,16 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'ainigma_maintenance') then
     create role ainigma_maintenance nologin noinherit;
   end if;
+
+  if not exists (select 1 from pg_roles where rolname = 'ainigma_external_provisioning_worker') then
+    create role ainigma_external_provisioning_worker nologin noinherit;
+  end if;
 end
 $roles$;
 
 grant ainigma_function_owner to postgres;
 grant ainigma_maintenance to postgres;
+grant ainigma_external_provisioning_worker to postgres;
 grant usage on schema extensions to ainigma_maintenance;
 
 -- Function ownership transfers in generated migrations require the target role

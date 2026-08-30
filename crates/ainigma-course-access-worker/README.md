@@ -25,6 +25,12 @@ memberships or authenticate students.
 - A pre-issued `GITHUB_TOKEN` remains supported for local or legacy setups and
   takes precedence when present.
 
+For deployment, connect with a dedicated `LOGIN` role that is a member of the
+schema-provided `ainigma_external_provisioning_worker` role. That role can execute only
+the external-access and repository-provisioning RPCs; it has no direct table
+access. The login role itself should be `NOSUPERUSER`, `NOCREATEDB`,
+`NOCREATEROLE`, `NOREPLICATION`, and `NOBYPASSRLS`.
+
 ## Commands
 
 From the repository root:

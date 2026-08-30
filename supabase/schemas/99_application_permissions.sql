@@ -128,6 +128,19 @@ grant execute on function private.complete_course_repository_provisioning(uuid, 
 grant execute on function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) to ainigma_maintenance;
 grant execute on function private.confirm_external_course_access(uuid, uuid, text, text, text, text, text) to ainigma_maintenance;
 
+-- The external worker receives only trusted RPC execution. It has no direct
+-- table access; deployment creates a separate LOGIN role as its member.
+grant usage on schema private to ainigma_external_provisioning_worker;
+grant execute on function private.list_external_course_access_to_reconcile() to ainigma_external_provisioning_worker;
+grant execute on function private.record_external_course_access_invitation(uuid, uuid, private.external_invitation_method, text, text) to ainigma_external_provisioning_worker;
+grant execute on function private.record_external_course_access_status(uuid, uuid, private.external_course_access_state, text) to ainigma_external_provisioning_worker;
+grant execute on function private.record_external_course_access_check_failure(uuid, uuid, text) to ainigma_external_provisioning_worker;
+grant execute on function private.record_external_course_access_membership_absence(uuid, uuid) to ainigma_external_provisioning_worker;
+grant execute on function private.confirm_external_course_access(uuid, uuid, text, text, text, text, text) to ainigma_external_provisioning_worker;
+grant execute on function private.claim_course_repository_provisioning(integer, uuid, uuid) to ainigma_external_provisioning_worker;
+grant execute on function private.complete_course_repository_provisioning(uuid, uuid, uuid, text, text, text) to ainigma_external_provisioning_worker;
+grant execute on function private.record_course_repository_provisioning_failure(uuid, uuid, uuid, text, boolean) to ainigma_external_provisioning_worker;
+
 grant execute on function
   public.get_my_profile(),
   public.update_my_profile(text),

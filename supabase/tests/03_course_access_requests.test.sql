@@ -274,7 +274,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000001', true);
 select extensions.is(
-  (select external_access_state
+  (select external_access_state::text
    from public.list_my_course_access_requests()
    limit 1),
   'not_started'::text,
@@ -375,7 +375,7 @@ reset role;
 revoke ainigma_maintenance from postgres;
 set local role authenticated;
 select extensions.is(
-  (select external_access_state
+  (select external_access_state::text
    from public.list_my_course_access_requests()
    limit 1),
   'invitation_pending'::text,

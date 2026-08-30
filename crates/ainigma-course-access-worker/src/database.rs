@@ -56,7 +56,7 @@ pub async fn invitation_data(
     let row = sqlx::query!(
         r#"select provider_kind, expected_external_group_handle,
                   external_user_id, external_user_handle, external_invitation_id,
-                  external_email, state
+                  external_email, state::text
            from private.list_external_course_access_to_reconcile()
            where course_id = $1 and profile_id = $2"#,
         course_id,
@@ -127,7 +127,7 @@ pub async fn record_invitation(
     external_invitation_id: &str,
 ) -> Result<(), Box<dyn Error>> {
     sqlx::query!(
-        "select private.record_external_course_access_invitation($1, $2, $3, $4, $5)",
+        "select private.record_external_course_access_invitation($1, $2, $3::text::private.external_invitation_method, $4, $5)",
         course_id,
         profile_id,
         method,
@@ -146,7 +146,7 @@ pub async fn access_to_reconcile(
         r#"select course_id, profile_id, offering_key, provider_kind,
                   expected_external_group_id, expected_external_group_handle,
                   external_user_id, external_user_handle, external_invitation_id,
-                  state
+                  state::text
            from private.list_external_course_access_to_reconcile()
            where state not in ('not_started', 'revoked')
              and external_invitation_id is not null"#
@@ -220,7 +220,7 @@ pub async fn record_status(
     failure_code: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     sqlx::query!(
-        "select private.record_external_course_access_status($1, $2, $3, $4)",
+        "select private.record_external_course_access_status($1, $2, $3::text::private.external_course_access_state, $4)",
         course_id,
         profile_id,
         state,

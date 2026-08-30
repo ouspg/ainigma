@@ -17,7 +17,7 @@ returns table (
   authorization_status text,
   requested_at timestamptz,
   decided_at timestamptz,
-  external_access_state text
+  external_access_state private.external_course_access_state
 )
 language plpgsql
 stable
@@ -88,7 +88,7 @@ begin
     end,
     request_row.requested_at,
     request_row.decided_at,
-    access_row.state::text
+    access_row.state
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
   join public.profiles as profile on profile.id = request_row.requester_profile_id

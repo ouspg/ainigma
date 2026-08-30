@@ -1099,9 +1099,9 @@ create or replace function private.list_external_course_access_to_reconcile()
     external_user_handle           text,
     external_invitation_id         text,
     external_email                 text,
-    invitation_method              text,
+    invitation_method              private.external_invitation_method,
     invitation_target              text,
-    state                          text
+    state                          private.external_course_access_state
   )
   language sql
   stable
@@ -1120,21 +1120,25 @@ BEGIN ATOMIC
      access_row.external_user_handle,
      access_row.external_invitation_id,
      email.normalized_value,
-     (access_row.invitation_method)::text
-  AS invitation_method,
+     access_row.invitation_method,
      access_row.invitation_target,
-     (access_row.state)::text AS state
-    FROM ((((private.external_course_access access_row
-      JOIN private.course_access_requests request_row ON (((request_row.id = access_row.access_request_id) AND (request_row.course_id = access_row.course_id) AND (request_row.requester_profile_id = access_row.profile_id))))
-      JOIN public.courses course ON ((course.id = access_row.course_id)))
-      JOIN private.course_definition_external_groups organization ON ((organization.course_definition_key = course.course_definition_key)))
-      LEFT JOIN LATERAL ( SELECT identifier.normalized_value
-            FROM private.profile_identifiers identifier
-           WHERE ((identifier.profile_id = access_row.profile_id) AND (identifier.kind = 'email'::text) AND (identifier.issuer = organization.provider_issuer) AND (identifier.revoked_at IS NULL))
-           ORDER BY identifier.last_verified_at DESC
-          LIMIT 1) email ON (true))
-   WHERE ((request_row.status = 'approved'::private.course_access_request_status) AND (course.status = 'published'::private.course_offering_status) AND (access_row.state <> 'revoked'::private.external_course_access_state));
-END;
+     access_row.state
+    from ((((private.external_course_access access_row
+      JOIN private.course_access_requests request_row
+        on (((request_row.id = access_row.access_request_id) AND (request_row.course_id = access_row.course_id) AND (request_row.requester_profile_id = access_row.profile_id))))
+      JOIN public.courses course on ((course.id = access_row.course_id)))
+      JOIN private.course_definition_external_groups organization on ((organization.course_definition_key = course.course_definition_key)))
+      LEFT JOIN LATERAL ( select identifier.normalized_value
+            from private.profile_identifiers identifier
+           where
+             ((identifier.profile_id = access_row.profile_id) AND (identifier.kind = 'email'::text) AND (identifier.issuer = organization.provider_issuer) AND
+             (identifier.revoked_at is null))
+           ORDER by identifier.last_verified_at desc
+          limit 1) email on (true))
+   where
+     ((request_row.status = 'approved'::private.course_access_request_status) AND (course.status = 'published'::private.course_offering_status) AND (access_row.state <>
+     'revoked'::private.external_course_access_state));
+end;
 
 alter function "private"."list_external_course_access_to_reconcile"() owner to "ainigma_function_owner";
 
@@ -2379,7 +2383,7 @@ create or replace function public.list_course_access_requests (
     authorization_status  text,
     requested_at          timestamp with time zone,
     decided_at            timestamp with time zone,
-    external_access_state text
+    external_access_state private.external_course_access_state
   )
   language plpgsql
   stable
@@ -2450,7 +2454,7 @@ begin
     end,
     request_row.requested_at,
     request_row.decided_at,
-    access_row.state::text
+    access_row.state
   from private.course_access_requests as request_row
   join public.courses as course on course.id = request_row.course_id
   join public.profiles as profile on profile.id = request_row.requester_profile_id
@@ -2542,7 +2546,7 @@ create or replace function public.list_my_course_access_requests()
     reason                text,
     requested_at          timestamp with time zone,
     decided_at            timestamp with time zone,
-    external_access_state text
+    external_access_state private.external_course_access_state
   )
   language sql
   stable
@@ -2555,14 +2559,13 @@ BEGIN ATOMIC
      request_row.reason,
      request_row.requested_at,
      request_row.decided_at,
-     (access_row.state)::text
-  AS state
-    FROM ((private.course_access_requests request_row
-      JOIN public.courses course ON ((course.id = request_row.course_id)))
-      LEFT JOIN private.external_course_access access_row ON ((access_row.access_request_id = request_row.id)))
-   WHERE (request_row.requester_profile_id = private.current_profile_id())
-   ORDER BY request_row.requested_at DESC;
-END;
+     access_row.state
+    from ((private.course_access_requests request_row
+      JOIN public.courses course on ((course.id = request_row.course_id)))
+      LEFT JOIN private.external_course_access access_row on ((access_row.access_request_id = request_row.id)))
+   where (request_row.requester_profile_id = private.current_profile_id())
+   ORDER by request_row.requested_at desc;
+end;
 
 alter function "public"."list_my_course_access_requests"() owner to "ainigma_function_owner";
 

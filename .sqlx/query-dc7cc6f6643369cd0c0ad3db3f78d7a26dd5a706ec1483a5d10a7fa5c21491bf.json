@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select course_id, profile_id, offering_key, provider_kind,\n                  expected_external_group_id, expected_external_group_handle,\n                  external_user_id, external_user_handle, external_invitation_id,\n                  state\n           from private.list_external_course_access_to_reconcile()\n           where state not in ('not_started', 'revoked')\n             and external_invitation_id is not null",
+  "query": "select course_id, profile_id, offering_key, provider_kind,\n                  expected_external_group_id, expected_external_group_handle,\n                  external_user_id, external_user_handle, external_invitation_id,\n                  state::text\n           from private.list_external_course_access_to_reconcile()\n           where state not in ('not_started', 'revoked')\n             and external_invitation_id is not null",
   "describe": {
     "columns": [
       {
@@ -80,5 +80,5 @@
       null
     ]
   },
-  "hash": "dcc35d926462bc702317d3932a32eb1889146c425afd6d4ca5cfc516aa24ac4b"
+  "hash": "dc7cc6f6643369cd0c0ad3db3f78d7a26dd5a706ec1483a5d10a7fa5c21491bf"
 }

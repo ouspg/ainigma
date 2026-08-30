@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select private.record_external_course_access_status($1, $2, $3, $4)",
+  "query": "select private.record_external_course_access_invitation($1, $2, $3::text::private.external_invitation_method, $4, $5)",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "record_external_course_access_status",
+        "name": "record_external_course_access_invitation",
         "type_info": "Void",
         "origin": "Expression"
       }
@@ -15,6 +15,7 @@
         "Uuid",
         "Uuid",
         "Text",
+        "Text",
         "Text"
       ]
     },
@@ -22,5 +23,5 @@
       null
     ]
   },
-  "hash": "225aae3ad0d7133f1b77af3413d02b49426f8a3ff3257a291726da21ba80c53e"
+  "hash": "a4e57052836c3ed01a151afb77f8b8eed3144bf2ed44b196ddc92f5d7f0e97ae"
 }

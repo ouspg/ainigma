@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select provider_kind, expected_external_group_handle,\n                  external_user_id, external_user_handle, external_invitation_id,\n                  external_email, state\n           from private.list_external_course_access_to_reconcile()\n           where course_id = $1 and profile_id = $2",
+  "query": "select provider_kind, expected_external_group_handle,\n                  external_user_id, external_user_handle, external_invitation_id,\n                  external_email, state::text\n           from private.list_external_course_access_to_reconcile()\n           where course_id = $1 and profile_id = $2",
   "describe": {
     "columns": [
       {
@@ -62,5 +62,5 @@
       null
     ]
   },
-  "hash": "4e5b29f2c26718c41b8fb145e6e066c710acb7d01fa8db3992eab5b064748d3e"
+  "hash": "9b3cd1a448e664c983fcfc2f5c1073c5f6384bb04c80d5b8fcc32a4aa6a59ddc"
 }

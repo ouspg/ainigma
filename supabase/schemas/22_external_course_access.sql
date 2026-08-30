@@ -99,9 +99,9 @@ returns table (
   external_user_handle text,
   external_invitation_id text,
   external_email text,
-  invitation_method text,
+  invitation_method private.external_invitation_method,
   invitation_target text,
-  state text
+  state private.external_course_access_state
 )
 language sql
 stable
@@ -121,9 +121,9 @@ begin atomic
     access_row.external_user_handle,
     access_row.external_invitation_id,
     email.normalized_value,
-    access_row.invitation_method::text,
+    access_row.invitation_method,
     access_row.invitation_target,
-    access_row.state::text
+    access_row.state
   from private.external_course_access as access_row
   join private.course_access_requests as request_row
     on request_row.id = access_row.access_request_id

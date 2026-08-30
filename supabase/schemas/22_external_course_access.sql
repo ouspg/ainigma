@@ -153,9 +153,10 @@ begin atomic
     and access_row.state <> 'revoked';
 end;
 
--- Record an invitation sent through the configured provider. The target must
--- be the currently verified identifier for this profile; the worker cannot
--- invite an arbitrary email address or handle for an offering.
+-- Record an invitation sent through the configured provider. Email targets are
+-- restricted to the institution's approved domains and may be supplied when a
+-- profile's verified email is not available yet. Stable external IDs remain
+-- tied to the approved profile.
 create function private.record_external_course_access_invitation(
   p_course_id uuid,
   p_profile_id uuid,
@@ -185,6 +186,13 @@ begin
     raise exception using errcode = '22023', message = 'invalid_external_invitation_target';
   end if;
 
+  if p_invitation_method = 'email' then
+    p_invitation_target := lower(p_invitation_target);
+    if p_invitation_target !~ '^[^@[:space:]]+@([^.@[:space:]]+[.])*oulu[.]fi$' then
+      raise exception using errcode = '22023', message = 'email_domain_not_allowed';
+    end if;
+  end if;
+
   select access_row.*
   into v_access
   from private.external_course_access as access_row
@@ -207,28 +215,11 @@ begin
     raise exception using errcode = '42501', message = 'course_access_not_approved';
   end if;
 
-  if p_invitation_method = 'email' then
-    select identifier.normalized_value
-    into v_expected_target
-    from private.profile_identifiers as identifier
-    where identifier.profile_id = p_profile_id
-      and identifier.kind = 'email'
-      and identifier.issuer = (
-        select organization.provider_issuer
-        from public.courses as course
-        join private.course_definition_external_groups as organization
-          on organization.course_definition_key = course.course_definition_key
-        where course.id = p_course_id
-      )
-      and identifier.revoked_at is null
-    order by identifier.last_verified_at desc
-    limit 1;
-  else
+  if p_invitation_method <> 'email' then
     v_expected_target := v_access.external_user_id;
-  end if;
-
-  if v_expected_target is null or v_expected_target <> p_invitation_target then
-    raise exception using errcode = '42501', message = 'external_invitation_identity_mismatch';
+    if v_expected_target is null or v_expected_target <> p_invitation_target then
+      raise exception using errcode = '42501', message = 'external_invitation_identity_mismatch';
+    end if;
   end if;
 
   select organization.external_group_id, organization.external_group_handle

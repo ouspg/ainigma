@@ -151,6 +151,11 @@ create unique index profile_identifiers_active_identity_uidx
   on private.profile_identifiers (kind, issuer, scheme_version, normalized_value)
   where revoked_at is null;
 
+-- A profile may not silently acquire a second live account identity per provider.
+create unique index profile_identifiers_active_external_user_uidx
+  on private.profile_identifiers (profile_id, issuer, scheme_version)
+  where kind = 'external_user_id' and revoked_at is null;
+
 create index profile_identifiers_profile_active_idx
   on private.profile_identifiers (profile_id, kind, issuer, scheme_version)
   where revoked_at is null;
@@ -256,6 +261,21 @@ declare
   v_identifier_id uuid;
   v_existing_profile_id uuid;
 begin
+  if p_kind = 'external_user_id'
+    and exists (
+      select 1
+      from private.profile_identifiers as identifier
+      where identifier.profile_id = p_profile_id
+        and identifier.kind = p_kind
+        and identifier.issuer = p_issuer
+        and identifier.scheme_version = p_scheme_version
+        and identifier.normalized_value <> p_normalized_value
+        and identifier.revoked_at is null
+    )
+  then
+    raise exception using errcode = '23505', message = 'verified_identifier_conflict';
+  end if;
+
   select identifier.id, identifier.profile_id
   into v_identifier_id, v_existing_profile_id
   from private.profile_identifiers as identifier
@@ -591,6 +611,27 @@ end;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function private.handle_auth_user_created();
+
+-- Provider data can be enriched after the first login (for example, when a
+-- user later verifies a university email). Re-sync the identity whenever Auth
+-- updates its provider payload so verified identifiers become available to
+-- course access without requiring a new profile.
+create function private.handle_auth_identity_changed()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  perform private.sync_auth_identity(new.id);
+  return new;
+end
+$function$;
+
+create trigger on_auth_identity_changed
+  after insert or update of provider_id, identity_data, provider on auth.identities
+  for each row execute function private.handle_auth_identity_changed();
+
 -- The function owner's table access is constrained by explicit grants;
 -- browser access is granted by the authorization schema.
 grant select on private.auth_users, private.auth_identities to ainigma_function_owner;
@@ -600,6 +641,7 @@ grant select, insert, update on private.profile_identifiers to ainigma_function_
 
 alter function private.ensure_auth_user_profile(uuid) owner to ainigma_function_owner;
 alter function private.handle_auth_user_created() owner to ainigma_function_owner;
+alter function private.handle_auth_identity_changed() owner to ainigma_function_owner;
 alter function private.upsert_verified_identifier(uuid, text, text, integer, text, timestamptz, uuid, text) owner to ainigma_function_owner;
 alter function private.sync_auth_identity(uuid) owner to ainigma_function_owner;
 alter function private.reconcile_auth_users() owner to ainigma_function_owner;
@@ -622,6 +664,7 @@ grant execute on function private.request_auth_user_id() to ainigma_function_own
 revoke all on function
   private.ensure_auth_user_profile(uuid),
   private.handle_auth_user_created(),
+  private.handle_auth_identity_changed(),
   private.upsert_verified_identifier(uuid, text, text, integer, text, timestamptz, uuid, text),
   private.sync_auth_identity(uuid),
   private.reconcile_auth_users(),

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select private.record_external_course_access_membership_absence($1, $2) as revoked",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "revoked",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "060a0e80405f806fb64378989abb4fcb23718428d099c0ace37dca45ceb47161"
+}

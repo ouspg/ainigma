@@ -29,6 +29,10 @@ enum Command {
         course_id: Uuid,
         #[arg(long)]
         profile_id: Uuid,
+        /// Override the target email for an approved profile. The address is
+        /// domain-limited and recorded as the invitation target.
+        #[arg(long)]
+        email: Option<String>,
         #[arg(long, value_enum, default_value_t = InvitationMethod::Email)]
         by: InvitationMethod,
     },
@@ -38,6 +42,9 @@ enum Command {
         course_id: Uuid,
         #[arg(long)]
         profile_id: Uuid,
+        /// Override the target email when adopting a manually sent invitation.
+        #[arg(long)]
+        email: Option<String>,
         #[arg(long, value_enum, default_value_t = InvitationMethod::Email)]
         by: InvitationMethod,
     },
@@ -69,10 +76,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Command::Invite {
             course_id,
             profile_id,
+            email,
             by,
         } => {
-            let github = github::GithubPlatform::from_token(&required_env("GITHUB_TOKEN")?)?;
-            invitations::invite_one(&database, &github, course_id, profile_id, by).await?;
+            let github = github::GithubPlatform::from_env().await?;
+            if email.is_some() && by != InvitationMethod::Email {
+                return Err("--email can only be used with --by email".into());
+            }
+            invitations::invite_one_with_email(
+                &database,
+                &github,
+                course_id,
+                profile_id,
+                by,
+                email.as_deref(),
+            )
+            .await?;
             println!(
                 "processed GitHub {by:?} invitation for course {course_id}, profile {profile_id}"
             );
@@ -80,10 +99,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Command::MarkInvited {
             course_id,
             profile_id,
+            email,
             by,
         } => {
-            let github = github::GithubPlatform::from_token(&required_env("GITHUB_TOKEN")?)?;
-            invitations::mark_invited(&database, &github, course_id, profile_id, by).await?;
+            let github = github::GithubPlatform::from_env().await?;
+            if email.is_some() && by != InvitationMethod::Email {
+                return Err("--email can only be used with --by email".into());
+            }
+            invitations::mark_invited_with_email(
+                &database,
+                &github,
+                course_id,
+                profile_id,
+                by,
+                email.as_deref(),
+            )
+            .await?;
             println!(
                 "marked GitHub invitation pending for course {course_id}, profile {profile_id}"
             );
@@ -94,7 +125,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             course_id,
             profile_id,
         } => {
-            let github = github::GithubPlatform::from_token(&required_env("GITHUB_TOKEN")?)?;
+            let github = github::GithubPlatform::from_env().await?;
             loop {
                 let invitation_summary =
                     invitations::invite_pending(&database, &github, course_id, profile_id).await?;

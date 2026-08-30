@@ -102,8 +102,8 @@ invitation automatically for each approved access request that has no invitation
 adopts a matching manually sent email invitation, preserving its email target and invitation ID;
 if none is pending, it sends a new invitation by the verified stable GitHub user ID. The explicit
 `invite` command remains available for a targeted retry or for sending by email. The database
-records the method, exact verified target, and GitHub organization invitation ID, so the worker
-cannot invite an arbitrary identity. Repeating either operation is safe for an already pending or
+records the method, exact allowed target, and GitHub organization invitation ID, so the worker
+can use an explicit, domain-limited email override for an approved profile. Repeating either operation is safe for an already pending or
 active access record. If starting the invitation fails, the row becomes `failed`; a later targeted
 `invite` command retries it without creating a second invitation when the provider already has one
 pending.

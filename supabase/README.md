@@ -1,3 +1,9 @@
+---
+title: "Development with Supabase"
+sidebar:
+  order: 1
+---
+
 # Local Supabase
 
 The concise schema map and course-identity glossary live in [`schemas/README.md`](schemas/README.md).
@@ -40,6 +46,13 @@ variable. Restart the local stack after changing provider configuration or crede
 ./node_modules/.bin/supabase start
 ./node_modules/.bin/supabase status --output env
 ```
+
+The web login requests GitHub's read-only `user:email` scope because a public GitHub profile may
+not expose an email. GitHub can return the account's private and verified addresses under that
+scope; see [GitHub's email API](https://docs.github.com/en/rest/users/emails). Ainigma stores only
+the verified address present in the Auth identity payload. A profile may therefore start without
+the university email. Updating the GitHub identity later re-syncs its verified email without
+creating a second profile.
 
 Copy the reported API URL and publishable key (or legacy anon key) into the ignored
 `apps/web/.env.local`, using the names documented in `apps/web/.env.example`. Then run the web app:

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select private.confirm_external_course_access($1, $2, $3, $4, $5, $6, $7)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "confirm_external_course_access",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3b9d3c31e581a13c1cd70f0879dc99f74629671d260f7609a31472e75862ea1a"
+}

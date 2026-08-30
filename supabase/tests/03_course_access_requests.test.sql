@@ -288,18 +288,80 @@ select extensions.throws_ok(
 reset role;
 grant ainigma_maintenance to postgres;
 set role ainigma_maintenance;
+select extensions.throws_ok(
+  $$select private.record_external_course_access_invitation(
+    current_setting('ainigma_access_test.course_id')::uuid,
+    current_setting('ainigma_access_test.requester_profile_id')::uuid,
+    'email',
+    'requester@example.com',
+    '98000000'
+  )$$,
+  '22023',
+  'email_domain_not_allowed',
+  'email invitations reject domains outside the institution'
+);
+select extensions.throws_ok(
+  $$select private.record_external_course_access_invitation(
+    current_setting('ainigma_access_test.course_id')::uuid,
+    current_setting('ainigma_access_test.requester_profile_id')::uuid,
+    'email',
+    'requester@notoulu.fi',
+    '98000000'
+  )$$,
+  '22023',
+  'email_domain_not_allowed',
+  'email invitations reject lookalike domains'
+);
+select extensions.throws_ok(
+  $$select private.record_external_course_access_invitation(
+    current_setting('ainigma_access_test.course_id')::uuid,
+    current_setting('ainigma_access_test.requester_profile_id')::uuid,
+    'email',
+    'requester@.oulu.fi',
+    '98000003'
+  )$$,
+  '22023',
+  'email_domain_not_allowed',
+  'email invitations reject empty subdomains'
+);
+select extensions.throws_ok(
+  $$select private.record_external_course_access_invitation(
+    current_setting('ainigma_access_test.course_id')::uuid,
+    current_setting('ainigma_access_test.requester_profile_id')::uuid,
+    'email',
+    'requester@dept..oulu.fi',
+    '98000004'
+  )$$,
+  '22023',
+  'email_domain_not_allowed',
+  'email invitations reject malformed subdomains'
+);
 select private.record_external_course_access_invitation(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   'email',
-  'requester@university.example',
+  'requester@student.oulu.fi',
   '98000001'
 );
 select private.record_external_course_access_invitation(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   'email',
-  'requester@university.example',
+  'requester@dept.student.oulu.fi',
+  '98000002'
+);
+select private.record_external_course_access_invitation(
+  current_setting('ainigma_access_test.course_id')::uuid,
+  current_setting('ainigma_access_test.requester_profile_id')::uuid,
+  'email',
+  'requester@student.oulu.fi',
+  '98000001'
+);
+select private.record_external_course_access_invitation(
+  current_setting('ainigma_access_test.course_id')::uuid,
+  current_setting('ainigma_access_test.requester_profile_id')::uuid,
+  'email',
+  'requester@student.oulu.fi',
   '98000001'
 );
 reset role;
@@ -327,8 +389,8 @@ select extensions.is(
    from private.external_course_access
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
-  'requester@university.example'::text,
-  'the verified invitation target is stored'
+  'requester@student.oulu.fi'::text,
+  'the allowed invitation target is stored'
 );
 select extensions.is(
   (select external_invitation_id

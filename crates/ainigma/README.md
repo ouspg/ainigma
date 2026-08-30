@@ -13,10 +13,12 @@ student website auth link. It loads one paginated snapshot of each relevant GitH
 (active members and pending invitations), then uses the database confirmation RPC only after
 GitHub reports the expected stable user ID as an active member.
 
-It requires a direct PostgreSQL connection and a GitHub token with organization-membership read
-access and organization audit-log read access. Database queries use SQLx checked against the local
-Supabase schema. Local development uses plain PostgreSQL; configure a TLS connection and a dedicated
-least-privilege worker role before using it against a hosted database.
+It requires a direct PostgreSQL connection and a GitHub App installation with the organization and
+repository permissions it needs. The worker creates a short-lived installation token from the App
+ID, installation ID, and private key. A pre-issued GitHub token remains supported for local or
+legacy use. Database queries use SQLx checked against the local Supabase schema. Local development
+uses plain PostgreSQL; configure a TLS connection and a dedicated least-privilege worker role
+before using it against a hosted database.
 
 For local development:
 
@@ -42,7 +44,9 @@ the stable GitHub user ID explicitly:
 
 ```sh
 export DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
-export GITHUB_TOKEN='...'
+export GITHUB_APP_CLIENT_ID='Iv23abc123...'
+export GITHUB_APP_INSTALLATION_ID='78901234'
+export GITHUB_APP_PRIVATE_KEY_PATH='/run/secrets/ainigma-github-app.pem'
 cargo run -p ainigma-course-access-worker -- \
   poll
 cargo run -p ainigma-course-access-worker -- \

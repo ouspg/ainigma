@@ -2,6 +2,7 @@ use crate::platform::{
     AcceptedInvitation, ExternalPlatform, InvitationError, OrganizationSnapshot, PendingInvitation,
     Repository, SnapshotError,
 };
+use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use reqwest::{Client, StatusCode, header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -9,10 +10,15 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     error::Error,
+    fs,
+    sync::Arc,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+use tokio::sync::Mutex;
 
 const DEFAULT_API_URL: &str = "https://api.github.com";
-const API_VERSION: &str = "2022-11-28";
+const API_VERSION: &str = "2026-03-10";
+const INSTALLATION_TOKEN_REFRESH: Duration = Duration::from_secs(50 * 60);
 
 impl From<reqwest::Error> for SnapshotError {
     fn from(_: reqwest::Error) -> Self {
@@ -22,15 +28,75 @@ impl From<reqwest::Error> for SnapshotError {
 
 pub(crate) struct GithubPlatform {
     client: Client,
+    app_auth: Option<Arc<Mutex<AppAuthentication>>>,
     api_url: String,
 }
 
+struct AppAuthentication {
+    issuer: String,
+    installation_id: u64,
+    private_key: String,
+    client: Client,
+    refresh_at: Instant,
+}
+
 impl GithubPlatform {
-    pub(crate) fn from_token(token: &str) -> Result<Self, Box<dyn Error>> {
+    pub(crate) async fn from_env() -> Result<Self, Box<dyn Error>> {
+        let api_url = api_url();
+        if let Ok(token) = env::var("GITHUB_TOKEN")
+            && !token.trim().is_empty()
+        {
+            tracing::info!("GitHub authentication flow selected: pre-issued token");
+            return Ok(Self {
+                client: client(&token)?,
+                app_auth: None,
+                api_url,
+            });
+        }
+
+        let app_issuer = app_issuer_from_env()?;
+        let installation_id = required_numeric_env("GITHUB_APP_INSTALLATION_ID")?;
+        let private_key = private_key_from_env()?;
+        let token =
+            installation_token(&api_url, &app_issuer, installation_id, &private_key).await?;
+        let client = client(&token)?;
+        tracing::info!("GitHub authentication flow selected: App installation token");
+        let app_auth = {
+            Arc::new(Mutex::new(AppAuthentication {
+                issuer: app_issuer,
+                installation_id,
+                private_key,
+                client: client.clone(),
+                refresh_at: Instant::now() + INSTALLATION_TOKEN_REFRESH,
+            }))
+        };
+
         Ok(Self {
-            client: client(token)?,
-            api_url: api_url(),
+            client,
+            app_auth: Some(app_auth),
+            api_url,
         })
+    }
+
+    async fn authorized_client(&self) -> Result<Client, Box<dyn Error>> {
+        let Some(app_auth) = &self.app_auth else {
+            return Ok(self.client.clone());
+        };
+
+        let mut app_auth = app_auth.lock().await;
+        if Instant::now() >= app_auth.refresh_at {
+            tracing::info!("Refreshing GitHub App installation token");
+            let token = installation_token(
+                &self.api_url,
+                &app_auth.issuer,
+                app_auth.installation_id,
+                &app_auth.private_key,
+            )
+            .await?;
+            app_auth.client = client(&token)?;
+            app_auth.refresh_at = Instant::now() + INSTALLATION_TOKEN_REFRESH;
+        }
+        Ok(app_auth.client.clone())
     }
 }
 
@@ -40,7 +106,8 @@ impl ExternalPlatform for GithubPlatform {
     }
 
     async fn user_login_by_id(&self, user_id: &str) -> Result<String, Box<dyn Error>> {
-        user_login_by_id(&self.client, &self.api_url, user_id).await
+        let client = self.authorized_client().await?;
+        user_login_by_id(&client, &self.api_url, user_id).await
     }
 
     async fn find_pending_invitation(
@@ -49,7 +116,8 @@ impl ExternalPlatform for GithubPlatform {
         username: Option<&str>,
         email: Option<&str>,
     ) -> Result<Option<PendingInvitation>, Box<dyn Error>> {
-        find_pending_invitation(&self.client, &self.api_url, organization, username, email).await
+        let client = self.authorized_client().await?;
+        find_pending_invitation(&client, &self.api_url, organization, username, email).await
     }
 
     async fn invite_by_email(
@@ -57,7 +125,11 @@ impl ExternalPlatform for GithubPlatform {
         organization: &str,
         email: &str,
     ) -> Result<PendingInvitation, InvitationError> {
-        let response = email_invitation(&self.client, &self.api_url, organization, email)
+        let client = self
+            .authorized_client()
+            .await
+            .map_err(|_| InvitationError::Failed("github_authentication_failed".to_owned()))?;
+        let response = email_invitation(&client, &self.api_url, organization, email)
             .await
             .map_err(|_| InvitationError::Failed("github_invitation_request_failed".to_owned()))?;
         invitation_response(response).await
@@ -68,7 +140,11 @@ impl ExternalPlatform for GithubPlatform {
         organization: &str,
         user_id: &str,
     ) -> Result<PendingInvitation, InvitationError> {
-        let response = user_id_invitation(&self.client, &self.api_url, organization, user_id)
+        let client = self
+            .authorized_client()
+            .await
+            .map_err(|_| InvitationError::Failed("github_authentication_failed".to_owned()))?;
+        let response = user_id_invitation(&client, &self.api_url, organization, user_id)
             .await
             .map_err(|_| InvitationError::Failed("github_invitation_request_failed".to_owned()))?;
         invitation_response(response).await
@@ -79,8 +155,12 @@ impl ExternalPlatform for GithubPlatform {
         organization: &str,
         unresolved_invitation_ids: &HashSet<String>,
     ) -> Result<OrganizationSnapshot, SnapshotError> {
+        let client = self
+            .authorized_client()
+            .await
+            .map_err(|_| SnapshotError::Failed("github_authentication_failed".to_owned()))?;
         organization_snapshot(
-            &self.client,
+            &client,
             &self.api_url,
             organization,
             unresolved_invitation_ids,
@@ -94,8 +174,12 @@ impl ExternalPlatform for GithubPlatform {
         repository_name: &str,
         expected_description: &str,
     ) -> Result<Repository, String> {
+        let client = self
+            .authorized_client()
+            .await
+            .map_err(|_| "github_authentication_failed".to_owned())?;
         find_or_create_repository(
-            &self.client,
+            &client,
             &self.api_url,
             organization,
             repository_name,
@@ -110,14 +194,11 @@ impl ExternalPlatform for GithubPlatform {
         repository: &str,
         username: &str,
     ) -> Result<(), String> {
-        grant_maintain(
-            &self.client,
-            &self.api_url,
-            organization,
-            repository,
-            username,
-        )
-        .await
+        let client = self
+            .authorized_client()
+            .await
+            .map_err(|_| "github_authentication_failed".to_owned())?;
+        grant_maintain(&client, &self.api_url, organization, repository, username).await
     }
 }
 
@@ -133,8 +214,10 @@ async fn invitation_response(
             .map_err(|_| InvitationError::Failed("github_invitation_response_invalid".to_owned()));
     }
     if status == StatusCode::UNPROCESSABLE_ENTITY {
+        log_http_failure("create_organization_invitation", &response);
         return Err(InvitationError::AlreadyExists);
     }
+    log_http_failure("create_organization_invitation", &response);
     Err(InvitationError::Failed(format!(
         "github_invitation_http_{}",
         status.as_u16()
@@ -226,13 +309,19 @@ pub fn api_url() -> String {
 }
 
 pub fn client(token: &str) -> Result<Client, Box<dyn Error>> {
+    let mut headers = common_headers();
+    headers.insert(
+        header::AUTHORIZATION,
+        header::HeaderValue::try_from(format!("Bearer {token}"))?,
+    );
+
     Ok(Client::builder()
         .user_agent("ainigma-course-access-worker/0.1")
-        .default_headers(headers(token)?)
+        .default_headers(headers)
         .build()?)
 }
 
-fn headers(token: &str) -> Result<header::HeaderMap, Box<dyn Error>> {
+fn common_headers() -> header::HeaderMap {
     let mut headers = header::HeaderMap::new();
     headers.insert(
         header::ACCEPT,
@@ -242,11 +331,121 @@ fn headers(token: &str) -> Result<header::HeaderMap, Box<dyn Error>> {
         "x-github-api-version",
         header::HeaderValue::from_static(API_VERSION),
     );
+    headers
+}
+
+#[derive(Debug, Serialize)]
+struct AppClaims {
+    iat: u64,
+    exp: u64,
+    iss: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct InstallationTokenResponse {
+    token: String,
+}
+
+fn app_issuer_from_env() -> Result<String, Box<dyn Error>> {
+    if let Some(client_id) = env::var("GITHUB_APP_CLIENT_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+    {
+        return Ok(client_id.trim().to_owned());
+    }
+
+    let app_id = env::var("GITHUB_APP_ID").map_err(
+        |_| "GITHUB_APP_CLIENT_ID or GITHUB_APP_ID must be set when GITHUB_TOKEN is absent",
+    )?;
+    let app_id = app_id.trim();
+    if app_id.is_empty()
+        || app_id == "0"
+        || !app_id.chars().all(|character| character.is_ascii_digit())
+    {
+        return Err("GITHUB_APP_ID must be a numeric GitHub App ID".into());
+    }
+    Ok(app_id.to_owned())
+}
+
+fn required_numeric_env(name: &str) -> Result<u64, Box<dyn Error>> {
+    let value =
+        env::var(name).map_err(|_| format!("{name} must be set when GITHUB_TOKEN is absent"))?;
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|_| format!("{name} must be a numeric GitHub ID"))?;
+    if parsed == 0 {
+        return Err(format!("{name} must be greater than zero").into());
+    }
+    Ok(parsed)
+}
+
+fn private_key_from_env() -> Result<String, Box<dyn Error>> {
+    let inline = env::var("GITHUB_APP_PRIVATE_KEY")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let path = env::var("GITHUB_APP_PRIVATE_KEY_PATH")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+
+    match (inline, path) {
+        (Some(_), Some(_)) => Err(
+            "set only one of GITHUB_APP_PRIVATE_KEY and GITHUB_APP_PRIVATE_KEY_PATH".into(),
+        ),
+        (Some(value), None) => Ok(value.replace("\\n", "\n")),
+        (None, Some(path)) => Ok(fs::read_to_string(path)?),
+        (None, None) => Err(
+            "GITHUB_APP_PRIVATE_KEY or GITHUB_APP_PRIVATE_KEY_PATH must be set when GITHUB_TOKEN is absent".into(),
+        ),
+    }
+}
+
+fn app_jwt(app_issuer: &str, private_key: &str) -> Result<String, Box<dyn Error>> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let claims = AppClaims {
+        iat: now.saturating_sub(60),
+        exp: now + 9 * 60,
+        iss: app_issuer.to_owned(),
+    };
+    Ok(encode(
+        &Header::new(Algorithm::RS256),
+        &claims,
+        &EncodingKey::from_rsa_pem(private_key.as_bytes())?,
+    )?)
+}
+
+async fn installation_token(
+    api_url: &str,
+    app_issuer: &str,
+    installation_id: u64,
+    private_key: &str,
+) -> Result<String, Box<dyn Error>> {
+    let jwt = app_jwt(app_issuer, private_key)?;
+    let mut headers = common_headers();
     headers.insert(
         header::AUTHORIZATION,
-        header::HeaderValue::try_from(format!("Bearer {token}"))?,
+        header::HeaderValue::try_from(format!("Bearer {jwt}"))?,
     );
-    Ok(headers)
+    let response = Client::builder()
+        .user_agent("ainigma-course-access-worker/0.1")
+        .default_headers(headers)
+        .build()?
+        .post(format!(
+            "{api_url}/app/installations/{installation_id}/access_tokens"
+        ))
+        .send()
+        .await?;
+
+    let status = response.status();
+    if !status.is_success() {
+        log_http_failure("create_installation_access_token", &response);
+        return Err(format!(
+            "GitHub App installation token request failed with HTTP {}",
+            status.as_u16()
+        )
+        .into());
+    }
+
+    Ok(response.json::<InstallationTokenResponse>().await?.token)
 }
 
 pub async fn email_invitation(
@@ -295,6 +494,7 @@ pub async fn user_login_by_id(
         .send()
         .await?;
     if !response.status().is_success() {
+        log_http_failure("lookup_github_user", &response);
         return Err(format!(
             "GitHub user lookup failed with HTTP {}",
             response.status().as_u16()
@@ -366,6 +566,7 @@ async fn organization_id(
         return Err(SnapshotError::SingleSignOnRequired);
     }
     if !response.status().is_success() {
+        log_http_failure("lookup_github_organization", &response);
         return Err(SnapshotError::Failed(format!(
             "github_organization_http_{}",
             response.status().as_u16()
@@ -393,6 +594,7 @@ async fn list_active_members(
             return Err(SnapshotError::SingleSignOnRequired);
         }
         if !response.status().is_success() {
+            log_http_failure("list_github_members", &response);
             return Err(SnapshotError::Failed(format!(
                 "github_members_http_{}",
                 response.status().as_u16()
@@ -433,6 +635,7 @@ async fn list_member_additions(
             return Err(SnapshotError::SingleSignOnRequired);
         }
         if !response.status().is_success() {
+            log_http_failure("list_github_audit_log", &response);
             return Err(SnapshotError::Failed(format!(
                 "github_audit_log_http_{}",
                 response.status().as_u16()
@@ -496,6 +699,7 @@ async fn list_pending_invitations(
             return Err(SnapshotError::SingleSignOnRequired);
         }
         if !response.status().is_success() {
+            log_http_failure("list_github_invitations", &response);
             return Err(SnapshotError::Failed(format!(
                 "github_invitations_http_{}",
                 response.status().as_u16()
@@ -524,6 +728,34 @@ fn sso_required(response: &reqwest::Response) -> bool {
         .get("x-github-sso")
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value.contains("required"))
+}
+
+/// Log provider diagnostics without logging request URLs, response bodies, or credentials.
+fn log_http_failure(operation: &'static str, response: &reqwest::Response) {
+    let request_id = response
+        .headers()
+        .get("x-github-request-id")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("unknown");
+    let rate_limit_remaining = response
+        .headers()
+        .get("x-ratelimit-remaining")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("unknown");
+    let rate_limit_reset = response
+        .headers()
+        .get("x-ratelimit-reset")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("unknown");
+
+    tracing::error!(
+        operation,
+        http_status = response.status().as_u16(),
+        github_request_id = request_id,
+        rate_limit_remaining,
+        rate_limit_reset,
+        "GitHub API request failed"
+    );
 }
 
 pub async fn find_pending_invitation(
@@ -596,6 +828,7 @@ pub async fn find_or_create_repository(
                 .await
                 .map_err(|_| "github_repository_lookup_failed".to_owned())?;
             if !retry_response.status().is_success() {
+                log_http_failure("retry_lookup_github_repository", &retry_response);
                 return Err("github_repository_create_conflict".to_owned());
             }
             retry_response
@@ -604,12 +837,14 @@ pub async fn find_or_create_repository(
                 .map(GithubRepository::into_platform)
                 .map_err(|_| "github_repository_response_invalid".to_owned())?
         } else {
+            log_http_failure("create_github_repository", &create_response);
             return Err(format!(
                 "github_repository_create_http_{}",
                 create_response.status().as_u16()
             ));
         }
     } else {
+        log_http_failure("lookup_github_repository", &response);
         return Err(format!(
             "github_repository_lookup_http_{}",
             response.status().as_u16()
@@ -640,6 +875,7 @@ pub async fn grant_maintain(
         .await
         .map_err(|_| "github_collaborator_request_failed".to_owned())?;
     if !response.status().is_success() {
+        log_http_failure("grant_github_repository_maintain", &response);
         return Err(format!(
             "github_collaborator_http_{}",
             response.status().as_u16()

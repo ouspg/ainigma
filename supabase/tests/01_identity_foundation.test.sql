@@ -208,6 +208,34 @@ select extensions.is(
   'renaming a GitHub user creates the new active alias'
 );
 
+update auth.identities
+set identity_data = jsonb_set(identity_data, '{email}', '"student@student.oulu.fi"'),
+    updated_at = clock_timestamp()
+where id = '20000000-0000-0000-0000-000000000001';
+
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.profile_identifiers
+    where kind = 'email'
+      and normalized_value = 'first@example.test'
+      and revoked_at is not null
+  ),
+  1::bigint,
+  'replaced provider email retires the previous verified address'
+);
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.profile_identifiers
+    where kind = 'email'
+      and normalized_value = 'student@student.oulu.fi'
+      and revoked_at is null
+  ),
+  1::bigint,
+  'an email added after profile creation becomes an active verified identifier'
+);
+
 update auth.users
 set raw_user_meta_data = '{"user_name":"attacker-controlled","course_role":"owner"}'
 where id = '10000000-0000-0000-0000-000000000001';
@@ -233,6 +261,12 @@ select extensions.has_index(
   'profile_identifiers',
   'profile_identifiers_active_identity_uidx',
   'active identifiers have a tuple-wide unique index'
+);
+select extensions.has_index(
+  'private',
+  'profile_identifiers',
+  'profile_identifiers_active_external_user_uidx',
+  'a profile has at most one active external user ID per provider'
 );
 select extensions.ok(
   not has_schema_privilege('authenticated', 'private', 'USAGE'),

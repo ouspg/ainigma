@@ -9,6 +9,7 @@ pub struct InvitationData {
     pub external_user_id: String,
     pub external_user_handle: Option<String>,
     pub external_email: Option<String>,
+    pub invitation_target: Option<String>,
     pub external_invitation_id: Option<String>,
     pub state: String,
 }
@@ -63,6 +64,19 @@ pub async fn invitation_data(
     .await?
     .ok_or("approved external access record not found")?;
 
+    // Keep the primary query's prepared metadata stable while reading the
+    // optional target added for explicit email overrides.
+    let invitation_target = sqlx::query_scalar::<_, Option<String>>(
+        r#"select invitation_target
+           from private.list_external_course_access_to_reconcile()
+           where course_id = $1 and profile_id = $2"#,
+    )
+    .bind(course_id)
+    .bind(profile_id)
+    .fetch_optional(database)
+    .await?
+    .flatten();
+
     Ok(InvitationData {
         provider_kind: row
             .provider_kind
@@ -76,6 +90,7 @@ pub async fn invitation_data(
         external_user_handle: row.external_user_handle,
         external_invitation_id: row.external_invitation_id,
         external_email: row.external_email,
+        invitation_target,
         state: row
             .state
             .ok_or("database returned no external access state")?,

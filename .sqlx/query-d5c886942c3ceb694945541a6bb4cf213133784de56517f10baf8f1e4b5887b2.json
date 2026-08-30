@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select private.complete_course_repository_provisioning($1, $2, $3, $4, $5, $6)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "complete_course_repository_provisioning",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d5c886942c3ceb694945541a6bb4cf213133784de56517f10baf8f1e4b5887b2"
+}

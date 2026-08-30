@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select private.record_course_repository_provisioning_failure($1, $2, $3, $4, $5)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_course_repository_provisioning_failure",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "133cd962c6bc91be95ba6584cff488ce1f309a97e8fafea880390cb38c14c6e3"
+}

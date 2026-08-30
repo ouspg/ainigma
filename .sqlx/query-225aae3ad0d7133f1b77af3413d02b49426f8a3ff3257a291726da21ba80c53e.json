@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select private.record_external_course_access_status($1, $2, $3, $4)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_external_course_access_status",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "225aae3ad0d7133f1b77af3413d02b49426f8a3ff3257a291726da21ba80c53e"
+}

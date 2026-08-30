@@ -225,6 +225,13 @@ async fn record_status(
         failure_code,
     )
     .await?;
-    tracing::info!(offering = %access.offering_key, state, "recorded external access state");
+    tracing::info!(
+        course_id = %access.course_id,
+        profile_id = %access.profile_id,
+        offering = %access.offering_key,
+        state,
+        failure_code = failure_code.unwrap_or("none"),
+        "recorded external access state"
+    );
     Ok(())
 }

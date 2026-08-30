@@ -19,6 +19,8 @@ pub enum InvitationMethod {
     ExternalUserId,
 }
 
+const ALLOWED_EMAIL_DOMAIN_SUFFIXES: [&str; 2] = ["oulu.fi", "student.oulu.fi"];
+
 impl InvitationMethod {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -28,14 +30,25 @@ impl InvitationMethod {
     }
 }
 
-pub async fn mark_invited<P: ExternalPlatform>(
+pub async fn mark_invited_with_email<P: ExternalPlatform>(
     database: &PgPool,
     platform: &P,
     course_id: Uuid,
     profile_id: Uuid,
     method: InvitationMethod,
+    email: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
-    if !adopt_pending_invitation(database, platform, course_id, profile_id, method).await? {
+    let email = email.map(validate_email).transpose()?;
+    if !adopt_pending_invitation(
+        database,
+        platform,
+        course_id,
+        profile_id,
+        method,
+        email.as_deref(),
+    )
+    .await?
+    {
         return Err("matching pending external invitation not found".into());
     }
     Ok(())
@@ -49,8 +62,10 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
     course_id: Uuid,
     profile_id: Uuid,
     method: InvitationMethod,
+    email: Option<&str>,
 ) -> Result<bool, Box<dyn Error>> {
     let data = database::invitation_data(database, course_id, profile_id).await?;
+    ensure_email_override(&data, email)?;
     if data.provider_kind != platform.kind() {
         return Err(format!(
             "configured provider {} is not supported by {}",
@@ -67,14 +82,16 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
         .find_pending_invitation(
             &data.external_group_handle,
             resolved_handle.as_deref(),
-            data.external_email.as_deref(),
+            email
+                .or(data.invitation_target.as_deref())
+                .or(data.external_email.as_deref()),
         )
         .await?
         .map(|pending| pending.id);
     let Some(invitation_id) = pending else {
         return Ok(false);
     };
-    let target = target(&data, method)?;
+    let target = target(&data, method, email)?;
     database::record_invitation(
         database,
         course_id,
@@ -94,7 +111,20 @@ pub async fn invite_one<P: ExternalPlatform>(
     profile_id: Uuid,
     method: InvitationMethod,
 ) -> Result<(), Box<dyn Error>> {
+    invite_one_with_email(database, platform, course_id, profile_id, method, None).await
+}
+
+pub async fn invite_one_with_email<P: ExternalPlatform>(
+    database: &PgPool,
+    platform: &P,
+    course_id: Uuid,
+    profile_id: Uuid,
+    method: InvitationMethod,
+    email: Option<&str>,
+) -> Result<(), Box<dyn Error>> {
+    let email = email.map(validate_email).transpose()?;
     let data = database::invitation_data(database, course_id, profile_id).await?;
+    ensure_email_override(&data, email.as_deref())?;
     if data.provider_kind != platform.kind() {
         return Err(format!(
             "configured provider {} is not supported by {}",
@@ -115,7 +145,10 @@ pub async fn invite_one<P: ExternalPlatform>(
             .find_pending_invitation(
                 &data.external_group_handle,
                 resolved_handle.as_deref(),
-                data.external_email.as_deref(),
+                email
+                    .as_deref()
+                    .or(data.invitation_target.as_deref())
+                    .or(data.external_email.as_deref()),
             )
             .await?
             .is_some_and(|pending| data.external_invitation_id == Some(pending.id))
@@ -123,7 +156,7 @@ pub async fn invite_one<P: ExternalPlatform>(
             return Ok(());
         }
     }
-    let target = target(&data, method)?;
+    let target = target(&data, method, email.as_deref())?;
     let invitation = match method {
         InvitationMethod::Email => {
             platform
@@ -147,7 +180,10 @@ pub async fn invite_one<P: ExternalPlatform>(
                 .find_pending_invitation(
                     &data.external_group_handle,
                     resolved_handle.as_deref(),
-                    data.external_email.as_deref(),
+                    email
+                        .as_deref()
+                        .or(data.invitation_target.as_deref())
+                        .or(data.external_email.as_deref()),
                 )
                 .await?
                 .ok_or(
@@ -195,6 +231,7 @@ pub async fn invite_pending<P: ExternalPlatform>(
             candidate.course_id,
             candidate.profile_id,
             InvitationMethod::Email,
+            None,
         )
         .await
         {
@@ -240,12 +277,89 @@ pub async fn invite_pending<P: ExternalPlatform>(
 fn target(
     data: &database::InvitationData,
     method: InvitationMethod,
+    email: Option<&str>,
 ) -> Result<String, Box<dyn Error>> {
     let target = match method {
-        InvitationMethod::Email => data.external_email.as_deref(),
+        InvitationMethod::Email => email
+            .or(data.invitation_target.as_deref())
+            .or(data.external_email.as_deref()),
         InvitationMethod::ExternalUserId => Some(data.external_user_id.as_str()),
     };
     target
         .map(str::to_owned)
         .ok_or_else(|| format!("verified external identity for {method:?} is not available").into())
+}
+
+fn ensure_email_override(
+    data: &database::InvitationData,
+    email: Option<&str>,
+) -> Result<(), Box<dyn Error>> {
+    if let (Some(requested), Some(recorded)) = (email, data.invitation_target.as_deref())
+        && requested != recorded
+    {
+        return Err("email override does not match the recorded invitation target".into());
+    }
+    Ok(())
+}
+
+fn validate_email(email: &str) -> Result<String, Box<dyn Error>> {
+    let normalized = email.trim().to_ascii_lowercase();
+    if normalized.is_empty() || normalized.len() > 254 {
+        return Err("email must contain between 1 and 254 characters".into());
+    }
+
+    let Some((local, domain)) = normalized.rsplit_once('@') else {
+        return Err("email must contain one @ character".into());
+    };
+    if local.is_empty()
+        || local.contains('@')
+        || local.starts_with('.')
+        || local.ends_with('.')
+        || local.contains("..")
+        || local
+            .chars()
+            .any(|character| character.is_ascii_whitespace() || character.is_control())
+    {
+        return Err("email local part is invalid".into());
+    }
+    if domain.starts_with('.')
+        || domain.ends_with('.')
+        || domain.contains("..")
+        || domain.split('.').any(str::is_empty)
+    {
+        return Err("email domain is invalid".into());
+    }
+    if !ALLOWED_EMAIL_DOMAIN_SUFFIXES
+        .iter()
+        .any(|allowed| domain == *allowed || domain.ends_with(&format!(".{allowed}")))
+    {
+        return Err("email domain is not allowed for course invitations".into());
+    }
+
+    Ok(normalized)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_email;
+
+    #[test]
+    fn accepts_allowed_domains_and_normalizes_case() {
+        assert_eq!(
+            validate_email("Person@Student.Oulu.fi").unwrap(),
+            "person@student.oulu.fi"
+        );
+        assert!(validate_email("person@oulu.fi").is_ok());
+        assert!(validate_email("person@dept.student.oulu.fi").is_ok());
+    }
+
+    #[test]
+    fn rejects_other_domains_and_malformed_addresses() {
+        assert!(validate_email("person@example.com").is_err());
+        assert!(validate_email("person@notoulu.fi").is_err());
+        assert!(validate_email("person@oulu.fishing").is_err());
+        assert!(validate_email("person@dept..oulu.fi").is_err());
+        assert!(validate_email("person@sub.oulu.fi").is_ok());
+        assert!(validate_email("person..name@student.oulu.fi").is_err());
+    }
 }

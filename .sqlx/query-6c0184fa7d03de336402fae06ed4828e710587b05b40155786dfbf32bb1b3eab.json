@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select private.record_external_course_access_check_failure($1, $2, $3)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_external_course_access_check_failure",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6c0184fa7d03de336402fae06ed4828e710587b05b40155786dfbf32bb1b3eab"
+}

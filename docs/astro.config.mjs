@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { unified } from "@astrojs/markdown-remark";
-import nimbus, { defineConfig as defineNimbusConfig } from "@cloudflare/nimbus-docs";
+import nimbus, {
+  defineConfig as defineNimbusConfig,
+} from "@cloudflare/nimbus-docs";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 import { docsSites } from "./config/sites.mjs";
@@ -12,12 +14,16 @@ const astroIconComponents = fileURLToPath(
   new URL("./src/components/astro-icon-components.ts", import.meta.url),
 );
 const site = process.env.DOCS_SITE?.trim() || "http://localhost:4324";
-const encodedGitRef = docsVersions.gitRef.split("/").map(encodeURIComponent).join("/");
+const encodedGitRef = docsVersions.gitRef
+  .split("/")
+  .map(encodeURIComponent)
+  .join("/");
 
 const nimbusConfig = defineNimbusConfig({
   site,
   title: "Ainigma Docs",
-  description: "Architecture, development, and operations documentation for Ainigma.",
+  description:
+    "Architecture, development, and operations documentation for Ainigma.",
   locale: "en",
   homeLabel: "Ainigma",
   github: repositoryUrl,
@@ -35,7 +41,7 @@ const nimbusConfig = defineNimbusConfig({
     scope: "section",
     overviewLabel: "Overview",
     items: [
-      { label: "Home", link: "/" },
+      { label: "Overview", link: "/" },
       // Root-level pages form the landing-page rail. Product-site groups
       // below are only shown when a page inside that site is active.
       { label: "Core philosophy", link: "/core-philosophy/" },

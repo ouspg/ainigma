@@ -194,7 +194,6 @@ create table "private"."external_course_access" (
   "external_user_id"                text                     not null,
   "external_user_handle"            text,
   "external_invitation_id"          text,
-  "invitation_method"               text                     not null default 'email'::text,
   "invitation_target"               text,
   "invited_at"                      timestamp with time zone,
   "accepted_at"                     timestamp with time zone,
@@ -211,7 +210,6 @@ create table "private"."external_course_access" (
     check
     (((external_invitation_id IS NULL) OR ((external_invitation_id = btrim(external_invitation_id)) AND ((char_length(external_invitation_id) >= 1) AND
     (char_length(external_invitation_id) <= 255))))),
-  constraint "external_course_access_invitation_method_check" check ((invitation_method = ANY (ARRAY['email'::text, 'external_user_id'::text]))),
   constraint "external_course_access_invitation_target_check"
     check
     (((invitation_target IS NULL) OR ((invitation_target = btrim(invitation_target)) AND ((char_length(invitation_target) >= 1) AND (char_length(invitation_target) <= 512))))),
@@ -390,6 +388,14 @@ create type "private"."external_course_access_state" as enum (
 
 alter table "private"."external_course_access"
   add column "state" private.external_course_access_state not null default 'not_started'::private.external_course_access_state;
+
+create type "private"."external_invitation_method" as enum (
+  'email',
+  'external_user_id'
+);
+
+alter table "private"."external_course_access"
+  add column "invitation_method" private.external_invitation_method not null default 'external_user_id'::private.external_invitation_method;
 
 create or replace function private.add_course_membership (
   p_course_id        uuid,
@@ -1114,10 +1120,10 @@ BEGIN ATOMIC
      access_row.external_user_handle,
      access_row.external_invitation_id,
      email.normalized_value,
-     access_row.invitation_method,
+     (access_row.invitation_method)::text
+  AS invitation_method,
      access_row.invitation_target,
-     (access_row.state)::text
-  AS state
+     (access_row.state)::text AS state
     FROM ((((private.external_course_access access_row
       JOIN private.course_access_requests request_row ON (((request_row.id = access_row.access_request_id) AND (request_row.course_id = access_row.course_id) AND (request_row.requester_profile_id = access_row.profile_id))))
       JOIN public.courses course ON ((course.id = access_row.course_id)))
@@ -1316,7 +1322,7 @@ alter function "private"."record_external_course_access_check_failure"(uuid, uui
 create or replace function private.record_external_course_access_invitation (
   p_course_id              uuid,
   p_profile_id             uuid,
-  p_invitation_method      text,
+  p_invitation_method      private.external_invitation_method,
   p_invitation_target      text,
   p_external_invitation_id text
 )
@@ -1445,7 +1451,7 @@ begin
 end
 $function$;
 
-alter function "private"."record_external_course_access_invitation"(uuid, uuid, text, text, text) owner to "ainigma_function_owner";
+alter function "private"."record_external_course_access_invitation"(uuid, uuid, private.external_invitation_method, text, text) owner to "ainigma_function_owner";
 
 create or replace function private.record_external_course_access_membership_absence (
   p_course_id  uuid,
@@ -3316,9 +3322,9 @@ revoke all on function "private"."record_external_course_access_check_failure"(u
 
 grant execute on function "private"."record_external_course_access_check_failure"(uuid, uuid, text) to "ainigma_maintenance";
 
-revoke all on function "private"."record_external_course_access_invitation"(uuid, uuid, text, text, text) from public;
+revoke all on function "private"."record_external_course_access_invitation"(uuid, uuid, private.external_invitation_method, text, text) from public;
 
-grant execute on function "private"."record_external_course_access_invitation"(uuid, uuid, text, text, text) to "ainigma_maintenance";
+grant execute on function "private"."record_external_course_access_invitation"(uuid, uuid, private.external_invitation_method, text, text) to "ainigma_maintenance";
 
 revoke all on function "private"."record_external_course_access_membership_absence"(uuid, uuid) from public;
 
@@ -3527,6 +3533,8 @@ grant usage on type "private"."course_membership_status" to "postgres";
 grant usage on type "private"."course_offering_status" to "postgres";
 
 grant usage on type "private"."external_course_access_state" to "postgres";
+
+grant usage on type "private"."external_invitation_method" to "postgres";
 
 grant select on table "private"."auth_identities" to "ainigma_function_owner";
 

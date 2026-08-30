@@ -39,3 +39,8 @@ create type private.external_course_access_state as enum (
   'failed',
   'revoked'
 );
+
+create type private.external_invitation_method as enum (
+  'email',
+  'external_user_id'
+);

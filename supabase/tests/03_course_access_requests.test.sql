@@ -384,7 +384,7 @@ select extensions.is(
 reset role;
 grant ainigma_maintenance to postgres;
 select extensions.is(
-  (select invitation_method
+  (select invitation_method::text
    from private.external_course_access
    where course_id = current_setting('ainigma_access_test.course_id')::uuid
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),

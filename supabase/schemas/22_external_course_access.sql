@@ -11,7 +11,7 @@ create table private.external_course_access (
   -- provider API handle and a cache used for repository permissions/naming.
   external_user_handle text,
   external_invitation_id text,
-  invitation_method text not null default 'email',
+  invitation_method private.external_invitation_method not null default 'external_user_id',
   invitation_target text,
   state private.external_course_access_state not null default 'not_started',
   invited_at timestamptz,
@@ -42,9 +42,6 @@ create table private.external_course_access (
     or (external_user_handle = btrim(external_user_handle)
       and char_length(external_user_handle) between 1 and 255
       and external_user_handle !~ '[[:space:]]')
-  ),
-  constraint external_course_access_invitation_method_check check (
-    invitation_method in ('email', 'external_user_id')
   ),
   constraint external_course_access_invitation_target_check check (
     invitation_target is null
@@ -124,7 +121,7 @@ begin atomic
     access_row.external_user_handle,
     access_row.external_invitation_id,
     email.normalized_value,
-    access_row.invitation_method,
+    access_row.invitation_method::text,
     access_row.invitation_target,
     access_row.state::text
   from private.external_course_access as access_row
@@ -157,7 +154,7 @@ end;
 create function private.record_external_course_access_invitation(
   p_course_id uuid,
   p_profile_id uuid,
-  p_invitation_method text,
+  p_invitation_method private.external_invitation_method,
   p_invitation_target text,
   p_external_invitation_id text
 )

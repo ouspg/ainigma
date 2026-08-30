@@ -6,7 +6,7 @@ create table public.courses (
   course_definition_key text not null,
   course_definition_release_id uuid not null,
   code text not null,
-  status text not null default 'draft',
+  status private.course_offering_status not null default 'draft',
   starts_at timestamptz,
   ends_at timestamptz,
   external_url text,
@@ -28,7 +28,6 @@ create table public.courses (
   constraint courses_code_check check (
     code = btrim(code) and char_length(code) between 1 and 32
   ),
-  constraint courses_status_check check (status in ('draft', 'published', 'archived')),
   constraint courses_time_window_check check (
     ends_at is null or starts_at is null or ends_at > starts_at
   ),
@@ -55,11 +54,7 @@ create index courses_course_definition_release_id_idx
 create index courses_status_window_idx
   on public.courses (status, starts_at, ends_at);
 alter table public.courses
-  add column enrollment_mode text not null default 'approval_required';
-
-alter table public.courses
-  add constraint courses_enrollment_mode_check
-  check (enrollment_mode in ('approval_required', 'allowlist_auto', 'closed'));
+  add column enrollment_mode private.course_enrollment_mode not null default 'approval_required';
 
 create trigger courses_set_updated_at
 before update on public.courses

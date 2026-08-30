@@ -26,7 +26,7 @@ as $function$
     course.course_definition_key,
     course.course_definition_release_id,
     course.code,
-    course.enrollment_mode,
+    course.enrollment_mode::text,
     course.starts_at,
     course.ends_at,
     course.external_url
@@ -177,7 +177,7 @@ begin
     raise sqlstate 'PT400' using message = 'invalid_request_reason';
   end if;
 
-  select course.id, course.enrollment_mode, organization.provider_issuer
+  select course.id, course.enrollment_mode::text, organization.provider_issuer
   into v_course_id, v_enrollment_mode, v_provider_issuer
   from public.courses as course
   join private.course_definition_external_groups as organization

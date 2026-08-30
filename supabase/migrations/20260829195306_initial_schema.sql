@@ -1,5 +1,8 @@
 set local check_function_bodies = off;
 
+create type "private"."course_offering_status" as enum ('draft', 'published', 'archived');
+create type "private"."course_enrollment_mode" as enum ('approval_required', 'allowlist_auto', 'closed');
+
 alter default privileges for role "postgres" in schema "public" revoke all on sequences from "anon";
 
 alter default privileges for role "postgres" in schema "public" revoke all on sequences from "authenticated";
@@ -318,21 +321,19 @@ create table "public"."courses" (
   "course_definition_key"        text                     not null,
   "course_definition_release_id" uuid                     not null,
   "code"                         text                     not null,
-  "status"                       text                     not null default 'draft'::text,
+  "status"                       private.course_offering_status not null default 'draft'::private.course_offering_status,
   "starts_at"                    timestamp with time zone,
   "ends_at"                      timestamp with time zone,
   "external_url"                 text,
   "created_at"                   timestamp with time zone not null default clock_timestamp(),
   "updated_at"                   timestamp with time zone not null default clock_timestamp(),
-  "enrollment_mode"              text                     not null default 'approval_required'::text,
+  "enrollment_mode"              private.course_enrollment_mode not null default 'approval_required'::private.course_enrollment_mode,
   constraint "courses_code_check" check (((code = btrim(code)) AND ((char_length(code) >= 1) AND (char_length(code) <= 32)))),
   constraint "courses_course_definition_key_check" check ((course_definition_key ~ '^[a-z][a-z0-9-]{2,63}$'::text)),
-  constraint "courses_enrollment_mode_check" check ((enrollment_mode = ANY (ARRAY['approval_required'::text, 'allowlist_auto'::text, 'closed'::text]))),
   constraint "courses_external_url_check" check (((external_url IS NULL) OR ((char_length(external_url) <= 2048) AND (external_url ~ '^https?://'::text)))),
   constraint "courses_offering_key_check" check ((offering_key ~ '^[a-z][a-z0-9-]{2,127}$'::text)),
   constraint "courses_offering_key_key" unique (offering_key),
   constraint "courses_pkey" primary key (id),
-  constraint "courses_status_check" check ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text]))),
   constraint "courses_time_window_check" check (((ends_at IS NULL) OR (starts_at IS NULL) OR (ends_at > starts_at)))
 );
 
@@ -2288,7 +2289,7 @@ create or replace function public.list_available_courses()
     course.course_definition_key,
     course.course_definition_release_id,
     course.code,
-    course.enrollment_mode,
+    course.enrollment_mode::text,
     course.starts_at,
     course.ends_at,
     course.external_url
@@ -2605,7 +2606,7 @@ begin
     raise sqlstate 'PT400' using message = 'invalid_request_reason';
   end if;
 
-  select course.id, course.enrollment_mode, organization.provider_issuer
+  select course.id, course.enrollment_mode::text, organization.provider_issuer
   into v_course_id, v_enrollment_mode, v_provider_issuer
   from public.courses as course
   join private.course_definition_external_groups as organization

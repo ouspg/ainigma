@@ -66,8 +66,6 @@ export interface AppMessages {
   publicInfo: {
     aboutTitle: string;
     aboutIntro: string;
-    aboutSectionTitle: string;
-    aboutPlaceholder: string;
     privacyTitle: string;
     privacyIntro: string;
   };
@@ -223,9 +221,11 @@ const en: AppMessages = {
     loginTitle: "Sign in | Ainigma",
     loginDescription: "Sign in to your Ainigma learning space.",
     deskTitle: "My learning | Ainigma",
-    deskDescription: "Your courses, weekly study plan, and learning progress in Ainigma.",
+    deskDescription:
+      "Your courses, weekly study plan, and learning progress in Ainigma.",
     activityTitle: "Activity history | Ainigma",
-    activityDescription: "Announcements, generated artifacts, and lab instance events.",
+    activityDescription:
+      "Announcements, generated artifacts, and lab instance events.",
     aboutTitle: "About | Ainigma",
     aboutDescription: "Information about the Ainigma learning environment.",
     privacyTitle: "Privacy policy | Ainigma",
@@ -263,22 +263,21 @@ const en: AppMessages = {
   },
   publicInfo: {
     aboutTitle: "About Ainigma",
-    aboutIntro:
-      "Ainigma is an academic learning environment for course materials, interactive exercises, and learner-specific lab work.",
-    aboutSectionTitle: "About this service",
-    aboutPlaceholder:
-      "This is a placeholder. Ownership, responsible unit, accessibility information, support contacts, and service details will be added before launch.",
+    aboutIntro: "A bit more about the background",
     privacyTitle: "Privacy policy",
     privacyIntro:
       "This notice explains how personal data is processed in the Ainigma learning environment and what rights you have.",
   },
   errors: {
     notFoundTitle: "Page not found",
-    notFoundMessage: "The page may have moved, or the address may be incorrect.",
+    notFoundMessage:
+      "The page may have moved, or the address may be incorrect.",
     accessDeniedTitle: "Course access required",
-    accessDeniedMessage: "Your account does not currently have access to this course.",
+    accessDeniedMessage:
+      "Your account does not currently have access to this course.",
     unavailableTitle: "Temporarily unavailable",
-    unavailableMessage: "We could not verify your access right now. Please try again shortly.",
+    unavailableMessage:
+      "We could not verify your access right now. Please try again shortly.",
     serverErrorTitle: "Something went wrong",
     serverErrorMessage: "An unexpected error occurred. Please try again later.",
     returnHome: "Return to the front page",
@@ -340,7 +339,11 @@ const en: AppMessages = {
     },
   },
   course: {
-    status: { "not-started": "Not started", "in-progress": "In progress", completed: "Completed" },
+    status: {
+      "not-started": "Not started",
+      "in-progress": "In progress",
+      completed: "Completed",
+    },
     workspace: "Course workspace",
     details: "Course details",
     record: "Your record",
@@ -357,7 +360,8 @@ const en: AppMessages = {
     start: "Start course",
     minutes: "minutes",
     map: "Course map",
-    mapDescription: "Follow the suggested order, or return to any available week.",
+    mapDescription:
+      "Follow the suggested order, or return to any available week.",
     week: "Week",
     activity: "activity",
     activities: "activities",
@@ -366,13 +370,15 @@ const en: AppMessages = {
       anonymous: {
         eyebrow: "Interactive activity",
         title: "Sign in required",
-        description: "Sign in with your university account to use this interactive activity.",
+        description:
+          "Sign in with your university account to use this interactive activity.",
         action: "Sign in to continue",
       },
       empty: {
         eyebrow: "Interactive activity",
         title: "Course access required",
-        description: "Request access to this course before starting its interactive activities.",
+        description:
+          "Request access to this course before starting its interactive activities.",
         action: "Request course access",
       },
       pending: {
@@ -396,8 +402,16 @@ const en: AppMessages = {
     navigation: "Previous and next learning material",
   },
   dashboard: {
-    status: { "not-started": "Not started", "in-progress": "In progress", completed: "Completed" },
-    agendaStatus: { todo: "To do", "in-progress": "In progress", completed: "Completed" },
+    status: {
+      "not-started": "Not started",
+      "in-progress": "In progress",
+      completed: "Completed",
+    },
+    agendaStatus: {
+      todo: "To do",
+      "in-progress": "In progress",
+      completed: "Completed",
+    },
     studyOverview: "Study overview",
     week: "Week",
     progress: "progress",
@@ -408,7 +422,8 @@ const en: AppMessages = {
     activeCoursesSource: "From your active courses",
     courseUpdates: "Course updates",
     welcome: "Welcome back,",
-    welcomeText: "Continue where you left off or review what needs attention this week.",
+    welcomeText:
+      "Continue where you left off or review what needs attention this week.",
     continueLearning: "Continue learning",
     thisWeek: "This week",
     weeklyPlan: "A plan across all enrolled courses",
@@ -457,9 +472,11 @@ const fi: AppMessages = {
     loginTitle: "Kirjautuminen | Ainigma",
     loginDescription: "Kirjaudu Ainigma-oppimistilaan.",
     deskTitle: "Oma oppiminen | Ainigma",
-    deskDescription: "Kurssisi, viikoittainen opiskelusuunnitelma ja edistymisesi Ainigmaassa.",
+    deskDescription:
+      "Kurssisi, viikoittainen opiskelusuunnitelma ja edistymisesi Ainigmaassa.",
     activityTitle: "Tapahtumahistoria | Ainigma",
-    activityDescription: "Ilmoitukset, luodut artefaktit ja laboratorioympäristöjen tapahtumat.",
+    activityDescription:
+      "Ilmoitukset, luodut artefaktit ja laboratorioympäristöjen tapahtumat.",
     aboutTitle: "Tietoa palvelusta | Ainigma",
     aboutDescription: "Tietoa Ainigma-oppimisympäristöstä.",
     privacyTitle: "Tietosuojaseloste | Ainigma",
@@ -469,7 +486,8 @@ const fi: AppMessages = {
   publicHome: {
     signIn: "Kirjaudu",
     unit: "Oulun yliopiston Secure Programming Group (OUSPG)",
-    title: "Kyberturvallisuuden kurssit ja interaktiiviset laboratoriot Oulun yliopistossa",
+    title:
+      "Kyberturvallisuuden kurssit ja interaktiiviset laboratoriot Oulun yliopistossa",
     intro:
       "Tämä sivusto sisältää osallistuvien kyberturvallisuuskurssien kurssimateriaaleja ja interaktiivisia harjoituksia. Henkilökohtaiset tehtävät ja edistyminen ovat ilmoittautuneiden opiskelijoiden käytettävissä kirjautumisen jälkeen.",
     alphaLabel: "Alphaversio",
@@ -498,10 +516,7 @@ const fi: AppMessages = {
   publicInfo: {
     aboutTitle: "Tietoa Ainigmasta",
     aboutIntro:
-      "Ainigma on akateeminen oppimisympäristö kurssimateriaaleille, interaktiivisille harjoituksille ja opiskelijakohtaisille laboratoriotehtäville.",
-    aboutSectionTitle: "Tietoa palvelusta",
-    aboutPlaceholder:
-      "Tämä on paikkamerkki. Palvelun omistaja, vastuuyksikkö, saavutettavuustiedot, tukiyhteystiedot ja palvelun tarkemmat tiedot lisätään ennen käyttöönottoa.",
+      "Ainigma on oppimisympäristö kurssimateriaaleille, interaktiivisille harjoituksille ja opiskelijakohtaisille laboratoriotehtäville.",
     privacyTitle: "Tietosuojaseloste",
     privacyIntro:
       "Tässä selosteessa kerrotaan, miten henkilötietoja käsitellään Ainigma-oppimisympäristössä ja mitä oikeuksia sinulla on.",
@@ -510,11 +525,14 @@ const fi: AppMessages = {
     notFoundTitle: "Sivua ei löytynyt",
     notFoundMessage: "Sivu on ehkä siirretty tai osoite on virheellinen.",
     accessDeniedTitle: "Kurssin käyttöoikeus vaaditaan",
-    accessDeniedMessage: "Tililläsi ei tällä hetkellä ole käyttöoikeutta tälle kurssille.",
+    accessDeniedMessage:
+      "Tililläsi ei tällä hetkellä ole käyttöoikeutta tälle kurssille.",
     unavailableTitle: "Palvelu on tilapäisesti poissa käytöstä",
-    unavailableMessage: "Käyttöoikeuttasi ei voitu tarkistaa. Yritä hetken kuluttua uudelleen.",
+    unavailableMessage:
+      "Käyttöoikeuttasi ei voitu tarkistaa. Yritä hetken kuluttua uudelleen.",
     serverErrorTitle: "Jokin meni vikaan",
-    serverErrorMessage: "Tapahtui odottamaton virhe. Yritä myöhemmin uudelleen.",
+    serverErrorMessage:
+      "Tapahtui odottamaton virhe. Yritä myöhemmin uudelleen.",
     returnHome: "Palaa etusivulle",
   },
   login: {
@@ -524,11 +542,13 @@ const fi: AppMessages = {
     continue: "Jatka GitHubilla",
     note: "Ainigma käyttää vahvistettua GitHub-identiteettiä kurssioikeuksien tarkistamiseen ja tehtävien yhdistämiseen oikeaan opiskelijaan.",
     localTitle: "Paikallisen kehityksen käyttäjät",
-    localDescription: "Testaa Supabaseen kylvettyä käyttäjää ilman GitHub OAuth -kirjautumista.",
+    localDescription:
+      "Testaa Supabaseen kylvettyä käyttäjää ilman GitHub OAuth -kirjautumista.",
     localNote: "Näkyy vain, kun paikallinen kirjautumistila on käytössä.",
     authError: "GitHub-kirjautumista ei voitu viimeistellä. Yritä uudelleen.",
     startError: "GitHub-kirjautumista ei voitu aloittaa. Yritä uudelleen.",
-    access: "Tarvitsetko käyttöoikeuden? Ota yhteyttä kurssin henkilökuntaan tai tutustu",
+    access:
+      "Tarvitsetko käyttöoikeuden? Ota yhteyttä kurssin henkilökuntaan tai tutustu",
     peppi: "Peppi-oppaaseen",
   },
   navigation: {
@@ -572,7 +592,11 @@ const fi: AppMessages = {
     },
   },
   course: {
-    status: { "not-started": "Ei aloitettu", "in-progress": "Kesken", completed: "Valmis" },
+    status: {
+      "not-started": "Ei aloitettu",
+      "in-progress": "Kesken",
+      completed: "Valmis",
+    },
     workspace: "Kurssityötila",
     details: "Kurssin tiedot",
     record: "Suoritustietosi",
@@ -599,19 +623,22 @@ const fi: AppMessages = {
       anonymous: {
         eyebrow: "Interaktiivinen tehtävä",
         title: "Kirjautuminen vaaditaan",
-        description: "Kirjaudu yliopistotunnuksellasi käyttääksesi tätä interaktiivista tehtävää.",
+        description:
+          "Kirjaudu yliopistotunnuksellasi käyttääksesi tätä interaktiivista tehtävää.",
         action: "Kirjaudu jatkaaksesi",
       },
       empty: {
         eyebrow: "Interaktiivinen tehtävä",
         title: "Kurssin käyttöoikeus vaaditaan",
-        description: "Pyydä kurssin käyttöoikeutta ennen interaktiivisten tehtävien aloittamista.",
+        description:
+          "Pyydä kurssin käyttöoikeutta ennen interaktiivisten tehtävien aloittamista.",
         action: "Pyydä kurssin käyttöoikeutta",
       },
       pending: {
         eyebrow: "Interaktiivinen tehtävä",
         title: "Käyttöoikeuspyyntö odottaa",
-        description: "Kurssin henkilökunnan on hyväksyttävä pyyntösi ennen tehtävän avaamista.",
+        description:
+          "Kurssin henkilökunnan on hyväksyttävä pyyntösi ennen tehtävän avaamista.",
         action: "Pyyntö odottaa",
       },
       accepted: {
@@ -628,8 +655,16 @@ const fi: AppMessages = {
     navigation: "Edellinen ja seuraava oppimateriaali",
   },
   dashboard: {
-    status: { "not-started": "Ei aloitettu", "in-progress": "Kesken", completed: "Valmis" },
-    agendaStatus: { todo: "Tehtävä", "in-progress": "Kesken", completed: "Valmis" },
+    status: {
+      "not-started": "Ei aloitettu",
+      "in-progress": "Kesken",
+      completed: "Valmis",
+    },
+    agendaStatus: {
+      todo: "Tehtävä",
+      "in-progress": "Kesken",
+      completed: "Valmis",
+    },
     studyOverview: "Opintojen yleiskatsaus",
     week: "Viikko",
     progress: "edistyminen",

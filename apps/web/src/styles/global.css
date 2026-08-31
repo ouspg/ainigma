@@ -721,6 +721,23 @@ a {
   line-height: var(--text-heading-3-leading);
 }
 
+.public-document-prose h3 {
+  color: var(--color-text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.public-document-prose a {
+  color: var(--color-text-accent);
+  font-weight: var(--font-weight-medium);
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.15em;
+}
+
+.public-document-prose a:hover {
+  text-decoration-thickness: 0.12em;
+}
+
 .course-prose p,
 .course-prose li,
 .reading-prose p,

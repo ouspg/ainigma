@@ -34,16 +34,7 @@ const intro = isAbout ? copy.aboutIntro : copy.privacyIntro;
 </Section>
 
 <Section className="public-info-section" dividers={["top"]} padding={0} variant="transparent">
-  {isAbout ? (
-    <VStack className="public-section-heading" gap={3}>
-      <Heading level={2}>{copy.aboutSectionTitle}</Heading>
-      <Text type="body" color="secondary">
-        {copy.aboutPlaceholder}
-      </Text>
-    </VStack>
-  ) : (
-    <article class="reading-prose">
-      <slot />
-    </article>
-  )}
+  <article class="reading-prose public-document-prose">
+    <slot />
+  </article>
 </Section>

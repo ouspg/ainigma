@@ -2,7 +2,7 @@
 
 Last updated: 31 August 2026
 
-This notice describes the personal data that Ainigma directly processes, why it is needed, and where it is stored. It is limited to the Ainigma learning environment. The University of Oulu's [general data privacy information](https://www.oulu.fi/en/data-privacy) and any applicable University-specific notices continue to apply to processing outside Ainigma.
+This notice supplements the University of Oulu's [general data privacy information](https://www.oulu.fi/en/data-privacy) by describing how the University's learning-related purposes for processing apply within Ainigma, including what personal data Ainigma directly processes, why it is needed, and where it is stored. It is limited to the Ainigma learning environment. The University's general information and any applicable University-specific notices continue to apply to processing outside Ainigma.
 
 ## Data controller and contacts
 
@@ -14,30 +14,30 @@ The data controller is the University of Oulu:
 > FI-90014 University of Oulu \
 > Tel. +358 294 48 0000
 
-Ainigma is operated by the Oulu University Secure Programming Group (OUSPG). For questions about using Ainigma or about data processed specifically by Ainigma, the course staff are the best first contact and are happy to help. If you want to exercise your data-subject rights, they can also help direct your formal request to the appropriate University contact. You can contact the University of Oulu Data Protection Officer at [dpo@oulu.fi](mailto:dpo@oulu.fi) or send a data-subject rights request to the [Registry Office at kirjaamo@oulu.fi](mailto:kirjaamo@oulu.fi) directly.
+Ainigma is operated by the Oulu University Secure Programming Group (OUSPG). For questions about using Ainigma or about data processed specifically by Ainigma, the course staff are the best first contact. They are happy to help directly, including with removing data from the Ainigma platform where this is possible and appropriate. If you want to exercise your data-subject rights, they can also help direct your formal request to the appropriate University contact. You can contact the University of Oulu Data Protection Officer at [dpo@oulu.fi](mailto:dpo@oulu.fi) or send a data-subject rights request to the [Registry Office at kirjaamo@oulu.fi](mailto:kirjaamo@oulu.fi) directly.
 
 ## What Ainigma processes
 
 Ainigma does not require an account to view public course material. The service directly processes the following data when the relevant feature is used.
 
-### Public browsing
+### 1. Public browsing
 
 When you use Ainigma, technical request and security logs are generated to operate, secure, and troubleshoot the service. These logs may contain information about the request and the connection. The exact fields are implementation details and are documented in the [Ainigma source code](https://github.com/ouspg/ainigma). Ainigma does not use this data for advertising or analytics. Public course material itself is not learner-specific.
 
-### GitHub sign-in
+### 2. GitHub sign-in
 
 For the current setup, you need a standard GitHub account to sign in to Ainigma. Access to the University of Oulu's protected GitHub resources also requires the University's sign-in. Ainigma checks course access separately before enabling interactive features.
 
-Ainigma receives only the account details needed for sign-in and account identification. This may include your GitHub username, a verified email address when GitHub provides it, and an internal Ainigma account identifier. Ainigma does not receive your GitHub password.
+To support sign-in and account identification, Ainigma may process account details received from GitHub. These may include your GitHub username and a verified email address when GitHub provides it. Ainigma also maintains an internal account identifier. Ainigma does not receive your GitHub password.
 For more, see [Supabase's GitHub provider](https://supabase.com/docs/guides/auth/social-login/auth-github).
 
 GitHub account use follows the University of Oulu's applicable policies. GitHub's [terms](https://github.com/customer-terms) and [privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) also apply to GitHub's processing.
 
-### Ainigma profile
+### 3. Ainigma profile
 
 After sign-in, Ainigma maintains an internal profile identifier, display name, and profile creation and update timestamps. Ainigma does not store or receive the user's GitHub password.
 
-### Course access and membership
+### 4. Course access and membership
 
 To show the correct course access state and protect interactive features, Ainigma processes:
 
@@ -50,24 +50,24 @@ To show the correct course access state and protect interactive features, Ainigm
 
 Course eligibility data may include a GitHub user identifier, GitHub username, email address, or student identifier (university email) when the course staff has configured a roster or allowlist. These records are restricted to course administration.
 
-### Interactive course features
+### 5. Interactive course features
 
 For an accepted course member, an interactive request may contain the course identifier, activity identifier, submitted answer or other exercise input, and the evaluation result required to return feedback. The server checks membership before processing interactive requests.
 
 If a learner enters personal, confidential, password, or special-category data into a free-text access-request reason or exercise answer, that information is sent to and may be processed by the service. **Learners should not enter such information.**
 
-### External course integrations
+### 6. External course integrations
 
 If an approved course enables external GitHub access or repository provisioning, Ainigma may process the external group identifier and handle, invitation identifier, external user identifier and handle, repository name or URL, provisioning state, failure information, and related timestamps. GitHub's and the relevant course service's own notices apply to their processing.
 
 ## Where data is stored and processed
 
-| Where                                    | What it handles                                                                   |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| CSC cPouta                               | The Ainigma application, accounts, course access data, database, and service logs |
-| CSC Allas                                | Files and backups used by the deployment                                          |
-| University of Oulu's GitHub organization | GitHub sign-in and any GitHub-side organization or repository activity            |
-| Your browser                             | Necessary sign-in cookies, appearance settings, and local activity state          |
+| Where                                    | What it handles                                                                                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| CSC cPouta                               | The Ainigma application, accounts, course access data, course progress, database, and service logs                                   |
+| CSC Allas                                | Files and backups used by the deployment                                                                                             |
+| University of Oulu's GitHub organization | GitHub sign-in and any GitHub-side organization or repository activity (most of the learners work that is not automatically graded). |
+| Your browser                             | Necessary sign-in cookies, appearance settings, and local activity state                                                             |
 
 CSC's applicable [privacy information](https://csc.fi/en/security-privacy-data-policy-and-open-source-policy/privacy/) and service terms apply to its services.
 

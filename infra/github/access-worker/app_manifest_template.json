@@ -1,0 +1,19 @@
+{
+  "name": "my-worker",
+  "description": "Automation worker",
+  "url": "https://example.com",
+  "hook_attributes": {
+    "url": "https://example.com/unused-webhook",
+    "active": false
+  },
+  "callback_urls": [],
+  "public": false,
+  "request_oauth_on_install": false,
+  "setup_on_update": false,
+  "default_permissions": {
+    "organization_administration": "read",
+    "members": "write",
+    "administration": "write"
+  },
+  "default_events": []
+}

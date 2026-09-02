@@ -60,8 +60,9 @@ repository template (or reuse the marked repository), grant the user `maintain` 
 complete or retry the job through private RPCs. The template owner and name are snapshotted on the
 job, so the source may differ from the access group and queued jobs remain deterministic. The
 provider user ID is the authoritative identity; the current username is retained only as a provider API handle and
-repository-name input. The access row also stores the exact provider invitation ID, and
-acceptance requires that ID plus the user ID to appear in the provider audit trail. Browser clients
+repository-name input. The access row also stores the exact provider invitation ID. Email invitations
+may bind the provider user ID only after that invitation is accepted; user-ID invitations still require
+the pre-linked identity. Browser clients
 cannot read or write these tables directly.
 
 Offerings may set `membership_verification` to `approval_only` when first-party SSO or a trusted

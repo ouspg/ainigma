@@ -244,17 +244,6 @@ begin
        and identifier.revoked_at is null
       where allowlist.course_id = v_course_id and allowlist.status = 'active'
     )
-    and (
-      v_membership_verification = 'approval_only'
-      or exists (
-        select 1
-        from private.profile_identifiers as identifier
-        where identifier.profile_id = v_profile_id
-          and identifier.kind = 'external_user_id'
-          and identifier.issuer = v_provider_issuer
-          and identifier.revoked_at is null
-      )
-    )
   into v_auto_approved;
 
   insert into private.course_access_requests (
@@ -291,23 +280,26 @@ begin
     end if;
 
     insert into private.external_course_access (
-      course_id, profile_id, access_request_id, external_user_id, state
+      course_id,
+      profile_id,
+      access_request_id,
+      external_user_id,
+      invitation_method,
+      invitation_target,
+      state
     )
-    select
+    values (
       v_course_id,
       v_profile_id,
       v_request.id,
-      private.unique_active_profile_identifier(
-        v_profile_id,
-        'external_user_id',
-        v_provider_issuer
-      ),
+      private.unique_active_profile_identifier(v_profile_id, 'external_user_id', v_provider_issuer),
+      case when private.unique_active_profile_identifier(v_profile_id, 'external_user_id', v_provider_issuer) is null
+        then 'email'::private.external_invitation_method
+        else 'external_user_id'::private.external_invitation_method
+      end,
+      private.unique_active_profile_identifier(v_profile_id, 'email', null),
       'not_started'
-    where private.unique_active_profile_identifier(
-      v_profile_id,
-      'external_user_id',
-      v_provider_issuer
-    ) is not null;
+    );
 
     return jsonb_build_object(
       'state', 'awaiting_external_access',

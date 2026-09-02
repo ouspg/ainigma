@@ -196,18 +196,40 @@ begin
       );
     end loop;
   else
-    insert into private.external_course_access (course_id, profile_id, access_request_id, external_user_id, state)
+    insert into private.external_course_access (
+      course_id,
+      profile_id,
+      access_request_id,
+      external_user_id,
+      invitation_method,
+      invitation_target,
+      state
+    )
     select request_row.course_id,
            request_row.requester_profile_id,
            request_row.id,
            identifier.normalized_value,
+           case when identifier.normalized_value is null
+             then 'email'::private.external_invitation_method
+             else 'external_user_id'::private.external_invitation_method
+           end,
+           email.normalized_value,
            'not_started'
     from private.course_access_requests as request_row
-    join private.profile_identifiers as identifier
-      on identifier.profile_id = request_row.requester_profile_id
-     and identifier.kind = 'external_user_id'
-     and identifier.issuer = v_provider_issuer
-     and identifier.revoked_at is null
+    left join lateral (
+      select private.unique_active_profile_identifier(
+        request_row.requester_profile_id,
+        'external_user_id',
+        v_provider_issuer
+      ) as normalized_value
+    ) as identifier on true
+    left join lateral (
+      select private.unique_active_profile_identifier(
+        request_row.requester_profile_id,
+        'email',
+        null
+      ) as normalized_value
+    ) as email on true
     where request_row.id = any (v_changed_request_ids)
     on conflict (course_id, profile_id) do update set access_request_id = excluded.access_request_id;
   end if;

@@ -6,9 +6,11 @@ create table private.external_course_access (
   access_request_id uuid not null,
   external_group_id text,
   external_group_handle text,
-  external_user_id text not null,
-  -- Stable external user ID is authoritative. The handle is the current
-  -- provider API handle and a cache used for repository permissions/naming.
+  -- Stable external user ID is authoritative once an email invitation is
+  -- accepted. It is absent only before that email identity is confirmed.
+  external_user_id text,
+  -- The handle is the current provider API handle and a cache used for
+  -- repository permissions/naming.
   external_user_handle text,
   external_invitation_id text,
   invitation_method private.external_invitation_method not null default 'external_user_id',
@@ -29,8 +31,13 @@ create table private.external_course_access (
     or (external_group_handle = btrim(external_group_handle) and char_length(external_group_handle) between 1 and 255)
   ),
   constraint external_course_access_user_id_check check (
-    external_user_id = btrim(external_user_id)
-    and char_length(external_user_id) between 1 and 255
+    external_user_id is null
+    or (external_user_id = btrim(external_user_id)
+      and char_length(external_user_id) between 1 and 255)
+  ),
+  constraint external_course_access_identity_shape_check check (
+    external_user_id is not null
+    or (invitation_method = 'email' and state <> 'active')
   ),
   constraint external_course_access_invitation_id_check check (
     external_invitation_id is null
@@ -72,7 +79,7 @@ create table private.external_course_access (
 );
 
 comment on column private.external_course_access.external_user_id is
-  'Stable external provider account ID. This is the identity key for the offering access record.';
+  'Stable external provider account ID. It is bound after an email invitation is accepted and is the identity key thereafter.';
 comment on column private.external_course_access.external_user_handle is
   'Current provider login or handle cached from verified membership; it may change and is not an identity key.';
 comment on column private.external_course_access.external_invitation_id is
@@ -83,8 +90,8 @@ create unique index external_course_access_request_uidx
 
 
 -- Return only approved external-access records that a trusted provider worker may
--- reconcile. The stable external user ID is authoritative; the handle is only
--- the provider API lookup handle and is verified again by the worker.
+-- reconcile. The stable external user ID is authoritative when present; an
+-- email invitation may be reconciled before the provider identity is bound.
 create function private.list_external_course_access_to_reconcile()
 returns table (
   course_id uuid,
@@ -628,8 +635,75 @@ begin
       and identifier.normalized_value = p_external_user_id
       and identifier.revoked_at is null
   ) then
-    raise exception using errcode = '42501', message = 'external_identity_mismatch';
+    if v_access.external_user_id is not null
+      or v_access.invitation_method <> 'email'
+      or p_external_invitation_id is null
+    then
+      raise exception using errcode = '42501', message = 'external_identity_mismatch';
+    end if;
+
+    if exists (
+      select 1
+      from private.profile_identifiers as identifier
+      where identifier.kind = 'external_user_id'
+        and identifier.issuer = v_provider_issuer
+        and identifier.scheme_version = 1
+        and identifier.normalized_value = p_external_user_id
+        and identifier.profile_id <> p_profile_id
+        and identifier.revoked_at is null
+    ) or exists (
+      select 1
+      from private.profile_identifiers as identifier
+      where identifier.profile_id = p_profile_id
+        and identifier.kind = 'external_user_id'
+        and identifier.issuer = v_provider_issuer
+        and identifier.scheme_version = 1
+        and identifier.normalized_value <> p_external_user_id
+        and identifier.revoked_at is null
+    ) then
+      update private.external_course_access
+      set state = 'failed',
+          last_checked_at = clock_timestamp(),
+          failure_code = 'external_identity_conflict'
+      where course_id = p_course_id and profile_id = p_profile_id;
+      return;
+    end if;
+
+    -- Email invitations may discover the provider identity only after
+    -- acceptance. The trusted worker has already matched this accepted
+    -- invitation ID to p_external_user_id.
+    perform private.upsert_verified_identifier(
+      p_profile_id,
+      'external_user_id',
+      v_provider_issuer,
+      1,
+      p_external_user_id,
+      clock_timestamp(),
+      null,
+      null
+    );
   end if;
+
+  update private.profile_identifiers
+  set revoked_at = clock_timestamp(),
+      last_verified_at = clock_timestamp()
+  where profile_id = p_profile_id
+    and kind = 'external_user_handle'
+    and issuer = v_provider_issuer
+    and scheme_version = 1
+    and normalized_value <> p_external_user_handle
+    and revoked_at is null;
+
+  perform private.upsert_verified_identifier(
+    p_profile_id,
+    'external_user_handle',
+    v_provider_issuer,
+    1,
+    p_external_user_handle,
+    clock_timestamp(),
+    null,
+    null
+  );
 
   update private.external_course_access
   set external_group_id = p_external_group_id,

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(61);
+select extensions.plan(69);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
@@ -50,6 +50,29 @@ values (
   clock_timestamp()
 );
 
+-- This profile has a verified application account but no external-platform
+-- identity yet. Email invitation acceptance should bind that identity later.
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '70000000-0000-0000-0000-000000000002',
+  'authenticated',
+  'authenticated',
+  'email-requester@student.oulu.fi',
+  '{}',
+  '{}',
+  clock_timestamp(),
+  clock_timestamp()
+);
+
 insert into auth.identities (
   id,
   provider_id,
@@ -77,6 +100,11 @@ select set_config(
 select set_config(
   'ainigma_access_test.owner_profile_id',
   (select profile_id::text from private.auth_user_links where auth_user_id = '50000000-0000-0000-0000-000000000001'),
+  true
+);
+select set_config(
+  'ainigma_access_test.email_requester_profile_id',
+  (select profile_id::text from private.auth_user_links where auth_user_id = '70000000-0000-0000-0000-000000000002'),
   true
 );
 
@@ -148,6 +176,16 @@ select set_config(
 
 -- A trusted external roster match is useful for the owner filter, but grants nothing.
 set role ainigma_maintenance;
+select private.upsert_verified_identifier(
+  current_setting('ainigma_access_test.email_requester_profile_id')::uuid,
+  'email',
+  'github',
+  1,
+  'email-requester@student.oulu.fi',
+  clock_timestamp(),
+  '70000000-0000-0000-0000-000000000002',
+  null
+);
 insert into private.course_roster_allowlist (
   course_id,
   identifier_kind,
@@ -170,6 +208,13 @@ values (
   1,
   '97000001',
   'test auto roster'
+), (
+  current_setting('ainigma_access_test.auto_course_id')::uuid,
+  'email',
+  'github',
+  1,
+  'email-requester@student.oulu.fi',
+  'test auto email roster'
 );
 reset role;
 revoke ainigma_maintenance from postgres;
@@ -703,6 +748,97 @@ select extensions.is(
   (select jsonb_array_length(public.list_my_courses()->'courses')),
   2,
   'GitHub confirmation activates the automatically approved course'
+);
+
+-- An approved request can start an email invitation before the profile has a
+-- linked GitHub identity. Acceptance binds the provider identity atomically.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000002', true);
+select set_config(
+  'ainigma_access_test.email_request_id',
+  (select public.request_course_access('access-gate-course-test', 'email invitation identity binding')->>'request_id'),
+  true
+);
+select extensions.is(
+  (select public.request_course_access('access-gate-course-test', null)->>'state'),
+  'pending'::text,
+  'a profile without an external identity can request course access'
+);
+select extensions.is(
+  (select public.request_course_access('access-gate-auto-course-test', null)->>'state'),
+  'awaiting_external_access'::text,
+  'an email allowlist can auto-approve without a pre-linked external identity'
+);
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '50000000-0000-0000-0000-000000000001', true);
+select extensions.is(
+  (select public.approve_course_access_requests(
+    'access-gate-course-test',
+    array[current_setting('ainigma_access_test.email_request_id')::uuid]
+  )),
+  1,
+  'approval creates external access for a profile without an external identity'
+);
+reset role;
+grant ainigma_maintenance to postgres;
+select extensions.is(
+  (select external_user_id
+   from private.external_course_access
+   where course_id = current_setting('ainigma_access_test.course_id')::uuid
+     and profile_id = current_setting('ainigma_access_test.email_requester_profile_id')::uuid),
+  null::text,
+  'email-first external access starts without a provider user ID'
+);
+select private.record_external_course_access_invitation(
+  current_setting('ainigma_access_test.course_id')::uuid,
+  current_setting('ainigma_access_test.email_requester_profile_id')::uuid,
+  'email',
+  'email-requester@student.oulu.fi',
+  '98000003'
+);
+select extensions.is(
+  (select state
+   from private.external_course_access
+   where course_id = current_setting('ainigma_access_test.course_id')::uuid
+     and profile_id = current_setting('ainigma_access_test.email_requester_profile_id')::uuid),
+  'invitation_pending'::private.external_course_access_state,
+  'email-first access records the invitation before acceptance'
+);
+select extensions.throws_ok(
+  $$update private.external_course_access
+    set state = 'active'
+    where course_id = current_setting('ainigma_access_test.course_id')::uuid
+      and profile_id = current_setting('ainigma_access_test.email_requester_profile_id')::uuid$$,
+  '23514',
+  null,
+  'email-first access cannot become active without a bound provider identity'
+);
+select private.confirm_external_course_access(
+  current_setting('ainigma_access_test.course_id')::uuid,
+  current_setting('ainigma_access_test.email_requester_profile_id')::uuid,
+  '88000001',
+  'access-gate-course-test-org',
+  '98000003',
+  '97000002',
+  'email-requester-test'
+);
+select extensions.is(
+  (select external_user_id
+   from private.external_course_access
+   where course_id = current_setting('ainigma_access_test.course_id')::uuid
+     and profile_id = current_setting('ainigma_access_test.email_requester_profile_id')::uuid),
+  '97000002'::text,
+  'accepted email invitation binds the provider user ID'
+);
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000002', true);
+select extensions.is(
+  (select jsonb_array_length(public.list_my_courses()->'courses')),
+  1,
+  'accepted email invitation activates the provisional profile'
 );
 
 reset role;

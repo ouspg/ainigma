@@ -1,4 +1,4 @@
--- Durable, explicitly requested external repository provisioning.
+-- Durable external repository provisioning.
 
 -- Durable outbox/state machine for one offering-specific submissions repository
 -- per profile. External provider calls happen outside the database transaction.
@@ -112,6 +112,97 @@ comment on column private.course_repository_provisioning.repository_template_own
   'Snapshot of the public repository template owner used for this job; it may differ from the target group.';
 comment on column private.course_repository_provisioning.repository_template_name is
   'Snapshot of the public repository template name used for this job.';
+
+-- Enqueue one repository after trusted course access has been activated. This
+-- is shared by the learner-facing request and opt-in worker automation.
+create function private.enqueue_course_repository_provisioning(
+  p_course_id uuid,
+  p_profile_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_course_definition_key text;
+  v_access_request_id uuid;
+  v_external_group_id text;
+  v_external_group_handle text;
+  v_repository_template_owner text;
+  v_repository_template_name text;
+begin
+  select
+    course.course_definition_key,
+    request_row.id,
+    organization.external_group_id,
+    organization.external_group_handle,
+    organization.repository_template_owner,
+    organization.repository_template_name
+  into
+    v_course_definition_key,
+    v_access_request_id,
+    v_external_group_id,
+    v_external_group_handle,
+    v_repository_template_owner,
+    v_repository_template_name
+  from public.courses as course
+  join public.course_memberships as membership
+    on membership.course_id = course.id
+   and membership.profile_id = p_profile_id
+   and membership.role = 'learner'
+   and membership.status = 'active'
+  join private.course_access_requests as request_row
+    on request_row.course_id = course.id
+   and request_row.requester_profile_id = p_profile_id
+   and request_row.id = membership.created_from_access_request_id
+   and request_row.status = 'approved'
+  join private.course_definition_external_groups as organization
+    on organization.course_definition_key = course.course_definition_key
+  where course.id = p_course_id
+    and course.status = 'published'
+    and (
+      course.membership_verification = 'approval_only'
+      or exists (
+        select 1
+        from private.external_course_access as access_row
+        where access_row.course_id = course.id
+          and access_row.profile_id = p_profile_id
+          and access_row.state = 'active'
+          and access_row.external_group_id = organization.external_group_id
+          and access_row.external_group_handle = organization.external_group_handle
+      )
+    )
+  for update of course;
+
+  if v_access_request_id is null then
+    return false;
+  end if;
+
+  insert into private.course_repository_provisioning (
+    course_id,
+    profile_id,
+    course_definition_key,
+    access_request_id,
+    external_group_id,
+    external_group_handle,
+    repository_template_owner,
+    repository_template_name
+  ) values (
+    p_course_id,
+    p_profile_id,
+    v_course_definition_key,
+    v_access_request_id,
+    v_external_group_id,
+    v_external_group_handle,
+    v_repository_template_owner,
+    v_repository_template_name
+  )
+  on conflict (course_id, profile_id) do nothing;
+
+  return true;
+end
+$function$;
 
 create unique index course_repository_provisioning_repository_id_uidx
   on private.course_repository_provisioning (external_repository_id)

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(56);
+select extensions.plan(58);
 
 select extensions.is(
   current_setting('plpgsql.extra_errors'),
@@ -534,6 +534,22 @@ select extensions.ok(
 select extensions.ok(
   not has_function_privilege('anon', 'public.request_my_course_repository(text)', 'EXECUTE'),
   'anonymous users cannot request course repositories'
+);
+select extensions.ok(
+  has_function_privilege(
+    'ainigma_external_provisioning_worker',
+    'private.enqueue_course_repository_provisioning(uuid, uuid)',
+    'EXECUTE'
+  ),
+  'the external provisioning worker can enqueue confirmed repositories'
+);
+select extensions.ok(
+  not has_function_privilege(
+    'authenticated',
+    'private.enqueue_course_repository_provisioning(uuid, uuid)',
+    'EXECUTE'
+  ),
+  'browser users cannot execute the internal repository enqueue function'
 );
 select extensions.ok(
   not exists (

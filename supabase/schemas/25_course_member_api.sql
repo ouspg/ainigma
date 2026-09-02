@@ -371,8 +371,8 @@ end
 $function$;
 
 -- Enqueue one optional submissions repository for the authenticated learner.
--- Identity, offering, request, and organization values are derived entirely
--- from trusted rows. Repeating the request returns the same durable job.
+-- Identity and offering values are derived from the authenticated profile and
+-- trusted rows. Repeating the request returns the same durable job.
 create function public.request_my_course_repository(p_offering_key text)
 returns jsonb
 language plpgsql
@@ -382,82 +382,20 @@ as $function$
 declare
   v_profile_id uuid := private.current_profile_id();
   v_course_id uuid;
-  v_access_request_id uuid;
-  v_course_definition_key text;
-  v_external_group_id text;
-  v_external_group_handle text;
-  v_repository_template_owner text;
-  v_repository_template_name text;
 begin
-  select
-    course.id,
-    course.course_definition_key,
-    request_row.id,
-    organization.external_group_id,
-    organization.external_group_handle,
-    organization.repository_template_owner,
-    organization.repository_template_name
-  into
-    v_course_id,
-    v_course_definition_key,
-    v_access_request_id,
-    v_external_group_id,
-    v_external_group_handle,
-    v_repository_template_owner,
-    v_repository_template_name
+  select course.id
+  into v_course_id
   from public.courses as course
-  join public.course_memberships as membership
-    on membership.course_id = course.id
-   and membership.profile_id = v_profile_id
-   and membership.role = 'learner'
-   and membership.status = 'active'
-  join private.course_access_requests as request_row
-    on request_row.course_id = course.id
-   and request_row.requester_profile_id = v_profile_id
-   and request_row.id = membership.created_from_access_request_id
-   and request_row.status = 'approved'
-  join private.course_definition_external_groups as organization
-    on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key
-    and course.status = 'published'
-    and (
-      course.membership_verification = 'approval_only'
-      or exists (
-        select 1
-        from private.external_course_access as access_row
-        where access_row.course_id = course.id
-          and access_row.profile_id = v_profile_id
-          and access_row.state = 'active'
-          and access_row.external_group_id = organization.external_group_id
-          and access_row.external_group_handle = organization.external_group_handle
-      )
-    )
-  for update of course;
+  for update;
 
   if v_course_id is null then
     raise sqlstate 'PT403' using message = 'course_repository_request_not_allowed';
   end if;
 
-  insert into private.course_repository_provisioning (
-    course_id,
-    profile_id,
-    course_definition_key,
-    access_request_id,
-    external_group_id,
-    external_group_handle,
-    repository_template_owner,
-    repository_template_name
-  ) values (
-    v_course_id,
-    v_profile_id,
-    v_course_definition_key,
-    v_access_request_id,
-    v_external_group_id,
-    v_external_group_handle,
-    v_repository_template_owner,
-    v_repository_template_name
-  )
-  on conflict (course_id, profile_id) do nothing;
+  if not private.enqueue_course_repository_provisioning(v_course_id, v_profile_id) then
+    raise sqlstate 'PT403' using message = 'course_repository_request_not_allowed';
+  end if;
 
   return public.get_my_course_repository(p_offering_key);
 end

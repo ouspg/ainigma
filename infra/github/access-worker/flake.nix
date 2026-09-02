@@ -81,7 +81,8 @@
                 fi
 
                 if [ "''${RUN_EMAIL_TEST_SETUP:-}" = "1" ]; then
-                  if [ "${if hasTestFixture then "0" else "1"}" = "1" ]; then
+                  test_fixture_available="${if hasTestFixture then "1" else "0"}"
+                  if [ "$test_fixture_available" = "0" ]; then
                     echo "this worker image does not contain the email test fixture" >&2
                     exit 1
                   fi

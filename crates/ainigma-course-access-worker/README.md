@@ -198,7 +198,9 @@ address. The override is recorded with the access record so
 retries remain idempotent; it does not create a profile or approve access.
 
 Polling is safe to repeat: existing invitations, memberships, repositories,
-and completed jobs are detected rather than duplicated. Transient provider
+and completed jobs are detected rather than duplicated. A learner who is already
+in the configured GitHub organization is confirmed from the stable user ID and
+active-member snapshot even when no invitation ID exists. Transient provider
 failures are recorded; active access is not revoked from one incomplete
 snapshot. Keep the token and database URL out of logs and deployment files.
 

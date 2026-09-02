@@ -514,9 +514,10 @@ $function$;
 
 
 -- Called only by the trusted provider integration after it has confirmed the
--- expected invitation ID and stable user ID are an active membership in the
--- course organization. The username is a current provider API handle, not
--- the identity key.
+-- stable user ID is an active membership in the course organization. An
+-- invitation ID is required for invitation-based access, but is null when
+-- confirming a student who was already a member. The username is a current
+-- provider API handle, not the identity key.
 create function private.confirm_external_course_access(
   p_course_id uuid,
   p_profile_id uuid,
@@ -544,9 +545,10 @@ begin
     or p_external_group_handle is null
     or p_external_group_handle <> btrim(p_external_group_handle)
     or char_length(p_external_group_handle) not between 1 and 255
-    or p_external_invitation_id is null
-    or p_external_invitation_id <> btrim(p_external_invitation_id)
-    or char_length(p_external_invitation_id) not between 1 and 255
+    or (p_external_invitation_id is not null and (
+      p_external_invitation_id <> btrim(p_external_invitation_id)
+      or char_length(p_external_invitation_id) not between 1 and 255
+    ))
     or p_external_user_id is null
     or p_external_user_id <> btrim(p_external_user_id)
     or char_length(p_external_user_id) not between 1 and 255
@@ -593,7 +595,8 @@ begin
     raise exception using errcode = '42501', message = 'external_group_mismatch';
   end if;
 
-  if v_access.external_invitation_id is distinct from p_external_invitation_id then
+  if v_access.external_invitation_id is distinct from p_external_invitation_id
+  then
     raise exception using errcode = '42501', message = 'external_invitation_mismatch';
   end if;
 
@@ -631,7 +634,10 @@ begin
     course_id, profile_id, event_kind, new_role, new_status, actor_profile_id, reason
   )
   select p_course_id, p_profile_id, 'created', 'learner', 'active', null,
-    'GitHub organization invitation and membership confirmed'
+    case when p_external_invitation_id is null
+      then 'Existing platform organization membership confirmed'
+      else 'Platform organization invitation and membership confirmed'
+    end
   where not exists (
     select 1 from private.course_membership_events as event_row
     where event_row.course_id = p_course_id

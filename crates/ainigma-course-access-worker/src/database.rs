@@ -26,7 +26,7 @@ pub struct AccessToReconcile {
     pub expected_external_group_handle: String,
     pub external_user_id: String,
     pub external_user_handle: Option<String>,
-    pub external_invitation_id: String,
+    pub external_invitation_id: Option<String>,
     pub state: String,
 }
 
@@ -56,7 +56,7 @@ pub async fn invitation_data(
     let row = sqlx::query!(
         r#"select provider_kind, expected_external_group_handle,
                   external_user_id, external_user_handle, external_invitation_id,
-                  external_email, state::text
+                  external_email, invitation_target, state::text
            from private.list_external_course_access_to_reconcile()
            where course_id = $1 and profile_id = $2"#,
         course_id,
@@ -66,24 +66,11 @@ pub async fn invitation_data(
     .await?
     .ok_or("approved external access record not found")?;
 
-    // Keep the primary query's prepared metadata stable while reading the
-    // optional target added for explicit email overrides.
-    let invitation_target = sqlx::query_scalar::<_, Option<String>>(
-        r#"select invitation_target
-           from private.list_external_course_access_to_reconcile()
-           where course_id = $1 and profile_id = $2"#,
-    )
-    .bind(course_id)
-    .bind(profile_id)
-    .fetch_optional(database)
-    .await?
-    .flatten();
-
-    let (email_domain_enforced, email_domain_suffixes) = sqlx::query_as::<_, (bool, Vec<String>)>(
-        r#"select organization.email_domain_enforced,
+    let settings = sqlx::query!(
+        r#"select organization.email_domain_enforced as "email_domain_enforced!",
                   coalesce(array_agg(domain.domain_suffix order by domain.domain_suffix)
                            filter (where domain.domain_suffix is not null),
-                           '{}'::text[])
+                           '{}'::text[]) as "email_domain_suffixes!"
            from public.courses course
            join private.course_definition_external_groups organization
              on organization.course_definition_key = course.course_definition_key
@@ -91,8 +78,8 @@ pub async fn invitation_data(
              on domain.course_definition_key = organization.course_definition_key
            where course.id = $1
            group by organization.email_domain_enforced"#,
+        course_id
     )
-    .bind(course_id)
     .fetch_one(database)
     .await?;
 
@@ -109,12 +96,12 @@ pub async fn invitation_data(
         external_user_handle: row.external_user_handle,
         external_invitation_id: row.external_invitation_id,
         external_email: row.external_email,
-        invitation_target,
+        invitation_target: row.invitation_target,
         state: row
             .state
             .ok_or("database returned no external access state")?,
-        email_domain_enforced,
-        email_domain_suffixes,
+        email_domain_enforced: settings.email_domain_enforced,
+        email_domain_suffixes: settings.email_domain_suffixes,
     })
 }
 
@@ -148,8 +135,7 @@ pub async fn access_to_reconcile(
                   external_user_id, external_user_handle, external_invitation_id,
                   state::text
            from private.list_external_course_access_to_reconcile()
-           where state not in ('not_started', 'revoked')
-             and external_invitation_id is not null"#
+           where state <> 'revoked'"#
     )
     .fetch_all(database)
     .await?;
@@ -179,9 +165,7 @@ pub async fn access_to_reconcile(
                     .external_user_id
                     .ok_or("database returned no external user ID")?,
                 external_user_handle: row.external_user_handle,
-                external_invitation_id: row
-                    .external_invitation_id
-                    .ok_or("database returned no external invitation ID")?,
+                external_invitation_id: row.external_invitation_id,
                 state: row.state.ok_or("database returned no access state")?,
             })
         })
@@ -270,7 +254,7 @@ pub async fn confirm_access(
     profile_id: Uuid,
     external_group_id: &str,
     external_group_handle: &str,
-    external_invitation_id: &str,
+    external_invitation_id: Option<&str>,
     external_user_id: &str,
     external_user_handle: &str,
 ) -> Result<(), Box<dyn Error>> {

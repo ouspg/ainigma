@@ -61,7 +61,7 @@ pub async fn poll_once<P: ExternalPlatform>(
         let unresolved_invitation_ids: HashSet<_> = accesses
             .iter()
             .filter(|access| access.state != "active")
-            .map(|access| access.external_invitation_id.clone())
+            .filter_map(|access| access.external_invitation_id.clone())
             .collect();
         let snapshot = platform
             .organization_snapshot(&organization, &unresolved_invitation_ids)
@@ -87,13 +87,15 @@ async fn reconcile_one(
         Err(SnapshotError::SingleSignOnRequired) => {
             if access.state == "active" {
                 record_check_failure(database, access, "external_sso_required").await?;
-            } else {
+            } else if access.external_invitation_id.is_some() {
                 record_status(database, access, "sso_required", None).await?;
             }
             return Ok(());
         }
         Err(SnapshotError::Failed(code)) => {
-            record_check_failure(database, access, code).await?;
+            if access.state == "active" || access.external_invitation_id.is_some() {
+                record_check_failure(database, access, code).await?;
+            }
             return Ok(());
         }
     };
@@ -101,7 +103,7 @@ async fn reconcile_one(
     if snapshot.organization_id() != expected_group_id {
         if access.state == "active" {
             record_check_failure(database, access, "external_group_id_mismatch").await?;
-        } else {
+        } else if access.external_invitation_id.is_some() {
             record_status(
                 database,
                 access,
@@ -121,7 +123,7 @@ async fn reconcile_one(
                     access.profile_id,
                     &access.expected_external_group_id,
                     &access.expected_external_group_handle,
-                    &access.external_invitation_id,
+                    access.external_invitation_id.as_deref(),
                     &access.external_user_id,
                     username,
                 )
@@ -144,52 +146,68 @@ async fn reconcile_one(
                     tracing::warn!(offering = %access.offering_key, "GitHub member absent from snapshot; waiting for confirmation");
                 }
             }
-        } else if let Some(invitation) =
-            snapshot.accepted_invitation(&access.external_invitation_id)
-        {
-            if invitation.user_id != access.external_user_id {
-                record_status(
-                    database,
-                    access,
-                    "failed",
-                    Some("external_invitation_identity_mismatch"),
-                )
-                .await?;
-            } else if let Some(username) = active_username {
+        } else if access.external_invitation_id.is_none() {
+            // A student may already belong to the organization, so there is
+            // no invitation audit record to match in that case.
+            if let Some(username) = active_username {
                 database::confirm_access(
                     database,
                     access.course_id,
                     access.profile_id,
                     &access.expected_external_group_id,
                     &access.expected_external_group_handle,
-                    &access.external_invitation_id,
+                    None,
                     &access.external_user_id,
                     username,
                 )
                 .await?;
-                tracing::info!(offering = %access.offering_key, "external invitation and membership confirmed");
+                tracing::info!(offering = %access.offering_key, "existing external membership confirmed");
+            }
+        } else {
+            let invitation_id = access.external_invitation_id.as_deref().unwrap();
+
+            if let Some(invitation) = snapshot.accepted_invitation(invitation_id) {
+                if invitation.user_id != access.external_user_id {
+                    record_status(
+                        database,
+                        access,
+                        "failed",
+                        Some("external_invitation_identity_mismatch"),
+                    )
+                    .await?;
+                } else if let Some(username) = active_username {
+                    database::confirm_access(
+                        database,
+                        access.course_id,
+                        access.profile_id,
+                        &access.expected_external_group_id,
+                        &access.expected_external_group_handle,
+                        Some(invitation_id),
+                        &access.external_user_id,
+                        username,
+                    )
+                    .await?;
+                    tracing::info!(offering = %access.offering_key, "external invitation and membership confirmed");
+                } else {
+                    record_status(
+                        database,
+                        access,
+                        "failed",
+                        Some("external_membership_not_found"),
+                    )
+                    .await?;
+                }
+            } else if snapshot.pending_invitation(invitation_id).is_some() {
+                record_status(database, access, "invitation_pending", None).await?;
             } else {
                 record_status(
                     database,
                     access,
                     "failed",
-                    Some("external_membership_not_found"),
+                    Some("external_invitation_acceptance_not_confirmed"),
                 )
                 .await?;
             }
-        } else if snapshot
-            .pending_invitation(&access.external_invitation_id)
-            .is_some()
-        {
-            record_status(database, access, "invitation_pending", None).await?;
-        } else {
-            record_status(
-                database,
-                access,
-                "failed",
-                Some("external_invitation_acceptance_not_confirmed"),
-            )
-            .await?;
         }
     }
 

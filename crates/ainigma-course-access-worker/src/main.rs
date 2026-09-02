@@ -84,6 +84,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if email.is_some() && by != InvitationMethod::Email {
                 return Err("--email can only be used with --by email".into());
             }
+            reconciliation::poll_once(&database, &github, Some(course_id), Some(profile_id))
+                .await?;
             invitations::invite_one_with_email(
                 &database,
                 &github,
@@ -128,10 +130,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         } => {
             let github = github::GithubPlatform::from_env().await?;
             loop {
-                let invitation_summary =
-                    invitations::invite_pending(&database, &github, course_id, profile_id).await?;
                 let count =
                     reconciliation::poll_once(&database, &github, course_id, profile_id).await?;
+                let invitation_summary =
+                    invitations::invite_pending(&database, &github, course_id, profile_id).await?;
                 let repository_summary =
                     repositories::provision_repositories(&database, &github, course_id, profile_id)
                         .await?;

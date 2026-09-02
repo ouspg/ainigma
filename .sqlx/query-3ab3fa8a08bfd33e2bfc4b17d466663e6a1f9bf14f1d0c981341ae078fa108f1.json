@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select organization.email_domain_enforced as \"email_domain_enforced!\",\n                  coalesce(array_agg(domain.domain_suffix order by domain.domain_suffix)\n                           filter (where domain.domain_suffix is not null),\n                           '{}'::text[]) as \"email_domain_suffixes!\"\n           from public.courses course\n           join private.course_definition_external_groups organization\n             on organization.course_definition_key = course.course_definition_key\n           left join private.course_definition_external_email_domains domain\n             on domain.course_definition_key = organization.course_definition_key\n           where course.id = $1\n           group by organization.email_domain_enforced",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email_domain_enforced!",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "private.course_definition_external_groups",
+            "name": "email_domain_enforced"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email_domain_suffixes!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "3ab3fa8a08bfd33e2bfc4b17d466663e6a1f9bf14f1d0c981341ae078fa108f1"
+}

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(30);
+select extensions.plan(42);
 
 -- These are database contract tests. A GitHub organization snapshot is not
 -- stored locally, so the trusted confirmation RPC represents the worker's
@@ -383,6 +383,159 @@ select extensions.is(
      and membership.course_id = (select id from public.courses where offering_key = 'test-course-a-local')),
   'revoked',
   'local course membership is revoked with external access'
+);
+
+-- First-party SSO can use the same request/approval boundary without requiring
+-- a second organization membership check. The configured provider remains
+-- available for optional repository provisioning.
+update public.courses
+set membership_verification = 'approval_only'
+where offering_key = 'test-course-b-local';
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '50000000-0000-0000-0000-000000000003', true);
+select extensions.is(
+  (public.request_course_access('test-course-b-local', 'direct SSO request')->>'state'),
+  'pending',
+  'approval-only access still requires an access request'
+);
+reset role;
+select extensions.is(
+  (select count(*)::bigint
+   from private.external_course_access access_row
+   join private.auth_user_links link on link.profile_id = access_row.profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000003'
+     and access_row.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  0::bigint,
+  'approval-only requests do not create external access records'
+);
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '50000000-0000-0000-0000-000000000001', true);
+select extensions.is(
+  public.approve_course_access_requests('test-course-b-local'),
+  1,
+  'owner approval activates an approval-only learner'
+);
+reset role;
+select extensions.is(
+  (select status::text
+   from public.course_memberships membership
+   join private.auth_user_links link on link.profile_id = membership.profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000003'
+     and membership.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  'active',
+  'approval-only access creates local course membership'
+);
+select extensions.is(
+  (select membership.created_from_access_request_id
+   from public.course_memberships membership
+   join private.auth_user_links link on link.profile_id = membership.profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000003'
+     and membership.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  (select request_row.id
+   from private.course_access_requests request_row
+   join private.auth_user_links link on link.profile_id = request_row.requester_profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000003'
+     and request_row.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  'approval-only membership records its approved request'
+);
+select extensions.throws_ok(
+  $$select private.record_external_course_access_invitation(
+    (select id from public.courses where offering_key = 'test-course-b-local'),
+    (select profile_id from private.auth_user_links
+     where auth_user_id = '50000000-0000-0000-0000-000000000003'),
+    'external_user_id',
+    '90000003',
+    '99100003'
+  )$$,
+  '42501',
+  'external_access_not_required',
+  'external invitations cannot bypass approval-only course access'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '50000000-0000-0000-0000-000000000003', true);
+select extensions.is(
+  (public.request_my_course_repository('test-course-b-local')->>'state'),
+  'queued',
+  'an approval-only learner can request a repository'
+);
+reset role;
+select extensions.is(
+  (select external_user_handle
+   from private.claim_course_repository_provisioning(
+     1,
+     (select id from public.courses where offering_key = 'test-course-b-local'),
+     (select profile_id from private.auth_user_links
+      where auth_user_id = '50000000-0000-0000-0000-000000000003'))),
+  'ainigma-local-emptylearner',
+  'repository provisioning resolves the optional provider identity from the profile'
+);
+select extensions.is(
+  (select repository_name
+   from private.course_repository_provisioning repository
+   join private.auth_user_links link on link.profile_id = repository.profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000003'
+     and repository.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  'submissions-test-course-b-local-ainigma-local-emptylearner',
+  'approval-only repository claims keep deterministic repository naming'
+);
+
+-- Allowlist auto-approval still creates the request first, then activates the
+-- local membership without consulting the external provider.
+update public.courses
+set enrollment_mode = 'allowlist_auto'
+where offering_key = 'test-course-b-local';
+insert into private.course_roster_allowlist (
+  course_id,
+  identifier_kind,
+  identifier_issuer,
+  identifier_scheme_version,
+  normalized_identifier_value,
+  source,
+  imported_by
+)
+select
+  (select id from public.courses where offering_key = 'test-course-b-local'),
+  identifier.kind,
+  identifier.issuer,
+  identifier.scheme_version,
+  identifier.normalized_value,
+  'direct-sso-test',
+  (select profile_id from private.auth_user_links
+   where auth_user_id = '50000000-0000-0000-0000-000000000001')
+from private.profile_identifiers identifier
+join private.auth_user_links link on link.profile_id = identifier.profile_id
+where link.auth_user_id = '50000000-0000-0000-0000-000000000004'
+  and identifier.kind = 'email'
+  and identifier.revoked_at is null;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '50000000-0000-0000-0000-000000000004', true);
+select extensions.is(
+  (public.request_course_access('test-course-b-local', 'allowlist direct SSO request')->>'state'),
+  'active',
+  'allowlisted approval-only access activates immediately after the request'
+);
+reset role;
+select extensions.is(
+  (select count(*)::bigint
+   from private.external_course_access access_row
+   join private.auth_user_links link on link.profile_id = access_row.profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000004'
+     and access_row.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  0::bigint,
+  'allowlisted approval-only access has no external access record'
+);
+select extensions.is(
+  (select request_row.decision_source
+   from private.course_access_requests request_row
+   join private.auth_user_links link on link.profile_id = request_row.requester_profile_id
+   where link.auth_user_id = '50000000-0000-0000-0000-000000000004'
+     and request_row.course_id = (select id from public.courses where offering_key = 'test-course-b-local')
+   order by request_row.requested_at desc
+   limit 1),
+  'allowlist',
+  'allowlist auto-approval remains recorded on the request'
 );
 
 select * from extensions.finish();

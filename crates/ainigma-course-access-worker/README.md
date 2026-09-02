@@ -9,8 +9,11 @@ sidebar:
 
 This trusted control-plane worker manages GitHub access for approved course
 records. It sends or adopts invitations, reconciles membership, and creates
-requested private submission repositories. It does not create student
-memberships or authenticate students.
+requested private submission repositories. Offerings using `approval_only`
+membership verification create local course membership in the database and
+produce no GitHub access work; the worker may still provision their requested
+repositories when a verified GitHub identity is linked. It does not create
+student memberships or authenticate students.
 
 ## Requirements
 

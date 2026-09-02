@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(47);
+select extensions.plan(48);
 
 select extensions.has_table('public', 'courses', 'courses table exists');
 select extensions.has_table(
@@ -133,7 +133,11 @@ select private.branch_course_offering(
   'security-fundamentals-2027-test',
   current_setting('ainigma_test.security_release_id')::uuid,
   'SEC-NEXT',
-  current_setting('ainigma_test.outsider_profile_id')::uuid
+  current_setting('ainigma_test.outsider_profile_id')::uuid,
+  null,
+  null,
+  null,
+  'approval_only'
 );
 reset role;
 
@@ -145,6 +149,15 @@ select extensions.is(
   ),
   2::bigint,
   'multiple course offerings may share one authored course definition'
+);
+select extensions.is(
+  (
+    select membership_verification::text
+    from public.courses
+    where offering_key = 'security-fundamentals-2027-test'
+  ),
+  'approval_only',
+  'branching an offering can select approval-only membership verification'
 );
 
 update public.courses

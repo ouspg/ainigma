@@ -62,6 +62,12 @@ repository-name input. The access row also stores the exact provider invitation 
 acceptance requires that ID plus the user ID to appear in the provider audit trail. Browser clients
 cannot read or write these tables directly.
 
+Offerings may set `membership_verification` to `approval_only` when first-party SSO or a trusted
+allowlist is the access authority. The learner must still create an access request, and owner
+approval or allowlist auto-approval creates the local membership without an external invitation or
+membership snapshot. The configured provider group remains available as the repository target; a
+repository job still requires a verified identity for that provider.
+
 Only published offerings are returned to the GitHub reconciliation worker. Transient provider
 failures preserve confirmed access, and three consecutive complete snapshots must omit a member
 before the database revokes offering membership. Repository names become immutable when first

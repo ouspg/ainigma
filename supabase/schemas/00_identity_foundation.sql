@@ -328,7 +328,11 @@ begin
 end
 $function$;
 
--- GitHub's numeric subject is authoritative; username and verified email remain replaceable provider facts.
+-- The provider subject is authoritative for every Auth provider. GitHub's
+-- numeric subject, username, and verified email retain their existing rules;
+-- other providers at least receive a stable subject identifier so first-party
+-- SSO can be matched by an allowlist without teaching course authorization
+-- about a specific provider.
 create function private.sync_auth_identity(p_identity_id uuid)
 returns uuid
 language plpgsql
@@ -338,6 +342,8 @@ as $function$
 declare
   v_identity record;
   v_profile_id uuid;
+  v_provider_issuer text;
+  v_external_user_id text;
   v_username text;
   v_email text;
 begin
@@ -356,24 +362,34 @@ begin
 
   v_profile_id := private.ensure_auth_user_profile(v_identity.user_id);
 
-  if v_identity.provider <> 'github' then
-    return v_profile_id;
+  v_external_user_id := btrim(coalesce(v_identity.provider_id, ''));
+  if v_external_user_id = '' then
+    raise exception using errcode = '22023', message = 'external_subject_required';
   end if;
 
-  if v_identity.provider_id !~ '^[0-9]+$' then
+  if v_identity.provider = 'github' and v_external_user_id !~ '^[0-9]+$' then
     raise exception using errcode = '22023', message = 'invalid_github_numeric_subject';
   end if;
+
+  v_provider_issuer := case
+    when v_identity.provider = 'github' then 'github.com'
+    else coalesce(nullif(btrim(v_identity.identity_data ->> 'iss'), ''), btrim(v_identity.provider))
+  end;
 
   perform private.upsert_verified_identifier(
     v_profile_id,
     'external_user_id',
-    'github.com',
+    v_provider_issuer,
     1,
-    v_identity.provider_id,
+    v_external_user_id,
     coalesce(v_identity.created_at, clock_timestamp()),
     v_identity.user_id,
     v_identity.id::text
   );
+
+  if v_identity.provider <> 'github' then
+    return v_profile_id;
+  end if;
 
   v_username := lower(btrim(coalesce(
     v_identity.identity_data ->> 'user_name',
@@ -475,7 +491,6 @@ begin
   for v_identity_id in
     select identity_row.id
     from private.auth_identities as identity_row
-    where identity_row.provider = 'github'
     order by identity_row.created_at, identity_row.id
   loop
     auth_identity_id := v_identity_id;

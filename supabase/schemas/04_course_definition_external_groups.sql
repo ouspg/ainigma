@@ -27,6 +27,9 @@ create table private.course_definition_external_groups (
   constraint course_definition_external_groups_org_slug_check check (
     external_group_handle = btrim(external_group_handle)
     and char_length(external_group_handle) between 1 and 255
+  ),
+  constraint course_definition_external_groups_repository_target_unique unique (
+    course_definition_key, external_group_id, external_group_handle
   )
 );
 
@@ -45,11 +48,11 @@ create table private.course_definition_external_email_domains (
 comment on table private.course_definition_external_groups is
   'The trusted external provider group configured for each reusable course definition.';
 comment on column private.course_definition_external_groups.provider_kind is
-  'Provider adapter key, currently github; it selects the external platform implementation.';
+  'Provider adapter key, currently github; it selects the external integration used for invitations and repositories.';
 comment on column private.course_definition_external_groups.provider_issuer is
   'Identifier issuer used to select verified profile facts for this provider instance.';
 comment on column private.course_definition_external_groups.external_group_id is
-  'Stable provider group ID used for authorization; the handle is only a display snapshot.';
+  'Stable provider group ID used for external membership verification when configured; the handle is only a display snapshot.';
 comment on column private.course_definition_external_groups.external_group_handle is
   'Current provider group handle for diagnostics and display; external_group_id is authoritative.';
 comment on column private.course_definition_external_groups.email_domain_enforced is

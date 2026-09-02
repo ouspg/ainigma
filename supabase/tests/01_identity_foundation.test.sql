@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(48);
+select extensions.plan(50);
 
 select extensions.is(
   current_setting('plpgsql.extra_errors'),
@@ -150,6 +150,48 @@ select extensions.is(
   ),
   1::bigint,
   'GitHub numeric subject is synchronized as the stable identifier'
+);
+
+insert into auth.identities (
+  id,
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  created_at,
+  updated_at
+)
+values (
+  '20000000-0000-0000-0000-000000000002',
+  'entra-subject-2',
+  '10000000-0000-0000-0000-000000000002',
+  '{"sub":"entra-subject-2","iss":"https://login.microsoftonline.com/test-tenant/v2.0"}',
+  'azure',
+  clock_timestamp(),
+  clock_timestamp()
+);
+
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.profile_identifiers
+    where kind = 'external_user_id'
+      and issuer = 'https://login.microsoftonline.com/test-tenant/v2.0'
+      and normalized_value = 'entra-subject-2'
+      and revoked_at is null
+  ),
+  1::bigint,
+  'a direct SSO subject is synchronized without a GitHub-specific adapter'
+);
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.reconcile_auth_identities() as result
+    where result.auth_identity_id = '20000000-0000-0000-0000-000000000002'
+      and result.status = 'synced'
+  ),
+  1::bigint,
+  'identity reconciliation includes direct SSO providers'
 );
 select extensions.is(
   (

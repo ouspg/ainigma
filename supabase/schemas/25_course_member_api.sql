@@ -168,6 +168,7 @@ declare
   v_profile_id uuid := private.current_profile_id();
   v_course_id uuid;
   v_enrollment_mode text;
+  v_membership_verification private.course_membership_verification;
   v_provider_issuer text;
   v_auto_approved boolean;
   v_request private.course_access_requests%rowtype;
@@ -177,13 +178,17 @@ begin
     raise sqlstate 'PT400' using message = 'invalid_request_reason';
   end if;
 
-  select course.id, course.enrollment_mode::text, organization.provider_issuer
-  into v_course_id, v_enrollment_mode, v_provider_issuer
+  select course.id,
+         course.enrollment_mode::text,
+         course.membership_verification,
+         organization.provider_issuer
+  into v_course_id, v_enrollment_mode, v_membership_verification, v_provider_issuer
   from public.courses as course
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
   where course.offering_key = p_offering_key
-    and course.status = 'published';
+    and course.status = 'published'
+  for update of course;
 
   if v_course_id is null then
     raise sqlstate 'PT404' using message = 'course_not_found';
@@ -213,14 +218,20 @@ begin
 
   if found and v_request.status in ('pending', 'approved') then
     return jsonb_build_object(
-      'state', case when v_request.status = 'approved' then 'awaiting_external_access' else 'pending' end,
+      'state', case
+        when v_request.status = 'approved'
+          and v_membership_verification = 'external_membership'
+          then 'awaiting_external_access'
+        when v_request.status = 'approved' then 'active'
+        else 'pending'
+      end,
       'offering_key', p_offering_key,
       'request_id', v_request.id
     );
   end if;
 
   select
-    v_enrollment_mode = 'allowlist_auto'
+      v_enrollment_mode = 'allowlist_auto'
     and exists (
       select 1
       from private.course_roster_allowlist as allowlist
@@ -233,13 +244,16 @@ begin
        and identifier.revoked_at is null
       where allowlist.course_id = v_course_id and allowlist.status = 'active'
     )
-    and exists (
-      select 1
-      from private.profile_identifiers as identifier
-      where identifier.profile_id = v_profile_id
-        and identifier.kind = 'external_user_id'
-        and identifier.issuer = v_provider_issuer
-        and identifier.revoked_at is null
+    and (
+      v_membership_verification = 'approval_only'
+      or exists (
+        select 1
+        from private.profile_identifiers as identifier
+        where identifier.profile_id = v_profile_id
+          and identifier.kind = 'external_user_id'
+          and identifier.issuer = v_provider_issuer
+          and identifier.revoked_at is null
+      )
     )
   into v_auto_approved;
 
@@ -263,6 +277,19 @@ begin
   returning * into v_request;
 
   if v_auto_approved then
+    if v_membership_verification = 'approval_only' then
+      perform private.activate_course_membership_from_request(
+        v_request.id,
+        'Course access request approved from allowlist'
+      );
+
+      return jsonb_build_object(
+        'state', 'active',
+        'offering_key', p_offering_key,
+        'request_id', v_request.id
+      );
+    end if;
+
     insert into private.external_course_access (
       course_id, profile_id, access_request_id, external_user_id, state
     )
@@ -362,16 +389,19 @@ declare
   v_profile_id uuid := private.current_profile_id();
   v_course_id uuid;
   v_access_request_id uuid;
+  v_course_definition_key text;
   v_external_group_id text;
   v_external_group_handle text;
 begin
   select
     course.id,
-    access_row.access_request_id,
-    access_row.external_group_id,
-    access_row.external_group_handle
+    course.course_definition_key,
+    request_row.id,
+    organization.external_group_id,
+    organization.external_group_handle
   into
     v_course_id,
+    v_course_definition_key,
     v_access_request_id,
     v_external_group_id,
     v_external_group_handle
@@ -381,23 +411,28 @@ begin
    and membership.profile_id = v_profile_id
    and membership.role = 'learner'
    and membership.status = 'active'
-  join private.external_course_access as access_row
-    on access_row.course_id = course.id
-   and access_row.profile_id = v_profile_id
-   and access_row.state = 'active'
-   and access_row.external_user_handle is not null
   join private.course_access_requests as request_row
-    on request_row.id = access_row.access_request_id
-   and request_row.course_id = access_row.course_id
-   and request_row.requester_profile_id = access_row.profile_id
+    on request_row.course_id = course.id
+   and request_row.requester_profile_id = v_profile_id
+   and request_row.id = membership.created_from_access_request_id
    and request_row.status = 'approved'
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
-   and organization.external_group_id = access_row.external_group_id
-   and organization.external_group_handle = access_row.external_group_handle
   where course.offering_key = p_offering_key
     and course.status = 'published'
-  for update of access_row;
+    and (
+      course.membership_verification = 'approval_only'
+      or exists (
+        select 1
+        from private.external_course_access as access_row
+        where access_row.course_id = course.id
+          and access_row.profile_id = v_profile_id
+          and access_row.state = 'active'
+          and access_row.external_group_id = organization.external_group_id
+          and access_row.external_group_handle = organization.external_group_handle
+      )
+    )
+  for update of course;
 
   if v_course_id is null then
     raise sqlstate 'PT403' using message = 'course_repository_request_not_allowed';
@@ -406,12 +441,14 @@ begin
   insert into private.course_repository_provisioning (
     course_id,
     profile_id,
+    course_definition_key,
     access_request_id,
     external_group_id,
     external_group_handle
   ) values (
     v_course_id,
     v_profile_id,
+    v_course_definition_key,
     v_access_request_id,
     v_external_group_id,
     v_external_group_handle

@@ -171,6 +171,7 @@ declare
   v_email_domain text;
   v_email_domain_enforced boolean;
   v_email_domain_allowed boolean;
+  v_membership_verification private.course_membership_verification;
 begin
   if p_invitation_method not in ('email', 'external_user_id')
     or p_invitation_target is null
@@ -209,6 +210,20 @@ begin
       and not coalesce(v_email_domain_allowed, false) then
       raise exception using errcode = '22023', message = 'email_domain_not_allowed';
     end if;
+  end if;
+
+  select course.membership_verification
+  into v_membership_verification
+  from public.courses as course
+  where course.id = p_course_id
+  for update;
+
+  if not found then
+    raise exception using errcode = '23503', message = 'course_not_found';
+  end if;
+
+  if v_membership_verification <> 'external_membership' then
+    raise exception using errcode = '42501', message = 'external_access_not_required';
   end if;
 
   select access_row.*
@@ -538,6 +553,7 @@ declare
   v_expected_external_group_id text;
   v_expected_external_group_handle text;
   v_provider_issuer text;
+  v_membership_verification private.course_membership_verification;
 begin
   if p_external_group_id is null
     or p_external_group_id <> btrim(p_external_group_id)
@@ -562,10 +578,12 @@ begin
 
   select organization.external_group_id,
          organization.external_group_handle,
-         organization.provider_issuer
+         organization.provider_issuer,
+         course.membership_verification
   into v_expected_external_group_id,
        v_expected_external_group_handle,
-       v_provider_issuer
+       v_provider_issuer,
+       v_membership_verification
   from public.courses as course
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
@@ -575,6 +593,10 @@ begin
 
   if not found then
     raise exception using errcode = '55000', message = 'course_offering_not_reconcilable';
+  end if;
+
+  if v_membership_verification <> 'external_membership' then
+    raise exception using errcode = '42501', message = 'external_access_not_required';
   end if;
 
   select access_row.* into v_access
@@ -623,28 +645,12 @@ begin
       consecutive_membership_absences = 0
   where course_id = p_course_id and profile_id = p_profile_id;
 
-  insert into public.course_memberships (
-    course_id, profile_id, role, status, created_from_access_request_id
-  ) values (
-    p_course_id, p_profile_id, 'learner', 'active', v_request.id
-  )
-  on conflict (course_id, profile_id) do nothing;
-
-  insert into private.course_membership_events (
-    course_id, profile_id, event_kind, new_role, new_status, actor_profile_id, reason
-  )
-  select p_course_id, p_profile_id, 'created', 'learner', 'active', null,
+  perform private.activate_course_membership_from_request(
+    v_request.id,
     case when p_external_invitation_id is null
       then 'Existing platform organization membership confirmed'
       else 'Platform organization invitation and membership confirmed'
     end
-  where not exists (
-    select 1 from private.course_membership_events as event_row
-    where event_row.course_id = p_course_id
-      and event_row.profile_id = p_profile_id
-      and event_row.event_kind = 'created'
-      and event_row.new_role = 'learner'
-      and event_row.new_status = 'active'
   );
 
 end

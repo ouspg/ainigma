@@ -10,6 +10,7 @@ create table public.courses (
   starts_at timestamptz,
   ends_at timestamptz,
   external_url text,
+  membership_verification private.course_membership_verification not null default 'external_membership',
   created_at timestamptz not null default clock_timestamp(),
   updated_at timestamptz not null default clock_timestamp(),
   constraint courses_offering_key_check check (
@@ -25,6 +26,7 @@ create table public.courses (
     course_definition_release_id,
     course_definition_key
   ) references private.course_definition_releases (id, course_definition_key) on delete restrict,
+  constraint courses_id_definition_key_unique unique (id, course_definition_key),
   constraint courses_code_check check (
     code = btrim(code) and char_length(code) between 1 and 32
   ),
@@ -45,6 +47,8 @@ comment on column public.courses.course_definition_key is
   'Immutable key of the reusable Git-authored course definition rendered for this offering.';
 comment on column public.courses.course_definition_release_id is
   'Exact compiler release currently rendered for this offering; ended offerings stop advancing.';
+comment on column public.courses.membership_verification is
+  'Post-approval course membership gate: external_membership requires the configured provider group; approval_only relies on first-party identity and request approval.';
 
 create index courses_course_definition_key_idx
   on public.courses (course_definition_key);

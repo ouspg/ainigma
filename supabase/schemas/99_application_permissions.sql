@@ -61,10 +61,11 @@ alter function private.has_course_role(uuid, private.course_membership_role[]) o
 alter function private.can_view_profile(uuid) owner to ainigma_function_owner;
 alter function private.register_course_definition_release(text, text, text, text) owner to ainigma_function_owner;
 alter function private.advance_open_course_offerings_to_release(uuid) owner to ainigma_function_owner;
-alter function private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text) owner to ainigma_function_owner;
+alter function private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text, private.course_membership_verification) owner to ainigma_function_owner;
 alter function private.add_course_membership(uuid, uuid, private.course_membership_role, uuid, text) owner to ainigma_function_owner;
 alter function private.transition_course_membership(uuid, uuid, private.course_membership_role, private.course_membership_status, uuid, text) owner to ainigma_function_owner;
 alter function private.transfer_course_ownership(uuid, uuid, uuid, text) owner to ainigma_function_owner;
+alter function private.activate_course_membership_from_request(uuid, text) owner to ainigma_function_owner;
 alter function private.list_external_course_access_to_reconcile() owner to ainigma_function_owner;
 alter function private.record_external_course_access_invitation(uuid, uuid, private.external_invitation_method, text, text) owner to ainigma_function_owner;
 alter function private.record_external_course_access_status(uuid, uuid, private.external_course_access_state, text) owner to ainigma_function_owner;
@@ -95,10 +96,11 @@ revoke all on function
   private.can_view_profile(uuid),
   private.register_course_definition_release(text, text, text, text),
   private.advance_open_course_offerings_to_release(uuid),
-  private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text),
+  private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text, private.course_membership_verification),
   private.add_course_membership(uuid, uuid, private.course_membership_role, uuid, text),
   private.transition_course_membership(uuid, uuid, private.course_membership_role, private.course_membership_status, uuid, text),
   private.transfer_course_ownership(uuid, uuid, uuid, text),
+  private.activate_course_membership_from_request(uuid, text),
   private.list_external_course_access_to_reconcile(),
   private.record_external_course_access_invitation(uuid, uuid, private.external_invitation_method, text, text),
   private.record_external_course_access_status(uuid, uuid, private.external_course_access_state, text),
@@ -136,10 +138,11 @@ grant execute on function private.reconcile_auth_identities() to ainigma_mainten
 grant execute on function private.report_identity_anomalies() to ainigma_maintenance;
 grant execute on function private.register_course_definition_release(text, text, text, text) to ainigma_maintenance;
 grant execute on function private.advance_open_course_offerings_to_release(uuid) to ainigma_maintenance;
-grant execute on function private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text) to ainigma_maintenance;
+grant execute on function private.branch_course_offering(text, uuid, text, uuid, timestamptz, timestamptz, text, private.course_membership_verification) to ainigma_maintenance;
 grant execute on function private.add_course_membership(uuid, uuid, private.course_membership_role, uuid, text) to ainigma_maintenance;
 grant execute on function private.transition_course_membership(uuid, uuid, private.course_membership_role, private.course_membership_status, uuid, text) to ainigma_maintenance;
 grant execute on function private.transfer_course_ownership(uuid, uuid, uuid, text) to ainigma_maintenance;
+grant execute on function private.activate_course_membership_from_request(uuid, text) to ainigma_function_owner, ainigma_maintenance;
 grant execute on function private.list_external_course_access_to_reconcile() to ainigma_maintenance;
 grant execute on function private.record_external_course_access_invitation(uuid, uuid, private.external_invitation_method, text, text) to ainigma_maintenance;
 grant execute on function private.record_external_course_access_status(uuid, uuid, private.external_course_access_state, text) to ainigma_maintenance;

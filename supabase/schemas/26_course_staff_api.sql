@@ -137,13 +137,17 @@ declare
   v_actor_profile_id uuid := private.current_profile_id();
   v_count integer;
   v_provider_issuer text;
+  v_membership_verification private.course_membership_verification;
+  v_changed_request_ids uuid[];
+  v_request_id uuid;
 begin
-  select course.id, organization.provider_issuer
-  into v_course_id, v_provider_issuer
+  select course.id, organization.provider_issuer, course.membership_verification
+  into v_course_id, v_provider_issuer, v_membership_verification
   from public.courses as course
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
-  where course.offering_key = p_offering_key;
+  where course.offering_key = p_offering_key
+  for update of course;
   if v_course_id is null or not private.has_course_role(v_course_id, array['owner']::private.course_membership_role[]) then
     raise sqlstate 'PT404' using message = 'course_not_found';
   end if;
@@ -155,7 +159,8 @@ begin
     raise sqlstate 'PT400' using message = 'request_course_mismatch';
   end if;
 
-  if exists (
+  if v_membership_verification = 'external_membership'
+    and exists (
     select 1
     from private.course_access_requests as request_row
     where request_row.course_id = v_course_id
@@ -186,17 +191,36 @@ begin
     where request_row.id = selected.id
     returning request_row.*
   )
-  insert into private.external_course_access (course_id, profile_id, access_request_id, external_user_id, state)
-  select changed.course_id, changed.requester_profile_id, changed.id, identifier.normalized_value, 'not_started'
-  from changed
-  join private.profile_identifiers as identifier
-    on identifier.profile_id = changed.requester_profile_id
-   and identifier.kind = 'external_user_id'
-   and identifier.issuer = v_provider_issuer
-   and identifier.revoked_at is null
-  on conflict (course_id, profile_id) do update set access_request_id = excluded.access_request_id;
+  select coalesce(array_agg(changed.id), '{}'::uuid[])
+  into v_changed_request_ids
+  from changed;
 
-  get diagnostics v_count = row_count;
+  v_count := cardinality(v_changed_request_ids);
+
+  if v_membership_verification = 'approval_only' then
+    foreach v_request_id in array v_changed_request_ids loop
+      perform private.activate_course_membership_from_request(
+        v_request_id,
+        'Course access request approved by owner'
+      );
+    end loop;
+  else
+    insert into private.external_course_access (course_id, profile_id, access_request_id, external_user_id, state)
+    select request_row.course_id,
+           request_row.requester_profile_id,
+           request_row.id,
+           identifier.normalized_value,
+           'not_started'
+    from private.course_access_requests as request_row
+    join private.profile_identifiers as identifier
+      on identifier.profile_id = request_row.requester_profile_id
+     and identifier.kind = 'external_user_id'
+     and identifier.issuer = v_provider_issuer
+     and identifier.revoked_at is null
+    where request_row.id = any (v_changed_request_ids)
+    on conflict (course_id, profile_id) do update set access_request_id = excluded.access_request_id;
+  end if;
+
   return v_count;
 end
 $function$;

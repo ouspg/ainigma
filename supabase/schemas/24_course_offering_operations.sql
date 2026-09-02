@@ -93,7 +93,8 @@ create function private.branch_course_offering(
   p_owner_profile_id uuid,
   p_starts_at timestamptz default null,
   p_ends_at timestamptz default null,
-  p_external_url text default null
+  p_external_url text default null,
+  p_membership_verification private.course_membership_verification default 'external_membership'
 )
 returns uuid
 language plpgsql
@@ -124,6 +125,7 @@ begin
     course_definition_key,
     course_definition_release_id,
     code,
+    membership_verification,
     starts_at,
     ends_at,
     external_url
@@ -133,6 +135,7 @@ begin
     v_course_definition_key,
     p_course_definition_release_id,
     p_code,
+    p_membership_verification,
     p_starts_at,
     p_ends_at,
     p_external_url
@@ -164,4 +167,3 @@ begin
   return v_course_id;
 end
 $function$;
-

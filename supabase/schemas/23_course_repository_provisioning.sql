@@ -5,6 +5,7 @@
 create table private.course_repository_provisioning (
   course_id uuid not null,
   profile_id uuid not null,
+  course_definition_key text not null,
   access_request_id uuid not null,
   external_group_id text not null,
   external_group_handle text not null,
@@ -20,21 +21,23 @@ create table private.course_repository_provisioning (
   created_at timestamptz not null default clock_timestamp(),
   updated_at timestamptz not null default clock_timestamp(),
   primary key (course_id, profile_id),
-  constraint course_repository_provisioning_access_identity_fkey foreign key (
+  constraint course_repository_provisioning_course_definition_fkey foreign key (
     course_id,
-    profile_id,
-    access_request_id,
+    course_definition_key
+  ) references public.courses (id, course_definition_key) on delete restrict,
+  constraint course_repository_provisioning_repository_target_fkey foreign key (
+    course_definition_key,
     external_group_id,
     external_group_handle
-  ) references private.external_course_access (
-    course_id,
-    profile_id,
-    access_request_id,
+  ) references private.course_definition_external_groups (
+    course_definition_key,
     external_group_id,
     external_group_handle
   ) on delete restrict,
-  constraint course_repository_provisioning_request_fkey foreign key (
-    access_request_id, course_id, profile_id
+  constraint course_repository_provisioning_access_request_fkey foreign key (
+    access_request_id,
+    course_id,
+    profile_id
   ) references private.course_access_requests (id, course_id, requester_profile_id) on delete restrict,
   constraint course_repository_provisioning_group_id_check check (
     external_group_id = btrim(external_group_id)
@@ -150,21 +153,18 @@ begin
       repository.external_group_handle,
       repository.external_repository_id,
       repository.external_repository_url,
-      access_row.external_user_id,
-      access_row.external_user_handle,
+      coalesce(access_row.external_user_id, provider_identity.normalized_value),
+      coalesce(access_row.external_user_handle, provider_handle.normalized_value),
       case
-        when access_row.external_user_handle is null then null
-        when char_length('submissions-' || course.offering_key || '-' || access_row.external_user_handle) <= 100
-          then 'submissions-' || course.offering_key || '-' || access_row.external_user_handle
+        when coalesce(access_row.external_user_handle, provider_handle.normalized_value) is null then null
+        when char_length('submissions-' || course.offering_key || '-' || coalesce(access_row.external_user_handle, provider_handle.normalized_value)) <= 100
+          then 'submissions-' || course.offering_key || '-' || coalesce(access_row.external_user_handle, provider_handle.normalized_value)
         else
           'submissions-' || left(course.offering_key, 58) || '-' ||
-          right(md5(course.offering_key || ':' || access_row.external_user_handle), 8) || '-' ||
-          left(access_row.external_user_handle, 20)
+          right(md5(course.offering_key || ':' || coalesce(access_row.external_user_handle, provider_handle.normalized_value)), 8) || '-' ||
+          left(coalesce(access_row.external_user_handle, provider_handle.normalized_value), 20)
       end as generated_repository_name
     from private.course_repository_provisioning as repository
-    join private.external_course_access as access_row
-      on access_row.course_id = repository.course_id
-     and access_row.profile_id = repository.profile_id
     join private.course_access_requests as request_row
       on request_row.id = repository.access_request_id
      and request_row.course_id = repository.course_id
@@ -175,13 +175,45 @@ begin
      and membership.created_from_access_request_id = repository.access_request_id
      and membership.status = 'active'
     join public.courses as course on course.id = repository.course_id
+     and course.course_definition_key = repository.course_definition_key
     join private.course_definition_external_groups as organization
-      on organization.course_definition_key = course.course_definition_key
+      on organization.course_definition_key = repository.course_definition_key
+    left join private.external_course_access as access_row
+      on access_row.course_id = repository.course_id
+     and access_row.profile_id = repository.profile_id
+     and access_row.external_group_id = repository.external_group_id
+     and access_row.external_group_handle = repository.external_group_handle
+    left join lateral (
+      select identifier.normalized_value
+      from private.profile_identifiers as identifier
+      where identifier.profile_id = repository.profile_id
+        and identifier.kind = 'external_user_id'
+        and identifier.issuer = organization.provider_issuer
+        and identifier.revoked_at is null
+      order by identifier.last_verified_at desc
+      limit 1
+    ) as provider_identity on true
+    left join lateral (
+      select identifier.normalized_value
+      from private.profile_identifiers as identifier
+      where identifier.profile_id = repository.profile_id
+        and identifier.kind = 'external_user_handle'
+        and identifier.issuer = organization.provider_issuer
+        and identifier.revoked_at is null
+      order by identifier.last_verified_at desc
+      limit 1
+    ) as provider_handle on true
     where request_row.status = 'approved'
-      and access_row.state = 'active'
-      and access_row.external_user_handle is not null
-      and access_row.failure_code is null
-      and access_row.last_checked_at >= clock_timestamp() - interval '5 minutes'
+      and (
+        course.membership_verification = 'approval_only'
+        or (
+          access_row.state = 'active'
+          and access_row.external_user_handle is not null
+          and access_row.failure_code is null
+          and access_row.last_checked_at >= clock_timestamp() - interval '5 minutes'
+        )
+      )
+      and coalesce(access_row.external_user_handle, provider_handle.normalized_value) is not null
       and (p_course_id is null or repository.course_id = p_course_id)
       and (p_profile_id is null or repository.profile_id = p_profile_id)
       and (
@@ -217,17 +249,39 @@ begin
     claimed.repository_name,
     claimed.external_repository_id,
     claimed.external_repository_url,
-    access_row.external_user_handle,
-    access_row.external_user_id,
+    coalesce(access_row.external_user_handle, provider_handle.normalized_value),
+    coalesce(access_row.external_user_id, provider_identity.normalized_value),
     claimed.lease_token,
     claimed.attempt_count
   from claimed
   join public.courses as course on course.id = claimed.course_id
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
-  join private.external_course_access as access_row
+  left join private.external_course_access as access_row
     on access_row.course_id = claimed.course_id
    and access_row.profile_id = claimed.profile_id
+   and access_row.external_group_id = claimed.external_group_id
+   and access_row.external_group_handle = claimed.external_group_handle
+  left join lateral (
+    select identifier.normalized_value
+    from private.profile_identifiers as identifier
+    where identifier.profile_id = claimed.profile_id
+      and identifier.kind = 'external_user_id'
+      and identifier.issuer = organization.provider_issuer
+      and identifier.revoked_at is null
+    order by identifier.last_verified_at desc
+    limit 1
+  ) as provider_identity on true
+  left join lateral (
+    select identifier.normalized_value
+    from private.profile_identifiers as identifier
+    where identifier.profile_id = claimed.profile_id
+      and identifier.kind = 'external_user_handle'
+      and identifier.issuer = organization.provider_issuer
+      and identifier.revoked_at is null
+    order by identifier.last_verified_at desc
+    limit 1
+  ) as provider_handle on true
   ;
 end
 $function$;

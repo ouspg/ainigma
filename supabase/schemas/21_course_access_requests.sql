@@ -94,3 +94,76 @@ create unique index course_roster_allowlist_active_uidx
 
 create index course_roster_allowlist_course_idx
   on private.course_roster_allowlist (course_id, status);
+
+-- Activate a learner only from an approved request. Both first-party
+-- approval-only access and external-provider confirmation use this helper so
+-- the request link and audit event cannot drift between workflows.
+create function private.activate_course_membership_from_request(
+  p_access_request_id uuid,
+  p_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_request private.course_access_requests%rowtype;
+begin
+  if p_access_request_id is null then
+    raise exception using errcode = '22004', message = 'access_request_id_required';
+  end if;
+
+  if p_reason is null or p_reason <> btrim(p_reason) or char_length(p_reason) not between 1 and 2000 then
+    raise exception using errcode = '22023', message = 'invalid_course_membership_reason';
+  end if;
+
+  perform 1
+  from public.courses as course
+  join private.course_access_requests as request_row
+    on request_row.course_id = course.id
+  where request_row.id = p_access_request_id
+  for update of course;
+
+  select request_row.*
+  into v_request
+  from private.course_access_requests as request_row
+  where request_row.id = p_access_request_id
+  for update;
+
+  if not found then
+    raise exception using errcode = '23503', message = 'access_request_not_found';
+  end if;
+
+  if v_request.status <> 'approved' then
+    raise exception using errcode = '42501', message = 'course_access_not_approved';
+  end if;
+
+  if v_request.requested_role <> 'learner' then
+    raise exception using errcode = '22023', message = 'requested_role_not_supported';
+  end if;
+
+  insert into public.course_memberships (
+    course_id, profile_id, role, status, created_from_access_request_id
+  ) values (
+    v_request.course_id, v_request.requester_profile_id, 'learner', 'active', v_request.id
+  )
+  on conflict (course_id, profile_id) do nothing;
+
+  if not found then
+    return;
+  end if;
+
+  insert into private.course_membership_events (
+    course_id, profile_id, event_kind, new_role, new_status, actor_profile_id, reason
+  ) values (
+    v_request.course_id,
+    v_request.requester_profile_id,
+    'created',
+    'learner',
+    'active',
+    null,
+    p_reason
+  );
+end
+$function$;

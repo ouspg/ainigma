@@ -12,6 +12,14 @@ create type private.course_enrollment_mode as enum (
   'closed'
 );
 
+-- Controls whether an approved request still needs a membership proof from
+-- the configured external platform. First-party SSO uses the approval-only
+-- path; the default preserves the existing external-membership gate.
+create type private.course_membership_verification as enum (
+  'external_membership',
+  'approval_only'
+);
+
 create type private.course_access_request_status as enum (
   'pending',
   'approved',

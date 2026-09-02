@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::error::Error;
 use uuid::Uuid;
 
@@ -7,7 +7,7 @@ pub struct InvitationData {
     pub provider_kind: String,
     pub provider_issuer: String,
     pub external_group_handle: String,
-    pub external_user_id: String,
+    pub external_user_id: Option<String>,
     pub external_user_handle: Option<String>,
     pub external_email: Option<String>,
     pub invitation_target: Option<String>,
@@ -26,7 +26,7 @@ pub struct AccessToReconcile {
     pub provider_issuer: String,
     pub expected_external_group_id: String,
     pub expected_external_group_handle: String,
-    pub external_user_id: String,
+    pub external_user_id: Option<String>,
     pub external_user_handle: Option<String>,
     pub external_invitation_id: Option<String>,
     pub state: String,
@@ -36,6 +36,7 @@ pub struct AccessToReconcile {
 pub struct AccessToInvite {
     pub course_id: Uuid,
     pub profile_id: Uuid,
+    pub external_user_id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -98,9 +99,7 @@ pub async fn invitation_data(
         external_group_handle: row
             .expected_external_group_handle
             .ok_or("database returned no external provider group slug")?,
-        external_user_id: row
-            .external_user_id
-            .ok_or("database returned no external user ID")?,
+        external_user_id: row.external_user_id,
         external_user_handle: row.external_user_handle,
         external_invitation_id: row.external_invitation_id,
         external_email: row.external_email,
@@ -175,9 +174,7 @@ pub async fn access_to_reconcile(
                 expected_external_group_handle: row
                     .expected_external_group_handle
                     .ok_or("database returned no external provider group slug")?,
-                external_user_id: row
-                    .external_user_id
-                    .ok_or("database returned no external user ID")?,
+                external_user_id: row.external_user_id,
                 external_user_handle: row.external_user_handle,
                 external_invitation_id: row.external_invitation_id,
                 state: row.state.ok_or("database returned no access state")?,
@@ -190,26 +187,23 @@ pub async fn access_to_invite(
     database: &PgPool,
     provider_kind: &str,
 ) -> Result<Vec<AccessToInvite>, Box<dyn Error>> {
-    let rows = sqlx::query!(
-        r#"select course_id, profile_id
+    let rows = sqlx::query(
+        r#"select course_id, profile_id, external_user_id
            from private.list_external_course_access_to_reconcile()
            where state = 'not_started'
              and external_invitation_id is null
-             and provider_kind = $1"#,
-        provider_kind
+           and provider_kind = $1"#,
     )
+    .bind(provider_kind)
     .fetch_all(database)
     .await?;
 
     rows.into_iter()
         .map(|row| {
             Ok(AccessToInvite {
-                course_id: row
-                    .course_id
-                    .ok_or("database returned no invitation course ID")?,
-                profile_id: row
-                    .profile_id
-                    .ok_or("database returned no invitation profile ID")?,
+                course_id: row.try_get("course_id")?,
+                profile_id: row.try_get("profile_id")?,
+                external_user_id: row.try_get("external_user_id")?,
             })
         })
         .collect()
@@ -290,6 +284,21 @@ pub async fn confirm_access(
     .execute(database)
     .await?;
     Ok(())
+}
+
+pub async fn enqueue_repository_job(
+    database: &PgPool,
+    course_id: Uuid,
+    profile_id: Uuid,
+) -> Result<bool, Box<dyn Error>> {
+    let row = sqlx::query_scalar::<_, bool>(
+        "select private.enqueue_course_repository_provisioning($1, $2)",
+    )
+    .bind(course_id)
+    .bind(profile_id)
+    .fetch_one(database)
+    .await?;
+    Ok(row)
 }
 
 pub async fn claim_repository_jobs(

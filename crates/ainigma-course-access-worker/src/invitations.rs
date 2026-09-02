@@ -73,7 +73,10 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
     }
     let resolved_handle = match data.external_user_handle.as_deref() {
         Some(handle) => Some(handle.to_owned()),
-        None => Some(platform.user_login_by_id(&data.external_user_id).await?),
+        None => match data.external_user_id.as_deref() {
+            Some(external_user_id) => Some(platform.user_login_by_id(external_user_id).await?),
+            None => None,
+        },
     };
     let pending = platform
         .find_pending_invitation(
@@ -145,7 +148,10 @@ pub async fn invite_one_with_email<P: ExternalPlatform>(
     if data.state == "invitation_pending" {
         let resolved_handle = match data.external_user_handle.as_deref() {
             Some(handle) => Some(handle.to_owned()),
-            None => Some(platform.user_login_by_id(&data.external_user_id).await?),
+            None => match data.external_user_id.as_deref() {
+                Some(external_user_id) => Some(platform.user_login_by_id(external_user_id).await?),
+                None => None,
+            },
         };
         if platform
             .find_pending_invitation(
@@ -171,7 +177,7 @@ pub async fn invite_one_with_email<P: ExternalPlatform>(
         }
         InvitationMethod::ExternalUserId => {
             platform
-                .invite_by_user_id(&data.external_group_handle, &data.external_user_id)
+                .invite_by_user_id(&data.external_group_handle, &target)
                 .await
         }
     };
@@ -180,7 +186,12 @@ pub async fn invite_one_with_email<P: ExternalPlatform>(
         Err(InvitationError::AlreadyExists) => {
             let resolved_handle = match data.external_user_handle.as_deref() {
                 Some(handle) => Some(handle.to_owned()),
-                None => Some(platform.user_login_by_id(&data.external_user_id).await?),
+                None => match data.external_user_id.as_deref() {
+                    Some(external_user_id) => {
+                        Some(platform.user_login_by_id(external_user_id).await?)
+                    }
+                    None => None,
+                },
             };
             platform
                 .find_pending_invitation(
@@ -213,8 +224,9 @@ pub async fn invite_one_with_email<P: ExternalPlatform>(
 
 /// Start invitations for approved access records that do not have a provider
 /// invitation yet. First adopt a matching manually sent email invitation;
-/// otherwise send a new invitation by stable external user ID. A failed send
-/// is recorded and does not abort other records.
+/// otherwise use the stable external user ID when available, or send by the
+/// recorded email target. A failed send is recorded and does not abort other
+/// records.
 pub async fn invite_pending<P: ExternalPlatform>(
     database: &PgPool,
     platform: &P,
@@ -243,14 +255,26 @@ pub async fn invite_pending<P: ExternalPlatform>(
         {
             Ok(true) => Ok(()),
             Ok(false) => {
-                invite_one(
-                    database,
-                    platform,
-                    candidate.course_id,
-                    candidate.profile_id,
-                    InvitationMethod::ExternalUserId,
-                )
-                .await
+                if candidate.external_user_id.is_some() {
+                    invite_one(
+                        database,
+                        platform,
+                        candidate.course_id,
+                        candidate.profile_id,
+                        InvitationMethod::ExternalUserId,
+                    )
+                    .await
+                } else {
+                    invite_one_with_email(
+                        database,
+                        platform,
+                        candidate.course_id,
+                        candidate.profile_id,
+                        InvitationMethod::Email,
+                        None,
+                    )
+                    .await
+                }
             }
             Err(error) => Err(error),
         };
@@ -289,7 +313,7 @@ fn target(
         InvitationMethod::Email => email
             .or(data.invitation_target.as_deref())
             .or(data.external_email.as_deref()),
-        InvitationMethod::ExternalUserId => Some(data.external_user_id.as_str()),
+        InvitationMethod::ExternalUserId => data.external_user_id.as_deref(),
     };
     target
         .map(str::to_owned)

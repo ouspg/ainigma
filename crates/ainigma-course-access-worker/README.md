@@ -9,7 +9,8 @@ sidebar:
 
 This trusted control-plane worker currently manages GitHub access for approved
 course records. It sends or adopts invitations, reconciles membership, and
-creates requested private submission repositories. Offerings using
+creates private submission repositories for explicit requests or opt-in
+automatic provisioning. Offerings using
 `approval_only` membership verification create local course membership in the
 database and produce no GitHub access work; the worker may still provision
 their requested repositories when a verified GitHub identity is linked. Both
@@ -58,6 +59,14 @@ export GITHUB_APP_PRIVATE_KEY_PATH='/run/secrets/ainigma-github-app.pem'
 
 # Process invitations, reconcile access, and provision requested repositories once.
 cargo run -p ainigma-course-access-worker -- poll
+
+# Also queue a repository whenever external course access is confirmed.
+cargo run -p ainigma-course-access-worker -- poll \
+  --auto-request-repository
+
+# Limit automatic repository requests to one offering while testing.
+cargo run -p ainigma-course-access-worker -- poll \
+  --course-id COURSE_UUID --auto-request-repository --watch
 
 # Keep polling. The interval is clamped to at least one second.
 cargo run -p ainigma-course-access-worker -- poll --watch --interval-seconds 30
@@ -110,148 +119,144 @@ client ID (or numeric App ID), a positive installation ID, and a readable PEM
 private key. If a non-empty `GITHUB_TOKEN` is set, the App settings are not
 needed and the pre-issued-token flow takes precedence.
 
-## Local smoke test without the web app
+## Real GitHub email-batch test
 
-The development seed creates a `pendingLearner` profile and a pending request
-for `test-course-a-local`. Approve that request as the seeded course owner,
-then let the worker process it. This is a real-provider smoke test, not a dry
-run: use a disposable organization and account because a valid token can send
-an invitation and, when a repository has been requested, create a repository.
-`GITHUB_ORG_ID` and `GITHUB_ORG_HANDLE` are used by the SQL below to point the
-seeded course at the selected organization; the worker reads the target from
-the database. `GITHUB_USER_ID` must be the real numeric ID of the account to
-test.
+This test uses the normal production worker and real GitHub side effects. Use a
+disposable GitHub organization and public template repository. The setup SQL
+updates the selected test offering, configures the target organization and
+template, enables an exact allowed email domain, creates local Auth users and
+profiles, seeds approved access requests, and queues the real repository jobs.
+
+The setup file is
+[`real_github_email_repository_setup.sql`](</Users/nicce/teaching/ainigma/crates/ainigma-course-access-worker/tests/real_github_email_repository_setup.sql>).
+It is a disposable fixture, not a schema migration. Do not run it against a
+production offering or commit real student addresses.
+
+### 1. Prepare GitHub
+
+Create or select:
+
+- a disposable target organization, for example `ainigma-course-access-test`;
+- a public repository marked as a template, for example
+  `ainigma-course-templates/course-submission-template`;
+- test mailboxes that can receive GitHub invitations, such as
+  `student-01@students.example.edu` through `student-50@students.example.edu`.
+
+Install the GitHub App in the target organization with Organization members:
+read and write, Repository administration: write, and Repository contents:
+read. These permissions cover invitation/member reconciliation, template
+repository generation, and granting repository access. A pre-issued token may
+be used for local testing instead, but it must have equivalent permissions.
+
+### 2. Configure the database and worker
+
+For the local Supabase database:
 
 ```sh
-export DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
-export GITHUB_TOKEN='...'
-export GITHUB_ORG_ID='12345678'
-export GITHUB_ORG_HANDLE='your-github-organization'
-export GITHUB_TEMPLATE_OWNER='your-template-organization'
-export GITHUB_TEMPLATE_REPOSITORY='course-submission-template'
-export GITHUB_USER_ID='87654321'
+export DATABASE_ADMIN_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+export DATABASE_URL="$DATABASE_ADMIN_URL"
 
-npx supabase db reset --local --yes
+# Use either a GitHub App or a disposable token.
+export GITHUB_APP_CLIENT_ID='Iv23abc123...'
+export GITHUB_APP_INSTALLATION_ID='78901234'
+export GITHUB_APP_PRIVATE_KEY_PATH='/run/secrets/ainigma-github-app.pem'
+# export GITHUB_TOKEN='ghp_...'
 
-psql "$DATABASE_URL" \
-  -v ON_ERROR_STOP=1 \
-  -v github_org_id="$GITHUB_ORG_ID" \
-  -v github_org_handle="$GITHUB_ORG_HANDLE" \
-  -v github_template_owner="$GITHUB_TEMPLATE_OWNER" \
-  -v github_template_repository="$GITHUB_TEMPLATE_REPOSITORY" \
-  -v github_user_id="$GITHUB_USER_ID" <<'SQL'
-begin;
-update private.course_definition_external_groups as organization
-set external_group_id = :'github_org_id',
-    external_group_handle = :'github_org_handle',
-    repository_template_owner = :'github_template_owner',
-    repository_template_name = :'github_template_repository'
-from public.courses as course
-where course.course_definition_key = organization.course_definition_key
-  and course.offering_key = 'test-course-a-local';
-insert into private.course_definition_external_email_domains (
-  course_definition_key,
-  domain_suffix
-)
-values ('test-course-a', 'student.oulu.fi')
-on conflict do nothing;
-update private.profile_identifiers as identifier
-set revoked_at = clock_timestamp()
-from private.auth_user_links as link
-where link.auth_user_id = '50000000-0000-0000-0000-000000000004'
-  and identifier.profile_id = link.profile_id
-  and identifier.kind = 'external_user_id'
-  and identifier.issuer = 'github'
-  and identifier.revoked_at is null;
-update auth.identities
-set provider_id = :'github_user_id',
-    identity_data = jsonb_set(
-      identity_data,
-      '{sub}',
-      to_jsonb(:'github_user_id'::text),
-      true
-    )
-where id = '51000000-0000-0000-0000-000000000004'
-  and provider = 'github';
-select private.sync_auth_identity('51000000-0000-0000-0000-000000000004');
-select set_config(
-  'request.jwt.claim.sub',
-  '50000000-0000-0000-0000-000000000001',
-  true
-);
-set local role authenticated;
-select public.approve_course_access_requests(
-  'test-course-a-local',
-  null
-);
-reset role;
-select access.external_user_id
-from private.external_course_access as access
-join public.courses as course on course.id = access.course_id
-join private.auth_user_links as link on link.profile_id = access.profile_id
-where course.offering_key = 'test-course-a-local'
-  and link.auth_user_id = '50000000-0000-0000-0000-000000000004';
-commit;
-SQL
-
-COURSE_ID="$(psql "$DATABASE_URL" -Atc "select id from public.courses where offering_key = 'test-course-a-local'")"
-
-# Option 1: --poll discovers approved records and processes the course.
-cargo run -p ainigma-course-access-worker -- poll --course-id "$COURSE_ID"
-
-# Option 2: invite this seeded learner explicitly by email.
-PROFILE_ID="$(psql "$DATABASE_URL" -Atc "select link.profile_id from private.auth_user_links as link where link.auth_user_id = '50000000-0000-0000-0000-000000000004'")"
-cargo run -p ainigma-course-access-worker -- invite \
-  --by email --email learner@student.oulu.fi \
-  --course-id "$COURSE_ID" --profile-id "$PROFILE_ID"
+export TEST_OFFERING_KEY='test-course-a-local'
+export TEST_ORGANIZATION_ID='12345678'
+export TEST_ORGANIZATION_HANDLE='ainigma-course-access-test'
+export TEST_TEMPLATE_OWNER='ainigma-course-templates'
+export TEST_TEMPLATE_REPOSITORY='course-submission-template'
+export TEST_EMAIL_DOMAIN='students.example.edu'
+export TEST_OWNER_AUTH_USER_ID='50000000-0000-0000-0000-000000000001'
+export TEST_EMAILS='student-01@students.example.edu
+student-02@students.example.edu
+student-03@students.example.edu'
 ```
 
-For either option, inspect the result with:
+`TEST_OWNER_AUTH_USER_ID` is the seeded course-owner Auth user. For another
+database, replace it with the Auth user ID of an owner profile for the selected
+offering. The worker connection used in deployment should be the restricted
+login role that is a member of `ainigma_external_provisioning_worker`; the
+admin connection is only for this fixture.
+
+### 3. Seed the real application tables
+
+Reset a disposable local database, then run the fixture:
 
 ```sh
-psql "$DATABASE_URL" -c "
-select access.state,
-       access.external_group_id,
-       access.external_group_handle,
-       access.external_user_id,
-       access.external_invitation_id
-from private.external_course_access as access
-join public.courses as course on course.id = access.course_id
-join private.auth_user_links as link on link.profile_id = access.profile_id
-where course.offering_key = 'test-course-a-local'
-  and link.auth_user_id = '50000000-0000-0000-0000-000000000004';
+npm run supabase:reset
+
+psql "$DATABASE_ADMIN_URL" \
+  -v ON_ERROR_STOP=1 \
+  -v test_offering_key="$TEST_OFFERING_KEY" \
+  -v test_organization_id="$TEST_ORGANIZATION_ID" \
+  -v test_organization_handle="$TEST_ORGANIZATION_HANDLE" \
+  -v test_template_owner="$TEST_TEMPLATE_OWNER" \
+  -v test_template_repository="$TEST_TEMPLATE_REPOSITORY" \
+  -v test_email_domain="$TEST_EMAIL_DOMAIN" \
+  -v test_owner_auth_user_id="$TEST_OWNER_AUTH_USER_ID" \
+  -v test_emails="$TEST_EMAILS" \
+  -f crates/ainigma-course-access-worker/tests/real_github_email_repository_setup.sql
+```
+
+`TEST_EMAILS` is a newline-separated list. Add all 50 addresses to that value;
+every address must end in `$TEST_EMAIL_DOMAIN`. The fixture, worker, and
+database all enforce that filter.
+
+The fixture deliberately seeds approved rows instead of calling the browser
+approval RPC. This isolates the real worker flow while the approval RPC remains
+covered by the SQL authorization tests.
+
+### 4. Run the worker and accept invitations
+
+```sh
+COURSE_ID="$(psql "$DATABASE_ADMIN_URL" -Atc \
+  "select id from public.courses where offering_key = '$TEST_OFFERING_KEY'")"
+
+cargo run -p ainigma-course-access-worker -- poll \
+  --course-id "$COURSE_ID" \
+  --auto-request-repository \
+  --watch \
+  --interval-seconds 60
+```
+
+The worker sends one email invitation per seeded profile. As each recipient
+accepts the GitHub invitation, polling observes the accepted invitation and
+active organization member, binds the returned GitHub user ID to that existing
+`profile_id`, activates course membership, queues the repository through the
+private enqueue RPC, and provisions a private repository from the public
+template. Repository creation and collaborator granting are idempotent.
+
+Inspect progress with:
+
+```sh
+psql "$DATABASE_ADMIN_URL" -c "
+select profile_id,
+       state,
+       invitation_target,
+       external_invitation_id,
+       external_user_id,
+       external_user_handle
+from private.external_course_access
+where course_id = '$COURSE_ID'::uuid
+order by invitation_target;
+
+select profile_id,
+       state,
+       repository_name,
+       external_repository_url,
+       last_error
+from private.course_repository_provisioning
+where course_id = '$COURSE_ID'::uuid
+order by profile_id;
 "
 ```
 
-If the account is already in the organization, expect `active` with no
-invitation ID; no invitation is sent. Otherwise, the first run should produce
-`invitation_pending` with an invitation ID. After the account accepts, run
-`poll` again and expect `active`. The SQL uses the real `GITHUB_USER_ID` for
-the seeded profile before approval, so reconciliation sees the intended
-account. The clean seed normally has no allowed email suffixes; the setup
-above adds `student.oulu.fi` for the email example. Do not commit personal
-test values.
-
-Repository provisioning is a separate, explicit request. Once the learner is
-`active`, call `public.request_my_course_repository('test-course-a-local')`
-while authenticated as that learner, then run `poll` again. The worker creates
-the private student repository from the configured public template in the
-target organization; it does not create an empty repository.
-
-The worker deliberately does not create profiles:
-Auth provisioning creates the profile and its verified identifiers first.
-
-The two UUIDs always identify an approved access record. `--by email` uses the
-profile's current verified email unless `--email` supplies another configured
-address. The override is recorded with the access record so
-retries remain idempotent; it does not create a profile or approve access.
-
-Polling is safe to repeat: existing invitations, memberships, repositories,
-and completed jobs are detected rather than duplicated. A learner who is already
-in the configured GitHub organization is confirmed from the stable user ID and
-active-member snapshot even when no invitation ID exists. Transient provider
-failures are recorded; active access is not revoked from one incomplete
-snapshot. Keep the token and database URL out of logs and deployment files.
+Expected states are `invitation_pending` before acceptance, then `active` and
+`ready` after acceptance and successful provisioning. Resetting the database
+removes local test users, memberships, and jobs, but does not remove GitHub
+organization members or repositories; clean those up separately in GitHub.
 
 Run tests with:
 

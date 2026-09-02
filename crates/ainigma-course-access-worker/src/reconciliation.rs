@@ -14,6 +14,7 @@ pub async fn poll_once<P: ExternalPlatform>(
     platform: &P,
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
+    auto_request_repository: bool,
 ) -> Result<usize, Box<dyn Error>> {
     let records = database::access_to_reconcile(database, platform.kind()).await?;
     let mut records_by_organization: HashMap<_, Vec<_>> = HashMap::new();
@@ -71,7 +72,14 @@ pub async fn poll_once<P: ExternalPlatform>(
             .await;
 
         for access in accesses {
-            reconcile_one(database, &access, expected_group_id.clone(), &snapshot).await?;
+            reconcile_one(
+                database,
+                &access,
+                expected_group_id.clone(),
+                &snapshot,
+                auto_request_repository,
+            )
+            .await?;
             reconciled += 1;
         }
     }
@@ -84,6 +92,7 @@ async fn reconcile_one(
     access: &database::AccessToReconcile,
     expected_group_id: String,
     snapshot: &Result<OrganizationSnapshot, SnapshotError>,
+    auto_request_repository: bool,
 ) -> Result<(), Box<dyn Error>> {
     let snapshot = match snapshot {
         Ok(snapshot) => snapshot,
@@ -116,9 +125,16 @@ async fn reconcile_one(
             .await?;
         }
     } else {
-        let active_username = snapshot.active_member_username(&access.external_user_id);
+        let active_username = access
+            .external_user_id
+            .as_deref()
+            .and_then(|external_user_id| snapshot.active_member_username(external_user_id));
 
         if access.state == "active" {
+            let Some(external_user_id) = access.external_user_id.as_deref() else {
+                record_check_failure(database, access, "external_identity_missing").await?;
+                return Ok(());
+            };
             if let Some(username) = active_username {
                 database::confirm_access(
                     database,
@@ -127,10 +143,11 @@ async fn reconcile_one(
                     &access.expected_external_group_id,
                     &access.expected_external_group_handle,
                     access.external_invitation_id.as_deref(),
-                    &access.external_user_id,
+                    external_user_id,
                     username,
                 )
                 .await?;
+                enqueue_repository_if_enabled(database, access, auto_request_repository).await?;
                 if access.external_user_handle.as_deref() != Some(username) {
                     tracing::info!(offering = %access.offering_key, "external username cache refreshed");
                 } else {
@@ -160,17 +177,25 @@ async fn reconcile_one(
                     &access.expected_external_group_id,
                     &access.expected_external_group_handle,
                     None,
-                    &access.external_user_id,
+                    access
+                        .external_user_id
+                        .as_deref()
+                        .ok_or("external identity missing")?,
                     username,
                 )
                 .await?;
+                enqueue_repository_if_enabled(database, access, auto_request_repository).await?;
                 tracing::info!(offering = %access.offering_key, "existing external membership confirmed");
             }
         } else {
             let invitation_id = access.external_invitation_id.as_deref().unwrap();
 
             if let Some(invitation) = snapshot.accepted_invitation(invitation_id) {
-                if invitation.user_id != access.external_user_id {
+                if access
+                    .external_user_id
+                    .as_deref()
+                    .is_some_and(|external_user_id| invitation.user_id != external_user_id)
+                {
                     record_status(
                         database,
                         access,
@@ -178,7 +203,8 @@ async fn reconcile_one(
                         Some("external_invitation_identity_mismatch"),
                     )
                     .await?;
-                } else if let Some(username) = active_username {
+                } else if let Some(username) = snapshot.active_member_username(&invitation.user_id)
+                {
                     database::confirm_access(
                         database,
                         access.course_id,
@@ -186,10 +212,12 @@ async fn reconcile_one(
                         &access.expected_external_group_id,
                         &access.expected_external_group_handle,
                         Some(invitation_id),
-                        &access.external_user_id,
+                        &invitation.user_id,
                         username,
                     )
                     .await?;
+                    enqueue_repository_if_enabled(database, access, auto_request_repository)
+                        .await?;
                     tracing::info!(offering = %access.offering_key, "external invitation and membership confirmed");
                 } else {
                     record_status(
@@ -214,6 +242,24 @@ async fn reconcile_one(
         }
     }
 
+    Ok(())
+}
+
+async fn enqueue_repository_if_enabled(
+    database: &PgPool,
+    access: &database::AccessToReconcile,
+    enabled: bool,
+) -> Result<(), Box<dyn Error>> {
+    if enabled {
+        let eligible =
+            database::enqueue_repository_job(database, access.course_id, access.profile_id).await?;
+        if !eligible {
+            tracing::debug!(
+                offering = %access.offering_key,
+                "external access was not eligible for automatic repository provisioning"
+            );
+        }
+    }
     Ok(())
 }
 

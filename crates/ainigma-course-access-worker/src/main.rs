@@ -61,6 +61,9 @@ enum Command {
         course_id: Option<Uuid>,
         #[arg(long)]
         profile_id: Option<Uuid>,
+        /// Queue a repository automatically after external access is confirmed.
+        #[arg(long, default_value_t = false)]
+        auto_request_repository: bool,
     },
 }
 
@@ -95,8 +98,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         "no configured adapter supports provider {provider_kind} ({provider_issuer})"
                     )
                 })?;
-            reconciliation::poll_once(&database, platform, Some(course_id), Some(profile_id))
-                .await?;
+            reconciliation::poll_once(
+                &database,
+                platform,
+                Some(course_id),
+                Some(profile_id),
+                false,
+            )
+            .await?;
             invitations::invite_one_with_email(
                 &database,
                 platform,
@@ -146,13 +155,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
             interval_seconds,
             course_id,
             profile_id,
+            auto_request_repository,
         } => loop {
             let mut count = 0;
             let mut invitation_summary = invitations::InvitationSummary::default();
             let mut repository_summary = repositories::ProvisioningSummary::default();
             for platform in platforms.iter() {
-                count +=
-                    reconciliation::poll_once(&database, platform, course_id, profile_id).await?;
+                count += reconciliation::poll_once(
+                    &database,
+                    platform,
+                    course_id,
+                    profile_id,
+                    auto_request_repository,
+                )
+                .await?;
                 let summary =
                     invitations::invite_pending(&database, platform, course_id, profile_id).await?;
                 invitation_summary.started += summary.started;

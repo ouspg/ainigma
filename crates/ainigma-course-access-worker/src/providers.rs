@@ -85,13 +85,21 @@ impl ExternalPlatform for ConfiguredPlatform {
     async fn find_or_create_repository(
         &self,
         organization: &str,
+        template_owner: &str,
+        template_name: &str,
         repository_name: &str,
         expected_description: &str,
     ) -> Result<Repository, String> {
         match self {
             Self::Github(platform) => {
                 platform
-                    .find_or_create_repository(organization, repository_name, expected_description)
+                    .find_or_create_repository(
+                        organization,
+                        template_owner,
+                        template_name,
+                        repository_name,
+                        expected_description,
+                    )
                     .await
             }
         }

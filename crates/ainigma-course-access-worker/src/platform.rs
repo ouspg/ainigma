@@ -114,6 +114,8 @@ pub(crate) trait ExternalPlatform {
     async fn find_or_create_repository(
         &self,
         organization: &str,
+        template_owner: &str,
+        template_name: &str,
         repository_name: &str,
         expected_description: &str,
     ) -> Result<Repository, String>;

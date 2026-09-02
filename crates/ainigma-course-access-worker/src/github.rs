@@ -190,6 +190,8 @@ impl ExternalPlatform for GithubPlatform {
     async fn find_or_create_repository(
         &self,
         organization: &str,
+        template_owner: &str,
+        template_name: &str,
         repository_name: &str,
         expected_description: &str,
     ) -> Result<Repository, String> {
@@ -201,6 +203,8 @@ impl ExternalPlatform for GithubPlatform {
             &client,
             &self.api_url,
             organization,
+            template_owner,
+            template_name,
             repository_name,
             expected_description,
         )
@@ -273,6 +277,23 @@ struct GithubRepository {
     html_url: String,
     private: bool,
     description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubTemplateRepository {
+    private: bool,
+    is_template: bool,
+    visibility: Option<String>,
+}
+
+fn validate_public_template(template: &GithubTemplateRepository) -> Result<(), String> {
+    if template.private || template.visibility.as_deref() != Some("public") {
+        return Err("repository_template_not_public".to_owned());
+    }
+    if !template.is_template {
+        return Err("repository_template_not_enabled".to_owned());
+    }
+    Ok(())
 }
 
 impl GithubRepository {
@@ -832,6 +853,8 @@ pub async fn find_or_create_repository(
     github: &Client,
     api_url: &str,
     organization: &str,
+    template_owner: &str,
+    template_name: &str,
     repository_name: &str,
     expected_description: &str,
 ) -> Result<Repository, String> {
@@ -848,21 +871,46 @@ pub async fn find_or_create_repository(
             .map(GithubRepository::into_platform)
             .map_err(|_| "repository_response_invalid".to_owned())?
     } else if response.status() == StatusCode::NOT_FOUND {
+        let template_response = github
+            .get(format!("{api_url}/repos/{template_owner}/{template_name}"))
+            .send()
+            .await
+            .map_err(|error| {
+                log_request_error("lookup_github_repository_template", &error);
+                "repository_template_lookup_failed".to_owned()
+            })?;
+        if template_response.status() == StatusCode::NOT_FOUND {
+            return Err("repository_template_not_found".to_owned());
+        }
+        if !template_response.status().is_success() {
+            log_http_failure("lookup_github_repository_template", &template_response);
+            return Err(format!(
+                "repository_template_lookup_http_{}",
+                template_response.status().as_u16()
+            ));
+        }
+        let template = template_response
+            .json::<GithubTemplateRepository>()
+            .await
+            .map_err(|_| "repository_template_response_invalid".to_owned())?;
+        validate_public_template(&template)?;
+
         let create_response = github
-            .post(format!("{api_url}/orgs/{organization}/repos"))
+            .post(format!(
+                "{api_url}/repos/{template_owner}/{template_name}/generate"
+            ))
             .json(&json!({
+                "owner": organization,
                 "name": repository_name,
                 "description": expected_description,
                 "private": true,
-                "has_issues": false,
-                "has_projects": false,
-                "has_wiki": false
+                "include_all_branches": false
             }))
             .send()
             .await
             .map_err(|error| {
-                log_request_error("create_github_repository", &error);
-                "repository_create_failed".to_owned()
+                log_request_error("generate_github_repository_from_template", &error);
+                "repository_template_generate_failed".to_owned()
             })?;
 
         if create_response.status().is_success() {
@@ -886,9 +934,9 @@ pub async fn find_or_create_repository(
                 .map(GithubRepository::into_platform)
                 .map_err(|_| "repository_response_invalid".to_owned())?
         } else {
-            log_http_failure("create_github_repository", &create_response);
+            log_http_failure("generate_github_repository_from_template", &create_response);
             return Err(format!(
-                "repository_create_http_{}",
+                "repository_template_generate_http_{}",
                 create_response.status().as_u16()
             ));
         }
@@ -938,7 +986,9 @@ pub async fn grant_maintain(
 
 #[cfg(test)]
 mod tests {
-    use super::{GithubPendingInvitation, next_link};
+    use super::{
+        GithubPendingInvitation, GithubTemplateRepository, next_link, validate_public_template,
+    };
 
     #[test]
     fn decodes_pending_organization_invitation_shape() {
@@ -960,6 +1010,46 @@ mod tests {
                 r#"<https://api.github.com/orgs/example/audit-log?after=abc>; rel="next", <https://api.github.com/orgs/example/audit-log?before=xyz>; rel="prev""#
             ),
             Some("https://api.github.com/orgs/example/audit-log?after=abc".to_owned())
+        );
+    }
+
+    #[test]
+    fn accepts_only_public_template_repositories() {
+        let public_template = GithubTemplateRepository {
+            private: false,
+            is_template: true,
+            visibility: Some("public".to_owned()),
+        };
+        assert_eq!(validate_public_template(&public_template), Ok(()));
+
+        let private_template = GithubTemplateRepository {
+            private: true,
+            is_template: true,
+            visibility: Some("private".to_owned()),
+        };
+        assert_eq!(
+            validate_public_template(&private_template),
+            Err("repository_template_not_public".to_owned())
+        );
+
+        let internal_template = GithubTemplateRepository {
+            private: false,
+            is_template: true,
+            visibility: Some("internal".to_owned()),
+        };
+        assert_eq!(
+            validate_public_template(&internal_template),
+            Err("repository_template_not_public".to_owned())
+        );
+
+        let ordinary_repository = GithubTemplateRepository {
+            private: false,
+            is_template: false,
+            visibility: Some("public".to_owned()),
+        };
+        assert_eq!(
+            validate_public_template(&ordinary_repository),
+            Err("repository_template_not_enabled".to_owned())
         );
     }
 }

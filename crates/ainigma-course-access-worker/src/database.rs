@@ -46,6 +46,8 @@ pub struct RepositoryJob {
     pub provider_kind: String,
     pub provider_issuer: String,
     pub external_group_handle: String,
+    pub repository_template_owner: String,
+    pub repository_template_name: String,
     pub repository_name: Option<String>,
     pub external_user_handle: Option<String>,
     pub lease_token: Uuid,
@@ -299,6 +301,7 @@ pub async fn claim_repository_jobs(
     let rows = sqlx::query!(
         r#"select course_id, profile_id, offering_key, provider_kind, provider_issuer,
                   external_group_handle,
+                  repository_template_owner, repository_template_name,
                   repository_name, external_user_handle, lease_token
            from private.claim_course_repository_provisioning($1, $2, $3, $4)"#,
         25_i32,
@@ -330,6 +333,12 @@ pub async fn claim_repository_jobs(
                 external_group_handle: row
                     .external_group_handle
                     .ok_or("database returned no repository external provider group slug")?,
+                repository_template_owner: row
+                    .repository_template_owner
+                    .ok_or("database returned no repository template owner")?,
+                repository_template_name: row
+                    .repository_template_name
+                    .ok_or("database returned no repository template name")?,
                 repository_name: row.repository_name,
                 external_user_handle: row.external_user_handle,
                 lease_token: row

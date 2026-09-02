@@ -87,7 +87,13 @@ async fn try_provision_repository<P: ExternalPlatform>(
     let marker = repository_marker(job.course_id, job.profile_id);
 
     let repository = platform
-        .find_or_create_repository(&job.external_group_handle, repository_name, &marker)
+        .find_or_create_repository(
+            &job.external_group_handle,
+            &job.repository_template_owner,
+            &job.repository_template_name,
+            repository_name,
+            &marker,
+        )
         .await?;
     platform
         .grant_maintain(&job.external_group_handle, &repository.name, username)
@@ -118,8 +124,14 @@ fn is_retryable_error(error_code: &str) -> bool {
             | "repository_collaborator_http_403"
             | "repository_lookup_http_401"
             | "repository_lookup_http_403"
-            | "repository_create_http_401"
-            | "repository_create_http_403"
+            | "repository_template_not_found"
+            | "repository_template_not_public"
+            | "repository_template_not_enabled"
+            | "repository_template_response_invalid"
+            | "repository_template_lookup_http_401"
+            | "repository_template_lookup_http_403"
+            | "repository_template_generate_http_401"
+            | "repository_template_generate_http_403"
     )
 }
 
@@ -129,9 +141,10 @@ mod tests {
 
     #[test]
     fn classifies_repository_failures_for_bounded_retry() {
-        assert!(is_retryable_error("repository_create_http_500"));
-        assert!(is_retryable_error("repository_create_failed"));
+        assert!(is_retryable_error("repository_template_generate_http_500"));
+        assert!(is_retryable_error("repository_template_generate_failed"));
         assert!(!is_retryable_error("repository_name_collision"));
+        assert!(!is_retryable_error("repository_template_not_public"));
         assert!(!is_retryable_error("repository_collaborator_http_403"));
     }
 }

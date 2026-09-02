@@ -1,7 +1,7 @@
 debug/
 target/
 .vscode/
-Cargo.lock
+
 .env
 .env.local
 .ainigma/

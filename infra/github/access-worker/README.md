@@ -20,91 +20,69 @@ IAT       IAT       IAT
 
 ## OCI access-worker image
 
-`flake.nix` builds the Rust `ainigma-course-access-worker` as a Linux OCI
-image. It is designed for Podman on a NixOS (or other Linux) host; it is not a
-full NixOS userspace image. Keeping the image as the worker plus its runtime
-dependencies makes it substantially smaller and avoids running a nested
-`systemd` in the container.
-
-Build and load it on an `x86_64-linux` builder:
+`flake.nix` builds a small Linux OCI image for Podman. The default `image` uses
+this checkout; `image-remote` uses the revision pinned in `flake.lock`.
 
 ```sh
-# Default: build the worker from this local checkout.
+# On a native Linux host, #image selects the matching supported architecture.
 nix build ./infra/github/access-worker#image
 podman load < result
 ```
 
-The default `image` and `worker` packages use the repository root as a local
-flake input, so uncommitted worker changes are included. For a source pinned
-by this flake's lock file instead, use the optional remote outputs:
+The flake exposes both `x86_64-linux` and `aarch64-linux`. Build an explicit
+target when the host is macOS or when using a remote Linux builder:
 
 ```sh
-nix build ./infra/github/access-worker#image-remote
+nix build ./infra/github/access-worker#packages.aarch64-linux.image
+# or:
+nix build ./infra/github/access-worker#packages.x86_64-linux.image
 podman load < result
 ```
 
-`image-remote` and `worker-remote` use the locked `github:ouspg/ainigma`
-revision. Refresh it deliberately with `nix flake update ainigma-remote --flake
-./infra/github/access-worker`.
+On Apple Silicon, build the `aarch64-linux` image on an ARM64 Linux VM or
+remote Nix builder; the macOS host itself is not the Linux image builder.
 
-The image defaults to the safe, repeatable polling command:
+The image runs `poll --watch --interval-seconds 30` by default. Pass another
+worker command after the image name for a one-off operation.
 
-```text
-ainigma-course-access-worker poll --watch --interval-seconds 30
+### Configure and run
+
+Store the worker configuration in an encrypted SOPS dotenv or YAML file. It
+needs `DATABASE_URL` and either `GITHUB_TOKEN`, or the GitHub App client ID
+(or numeric App ID), installation ID, and private key. See the
+[worker README](../../../crates/ainigma-course-access-worker/README.md) for all
+options.
+
+For YAML used with `sops exec-env`, keep the environment variables at the
+top level as scalar values. Nested mappings cannot be exported as environment
+variables. An email-batch test can use a multiline scalar:
+
+```yaml
+RUN_EMAIL_TEST_SETUP: "1"
+TEST_EMAILS: |
+  student-01@example.edu
+  student-02@example.edu
+  student-03@example.edu
 ```
 
-Pass another worker command after the image name to override that default.
-For example, a one-off poll is `... ainigma-course-access-worker poll`.
+The test entrypoint runs only when `RUN_EMAIL_TEST_SETUP=1`. It runs the
+bundled production-table fixture with `DATABASE_ADMIN_URL`, resolves
+`TEST_OFFERING_KEY`, and starts the normal polling worker with automatic
+repository provisioning enabled. It requires these additional top-level
+values: `TEST_OFFERING_KEY`, `TEST_ORGANIZATION_ID`,
+`TEST_ORGANIZATION_HANDLE`, `TEST_TEMPLATE_OWNER`, `TEST_TEMPLATE_REPOSITORY`,
+`TEST_EMAIL_DOMAIN`, and `TEST_OWNER_AUTH_USER_ID`.
 
-### Runtime configuration
+The database must be reachable from the Podman network and the `DATABASE_URL`
+login must be a member of `ainigma_external_provisioning_worker`. That role
+limits the worker to its provisioning RPCs.
 
-The worker configuration is taken directly from
-[`crates/ainigma-course-access-worker/README.md`](../../../crates/ainigma-course-access-worker/README.md):
-
-| Variable                      | Required when             | Notes                                                        |
-| ----------------------------- | ------------------------- | ------------------------------------------------------------ |
-| `DATABASE_URL`                | Always                    | Use the dedicated, least-privileged provisioning login role. |
-| `GITHUB_TOKEN`                | Token authentication      | Takes precedence over all App settings.                      |
-| `GITHUB_APP_CLIENT_ID`        | GitHub App authentication | `GITHUB_APP_ID` is the numeric fallback.                     |
-| `GITHUB_APP_INSTALLATION_ID`  | GitHub App authentication | Positive numeric installation ID.                            |
-| `GITHUB_APP_PRIVATE_KEY`      | GitHub App authentication | Use this _or_ `GITHUB_APP_PRIVATE_KEY_PATH`, not both.       |
-| `GITHUB_APP_PRIVATE_KEY_PATH` | GitHub App authentication | Path to a mounted PEM file.                                  |
-| `GITHUB_API_URL`              | Optional                  | Set only for GitHub Enterprise.                              |
-
-`RUST_LOG` may be passed as a normal Podman environment variable. Put all
-credentials—and preferably all of the table values—in the encrypted SOPS file.
-The image's entrypoint accepts the non-secret `SOPS_SECRETS_FILE` path, runs
-`sops exec-env --same-process`, and then replaces itself with the worker.
-SOPS exposes the decrypted values only to that worker process; it does not
-write a decrypted dotenv file into the image or the container writable layer.
-
-### Run with SOPS and a Podman secret
-
-Use an age identity through a Podman secret. The secret value is mounted as a
-file and is never supplied in a process environment variable. The encrypted
-SOPS file may be bind-mounted read-only because it contains ciphertext only.
-
-Create the Podman secret once on the host. Store the age identity in a protected
-file outside this repository:
+Mount the encrypted file read-only and mount the age identity as a Podman
+secret:
 
 ```sh
 podman secret create ainigma-access-worker-age-key /secure/path/age-key.txt
-```
 
-Create an encrypted SOPS dotenv or YAML file containing at least the required
-variables. For GitHub App authentication, it normally contains:
-
-```dotenv
-DATABASE_URL=postgresql://WORKER_LOGIN:PASSWORD@DATABASE_HOST:5432/postgres
-GITHUB_APP_CLIENT_ID=Iv23abc123...
-GITHUB_APP_INSTALLATION_ID=78901234
-GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-```
-
-Then run the image. Replace `./secrets/worker.env` with the encrypted SOPS
-file; do not use a decrypted file at that path.
-
-```sh
 podman run --rm --name ainigma-course-access-worker \
   --secret ainigma-access-worker-age-key,type=mount,target=/run/secrets/sops-age-key \
   --volume "./secrets/worker.env:/run/secrets/worker.env:ro,Z" \
@@ -114,19 +92,15 @@ podman run --rm --name ainigma-course-access-worker \
   localhost/ainigma-course-access-worker:latest
 ```
 
-`SOPS_AGE_KEY_FILE` contains only the path to the mounted identity, not the
-identity itself. The age identity remains a runtime-mounted Podman secret, and
-the App private key is decrypted only into the worker's process environment.
-For a GitHub App PEM mounted separately instead, put the non-secret
-`GITHUB_APP_PRIVATE_KEY_PATH` path in the SOPS file and mount that PEM at the
-same path with `--secret ... ,type=mount,target=...`.
+`SOPS_AGE_KEY_FILE` is only the path to the mounted identity. At startup,
+`sops exec-env` decrypts the configuration in memory and replaces itself with
+the worker; no plaintext dotenv file is written to the image or container
+layer. The decrypted database and GitHub values remain in the worker process
+for its lifetime, so do not pass their values with `podman --env`.
 
-For a local or legacy pre-issued token, put `DATABASE_URL` and `GITHUB_TOKEN`
-in the encrypted file instead. `GITHUB_TOKEN` deliberately takes precedence
-over the App variables, matching the worker behavior.
+After `Cargo.lock` is available in the upstream revision, refresh the optional
+remote source with:
 
-The container has no shell-facing SOPS key material baked into it. Do not pass
-`SOPS_AGE_KEY`, `GITHUB_TOKEN`, `DATABASE_URL`, or the GitHub App PEM using
-`--env`: those values can be inspected through container metadata while the
-container runs. Rotate the Podman secret and re-encrypt the SOPS file when an
-identity or credential is replaced.
+```sh
+nix flake update ainigma-remote --flake ./infra/github/access-worker
+```

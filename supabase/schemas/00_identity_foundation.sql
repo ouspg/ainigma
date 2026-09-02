@@ -156,6 +156,11 @@ create unique index profile_identifiers_active_external_user_uidx
   on private.profile_identifiers (profile_id, issuer, scheme_version)
   where kind = 'external_user_id' and revoked_at is null;
 
+-- A provider contributes at most one current handle and verified email per profile.
+create unique index profile_identifiers_active_provider_fact_uidx
+  on private.profile_identifiers (profile_id, kind, issuer, scheme_version)
+  where kind in ('email', 'external_user_handle') and revoked_at is null;
+
 create index profile_identifiers_profile_active_idx
   on private.profile_identifiers (profile_id, kind, issuer, scheme_version)
   where revoked_at is null;
@@ -163,6 +168,32 @@ create index profile_identifiers_profile_active_idx
 create index profile_identifiers_source_auth_user_idx
   on private.profile_identifiers (source_auth_user_id)
   where source_auth_user_id is not null;
+
+-- Return a provider fact only when the active set has exactly one value. This
+-- fails closed for legacy or manually imported ambiguous rows instead of
+-- choosing an arbitrary identifier.
+create function private.unique_active_profile_identifier(
+  p_profile_id uuid,
+  p_kind text,
+  p_issuer text
+)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select min(identifier.normalized_value)
+  from private.profile_identifiers as identifier
+  where identifier.profile_id = p_profile_id
+    and identifier.kind = p_kind
+    and (p_issuer is null or identifier.issuer = p_issuer)
+    and identifier.revoked_at is null
+  having count(*) = 1
+$function$;
+
+comment on function private.unique_active_profile_identifier(uuid, text, text) is
+  'Returns one active profile identifier only when the requested provider fact is unambiguous.';
 
 -- Database-managed timestamps remain reliable for browser, worker, and maintenance writes alike.
 create function private.set_updated_at()
@@ -328,11 +359,10 @@ begin
 end
 $function$;
 
--- The provider subject is authoritative for every Auth provider. GitHub's
--- numeric subject, username, and verified email retain their existing rules;
--- other providers at least receive a stable subject identifier so first-party
--- SSO can be matched by an allowlist without teaching course authorization
--- about a specific provider.
+-- Project trusted Auth identity facts into provider-neutral identifiers. The
+-- Auth provider's stable subject is authoritative; issuer, handle, and
+-- verified email are optional provider facts. External provider adapters and
+-- course configuration decide which identifier namespace is relevant.
 create function private.sync_auth_identity(p_identity_id uuid)
 returns uuid
 language plpgsql
@@ -345,6 +375,7 @@ declare
   v_provider_issuer text;
   v_external_user_id text;
   v_username text;
+  v_username_candidates text[];
   v_email text;
 begin
   perform pg_catalog.pg_advisory_xact_lock(
@@ -367,14 +398,13 @@ begin
     raise exception using errcode = '22023', message = 'external_subject_required';
   end if;
 
-  if v_identity.provider = 'github' and v_external_user_id !~ '^[0-9]+$' then
-    raise exception using errcode = '22023', message = 'invalid_github_numeric_subject';
+  v_provider_issuer := btrim(coalesce(
+    nullif(btrim(v_identity.identity_data ->> 'iss'), ''),
+    v_identity.provider
+  ));
+  if v_provider_issuer = '' then
+    raise exception using errcode = '22023', message = 'identity_issuer_required';
   end if;
-
-  v_provider_issuer := case
-    when v_identity.provider = 'github' then 'github.com'
-    else coalesce(nullif(btrim(v_identity.identity_data ->> 'iss'), ''), btrim(v_identity.provider))
-  end;
 
   perform private.upsert_verified_identifier(
     v_profile_id,
@@ -387,23 +417,30 @@ begin
     v_identity.id::text
   );
 
-  if v_identity.provider <> 'github' then
-    return v_profile_id;
+  select array_agg(distinct lower(btrim(candidate)))
+  into v_username_candidates
+  from unnest(array[
+    v_identity.identity_data ->> 'preferred_username',
+    v_identity.identity_data ->> 'user_name',
+    v_identity.identity_data ->> 'login',
+    v_identity.identity_data ->> 'username'
+  ]) as candidate(candidate)
+  where nullif(btrim(candidate), '') is not null
+    and btrim(candidate) !~ '[[:space:]]';
+
+  if cardinality(v_username_candidates) > 1 then
+    raise exception using errcode = '22023', message = 'ambiguous_external_user_handle';
   end if;
 
-  v_username := lower(btrim(coalesce(
-    v_identity.identity_data ->> 'user_name',
-    v_identity.identity_data ->> 'preferred_username',
-    v_identity.identity_data ->> 'login'
-  )));
+  v_username := v_username_candidates[1];
 
-  if nullif(v_username, '') is not null then
+  if nullif(v_username, '') is not null and v_username !~ '[[:space:]]' then
     update private.profile_identifiers
     set revoked_at = clock_timestamp(),
         last_verified_at = clock_timestamp()
     where profile_id = v_profile_id
       and kind = 'external_user_handle'
-      and issuer = 'github.com'
+      and issuer = v_provider_issuer
       and scheme_version = 1
       and normalized_value <> v_username
       and revoked_at is null;
@@ -411,7 +448,7 @@ begin
     perform private.upsert_verified_identifier(
       v_profile_id,
       'external_user_handle',
-      'github.com',
+      v_provider_issuer,
       1,
       v_username,
       coalesce(v_identity.created_at, clock_timestamp()),
@@ -429,7 +466,7 @@ begin
           last_verified_at = clock_timestamp()
       where profile_id = v_profile_id
         and kind = 'email'
-        and issuer = 'github.com'
+        and issuer = v_provider_issuer
         and scheme_version = 1
         and normalized_value <> v_email
         and revoked_at is null;
@@ -437,7 +474,7 @@ begin
       perform private.upsert_verified_identifier(
         v_profile_id,
         'email',
-        'github.com',
+        v_provider_issuer,
         1,
         v_email,
         coalesce(v_identity.created_at, clock_timestamp()),
@@ -658,6 +695,7 @@ alter function private.ensure_auth_user_profile(uuid) owner to ainigma_function_
 alter function private.handle_auth_user_created() owner to ainigma_function_owner;
 alter function private.handle_auth_identity_changed() owner to ainigma_function_owner;
 alter function private.upsert_verified_identifier(uuid, text, text, integer, text, timestamptz, uuid, text) owner to ainigma_function_owner;
+alter function private.unique_active_profile_identifier(uuid, text, text) owner to ainigma_function_owner;
 alter function private.sync_auth_identity(uuid) owner to ainigma_function_owner;
 alter function private.reconcile_auth_users() owner to ainigma_function_owner;
 alter function private.reconcile_auth_identities() owner to ainigma_function_owner;
@@ -681,6 +719,7 @@ revoke all on function
   private.handle_auth_user_created(),
   private.handle_auth_identity_changed(),
   private.upsert_verified_identifier(uuid, text, text, integer, text, timestamptz, uuid, text),
+  private.unique_active_profile_identifier(uuid, text, text),
   private.sync_auth_identity(uuid),
   private.reconcile_auth_users(),
   private.reconcile_auth_identities(),

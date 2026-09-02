@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(42);
+select extensions.plan(45);
 
 -- These are database contract tests. A GitHub organization snapshot is not
 -- stored locally, so the trusted confirmation RPC represents the worker's
@@ -90,7 +90,11 @@ select public.request_course_access('test-course-a-local', 'external platform te
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '50000000-0000-0000-0000-000000000001', true);
-select public.approve_course_access_requests('test-course-a-local');
+select extensions.is(
+  public.approve_course_access_requests('test-course-a-local'),
+  2,
+  'the owner approves both pending requests'
+);
 reset role;
 select extensions.is(
   (select count(*)::bigint
@@ -461,15 +465,72 @@ select extensions.is(
   'an approval-only learner can request a repository'
 );
 reset role;
+
+-- A stale external-access row must not become the identity source for an
+-- approval-only repository. The profile identifier remains authoritative.
+insert into private.external_course_access (
+  course_id,
+  profile_id,
+  access_request_id,
+  external_group_id,
+  external_group_handle,
+  external_user_id,
+  external_user_handle,
+  state,
+  last_checked_at
+)
+select
+  course.id,
+  request_row.requester_profile_id,
+  request_row.id,
+  organization.external_group_id,
+  organization.external_group_handle,
+  'stale-external-id',
+  'stale-external-handle',
+  'active',
+  clock_timestamp()
+from public.courses as course
+join private.course_definition_external_groups as organization
+  on organization.course_definition_key = course.course_definition_key
+join private.course_access_requests as request_row
+  on request_row.course_id = course.id
+where course.offering_key = 'test-course-b-local'
+  and request_row.requester_profile_id = (
+    select profile_id
+    from private.auth_user_links
+    where auth_user_id = '50000000-0000-0000-0000-000000000003'
+  )
+  and request_row.status = 'approved';
 select extensions.is(
-  (select external_user_handle
+  (select count(*)::bigint
+   from private.list_external_course_access_to_reconcile() access_row
+   where access_row.course_id = (select id from public.courses where offering_key = 'test-course-b-local')),
+  0::bigint,
+  'a stale access row cannot re-enable external reconciliation for approval-only access'
+);
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.claim_course_repository_provisioning(
+      1,
+      (select id from public.courses where offering_key = 'test-course-b-local'),
+      (select profile_id from private.auth_user_links
+       where auth_user_id = '50000000-0000-0000-0000-000000000003'),
+      'forgejo'
+    )
+  ),
+  0::bigint,
+  'a repository worker does not claim jobs for another provider'
+);
+select extensions.is(
+  (select external_user_handle || ':' || external_user_id
    from private.claim_course_repository_provisioning(
      1,
      (select id from public.courses where offering_key = 'test-course-b-local'),
      (select profile_id from private.auth_user_links
       where auth_user_id = '50000000-0000-0000-0000-000000000003'))),
-  'ainigma-local-emptylearner',
-  'repository provisioning resolves the optional provider identity from the profile'
+  'ainigma-local-emptylearner:90000003',
+  'approval-only repository provisioning ignores a stale external access identity'
 );
 select extensions.is(
   (select repository_name

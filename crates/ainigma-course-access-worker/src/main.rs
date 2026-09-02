@@ -3,11 +3,13 @@ mod github;
 mod http;
 mod invitations;
 mod platform;
+mod providers;
 mod reconciliation;
 mod repositories;
 
 use clap::{Parser, Subcommand};
 use invitations::InvitationMethod;
+use providers::PlatformRegistry;
 use sqlx::postgres::PgPoolOptions;
 use std::{env, error::Error, time::Duration};
 use uuid::Uuid;
@@ -24,7 +26,7 @@ struct Arguments {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Send one idempotent GitHub organization invitation by email or stable user ID.
+    /// Send one idempotent external-provider group invitation by email or stable user ID.
     Invite {
         #[arg(long)]
         course_id: Uuid,
@@ -37,7 +39,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = InvitationMethod::Email)]
         by: InvitationMethod,
     },
-    /// Record a manually sent invitation found in GitHub's pending invitations.
+    /// Record a manually sent invitation found in the provider's pending invitations.
     MarkInvited {
         #[arg(long)]
         course_id: Uuid,
@@ -49,7 +51,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = InvitationMethod::Email)]
         by: InvitationMethod,
     },
-    /// Reconcile GitHub access and requested repositories once, or watch continuously.
+    /// Reconcile external-provider access and requested repositories once, or watch continuously.
     Poll {
         #[arg(long, default_value_t = false)]
         watch: bool,
@@ -72,6 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .max_connections(5)
         .connect(&database_url)
         .await?;
+    let platforms = PlatformRegistry::from_env().await?;
 
     match arguments.command {
         Command::Invite {
@@ -80,15 +83,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
             email,
             by,
         } => {
-            let github = github::GithubPlatform::from_env().await?;
             if email.is_some() && by != InvitationMethod::Email {
                 return Err("--email can only be used with --by email".into());
             }
-            reconciliation::poll_once(&database, &github, Some(course_id), Some(profile_id))
+            let (provider_kind, provider_issuer) =
+                database::external_provider_for_access(&database, course_id, profile_id).await?;
+            let platform = platforms
+                .find(&provider_kind, &provider_issuer)
+                .ok_or_else(|| {
+                    format!(
+                        "no configured adapter supports provider {provider_kind} ({provider_issuer})"
+                    )
+                })?;
+            reconciliation::poll_once(&database, platform, Some(course_id), Some(profile_id))
                 .await?;
             invitations::invite_one_with_email(
                 &database,
-                &github,
+                platform,
                 course_id,
                 profile_id,
                 by,
@@ -96,7 +107,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             )
             .await?;
             println!(
-                "processed GitHub {by:?} invitation for course {course_id}, profile {profile_id}"
+                "processed {provider_kind} {by:?} invitation for course {course_id}, profile {profile_id}"
             );
         }
         Command::MarkInvited {
@@ -105,13 +116,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
             email,
             by,
         } => {
-            let github = github::GithubPlatform::from_env().await?;
             if email.is_some() && by != InvitationMethod::Email {
                 return Err("--email can only be used with --by email".into());
             }
+            let (provider_kind, provider_issuer) =
+                database::external_provider_for_access(&database, course_id, profile_id).await?;
+            let platform = platforms
+                .find(&provider_kind, &provider_issuer)
+                .ok_or_else(|| {
+                    format!(
+                        "no configured adapter supports provider {provider_kind} ({provider_issuer})"
+                    )
+                })?;
             invitations::mark_invited_with_email(
                 &database,
-                &github,
+                platform,
                 course_id,
                 profile_id,
                 by,
@@ -119,7 +138,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             )
             .await?;
             println!(
-                "marked GitHub invitation pending for course {course_id}, profile {profile_id}"
+                "marked {provider_kind} invitation pending for course {course_id}, profile {profile_id}"
             );
         }
         Command::Poll {
@@ -127,31 +146,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
             interval_seconds,
             course_id,
             profile_id,
-        } => {
-            let github = github::GithubPlatform::from_env().await?;
-            loop {
-                let count =
-                    reconciliation::poll_once(&database, &github, course_id, profile_id).await?;
-                let invitation_summary =
-                    invitations::invite_pending(&database, &github, course_id, profile_id).await?;
-                let repository_summary =
-                    repositories::provision_repositories(&database, &github, course_id, profile_id)
-                        .await?;
-
-                if !watch {
-                    println!(
-                        "processed {} invitation(s), recorded {} invitation failure(s), reconciled {count} GitHub access record(s); {} requested repository job(s) became ready and {} recorded a failure",
-                        invitation_summary.started,
-                        invitation_summary.failed,
-                        repository_summary.ready,
-                        repository_summary.failed
-                    );
-                    break;
-                }
-
-                tokio::time::sleep(Duration::from_secs(interval_seconds.max(1))).await;
+        } => loop {
+            let mut count = 0;
+            let mut invitation_summary = invitations::InvitationSummary::default();
+            let mut repository_summary = repositories::ProvisioningSummary::default();
+            for platform in platforms.iter() {
+                count +=
+                    reconciliation::poll_once(&database, platform, course_id, profile_id).await?;
+                let summary =
+                    invitations::invite_pending(&database, platform, course_id, profile_id).await?;
+                invitation_summary.started += summary.started;
+                invitation_summary.failed += summary.failed;
+                let summary = repositories::provision_repositories(
+                    &database, platform, course_id, profile_id,
+                )
+                .await?;
+                repository_summary.ready += summary.ready;
+                repository_summary.failed += summary.failed;
             }
-        }
+
+            if !watch {
+                println!(
+                    "processed {} invitation(s), recorded {} invitation failure(s), reconciled {count} external access record(s); {} requested repository job(s) became ready and {} recorded a failure",
+                    invitation_summary.started,
+                    invitation_summary.failed,
+                    repository_summary.ready,
+                    repository_summary.failed
+                );
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(interval_seconds.max(1))).await;
+        },
     }
 
     Ok(())

@@ -43,6 +43,23 @@ struct AppAuthentication {
 }
 
 impl GithubPlatform {
+    pub(crate) fn is_configured() -> bool {
+        [
+            "GITHUB_TOKEN",
+            "GITHUB_APP_CLIENT_ID",
+            "GITHUB_APP_ID",
+            "GITHUB_APP_PRIVATE_KEY",
+            "GITHUB_APP_PRIVATE_KEY_PATH",
+            "GITHUB_APP_INSTALLATION_ID",
+        ]
+        .into_iter()
+        .any(|name| {
+            env::var(name)
+                .ok()
+                .is_some_and(|value| !value.trim().is_empty())
+        })
+    }
+
     pub(crate) async fn from_env() -> Result<Self, Box<dyn Error>> {
         let api_url = api_url();
         if let Ok(token) = env::var("GITHUB_TOKEN")
@@ -821,7 +838,7 @@ pub async fn find_or_create_repository(
     let get_url = format!("{api_url}/repos/{organization}/{repository_name}");
     let response = github.get(&get_url).send().await.map_err(|error| {
         log_request_error("lookup_github_repository", &error);
-        "github_repository_lookup_failed".to_owned()
+        "repository_lookup_failed".to_owned()
     })?;
 
     let repository = if response.status().is_success() {
@@ -829,7 +846,7 @@ pub async fn find_or_create_repository(
             .json::<GithubRepository>()
             .await
             .map(GithubRepository::into_platform)
-            .map_err(|_| "github_repository_response_invalid".to_owned())?
+            .map_err(|_| "repository_response_invalid".to_owned())?
     } else if response.status() == StatusCode::NOT_FOUND {
         let create_response = github
             .post(format!("{api_url}/orgs/{organization}/repos"))
@@ -845,7 +862,7 @@ pub async fn find_or_create_repository(
             .await
             .map_err(|error| {
                 log_request_error("create_github_repository", &error);
-                "github_repository_create_failed".to_owned()
+                "repository_create_failed".to_owned()
             })?;
 
         if create_response.status().is_success() {
@@ -853,38 +870,38 @@ pub async fn find_or_create_repository(
                 .json::<GithubRepository>()
                 .await
                 .map(GithubRepository::into_platform)
-                .map_err(|_| "github_repository_response_invalid".to_owned())?
+                .map_err(|_| "repository_response_invalid".to_owned())?
         } else if create_response.status() == StatusCode::UNPROCESSABLE_ENTITY {
             let retry_response = github.get(&get_url).send().await.map_err(|error| {
                 log_request_error("retry_lookup_github_repository", &error);
-                "github_repository_lookup_failed".to_owned()
+                "repository_lookup_failed".to_owned()
             })?;
             if !retry_response.status().is_success() {
                 log_http_failure("retry_lookup_github_repository", &retry_response);
-                return Err("github_repository_create_conflict".to_owned());
+                return Err("repository_create_conflict".to_owned());
             }
             retry_response
                 .json::<GithubRepository>()
                 .await
                 .map(GithubRepository::into_platform)
-                .map_err(|_| "github_repository_response_invalid".to_owned())?
+                .map_err(|_| "repository_response_invalid".to_owned())?
         } else {
             log_http_failure("create_github_repository", &create_response);
             return Err(format!(
-                "github_repository_create_http_{}",
+                "repository_create_http_{}",
                 create_response.status().as_u16()
             ));
         }
     } else {
         log_http_failure("lookup_github_repository", &response);
         return Err(format!(
-            "github_repository_lookup_http_{}",
+            "repository_lookup_http_{}",
             response.status().as_u16()
         ));
     };
 
     if !repository.private || repository.description.as_deref() != Some(expected_description) {
-        return Err("github_repository_name_collision".to_owned());
+        return Err("repository_name_collision".to_owned());
     }
     Ok(repository)
 }
@@ -907,12 +924,12 @@ pub async fn grant_maintain(
         .await
         .map_err(|error| {
             log_request_error("grant_github_repository_maintain", &error);
-            "github_collaborator_request_failed".to_owned()
+            "repository_collaborator_request_failed".to_owned()
         })?;
     if !response.status().is_success() {
         log_http_failure("grant_github_repository_maintain", &response);
         return Err(format!(
-            "github_collaborator_http_{}",
+            "repository_collaborator_http_{}",
             response.status().as_u16()
         ));
     }

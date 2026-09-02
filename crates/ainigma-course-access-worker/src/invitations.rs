@@ -63,7 +63,7 @@ async fn adopt_pending_invitation<P: ExternalPlatform>(
         })
         .transpose()?;
     ensure_email_override(&data, email.as_deref())?;
-    if data.provider_kind != platform.kind() {
+    if !platform.supports(&data.provider_kind, &data.provider_issuer) {
         return Err(format!(
             "configured provider {} is not supported by {}",
             data.provider_kind,
@@ -131,7 +131,7 @@ pub async fn invite_one_with_email<P: ExternalPlatform>(
         })
         .transpose()?;
     ensure_email_override(&data, email.as_deref())?;
-    if data.provider_kind != platform.kind() {
+    if !platform.supports(&data.provider_kind, &data.provider_issuer) {
         return Err(format!(
             "configured provider {} is not supported by {}",
             data.provider_kind,
@@ -221,7 +221,7 @@ pub async fn invite_pending<P: ExternalPlatform>(
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
 ) -> Result<InvitationSummary, Box<dyn Error>> {
-    let candidates = database::access_to_invite(database).await?;
+    let candidates = database::access_to_invite(database, platform.kind()).await?;
     let mut summary = InvitationSummary::default();
 
     for candidate in candidates {

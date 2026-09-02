@@ -297,15 +297,17 @@ begin
       v_course_id,
       v_profile_id,
       v_request.id,
-      identifier.normalized_value,
+      private.unique_active_profile_identifier(
+        v_profile_id,
+        'external_user_id',
+        v_provider_issuer
+      ),
       'not_started'
-    from private.profile_identifiers as identifier
-    where identifier.profile_id = v_profile_id
-      and identifier.kind = 'external_user_id'
-      and identifier.issuer = v_provider_issuer
-      and identifier.revoked_at is null
-    order by identifier.last_verified_at desc
-    limit 1;
+    where private.unique_active_profile_identifier(
+      v_profile_id,
+      'external_user_id',
+      v_provider_issuer
+    ) is not null;
 
     return jsonb_build_object(
       'state', 'awaiting_external_access',
@@ -459,7 +461,7 @@ begin
 end
 $function$;
 
--- Reading request history never exposes another profile's application or GitHub state.
+-- Reading request history never exposes another profile's application or external-provider state.
 create function public.list_my_course_access_requests()
 returns table (
   offering_key text,

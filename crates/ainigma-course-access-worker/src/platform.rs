@@ -78,6 +78,12 @@ pub(crate) struct Repository {
 pub(crate) trait ExternalPlatform {
     fn kind(&self) -> &'static str;
 
+    /// A provider kind may have several configured identity namespaces. An
+    /// adapter can override this when it only supports selected instances.
+    fn supports(&self, provider_kind: &str, _provider_issuer: &str) -> bool {
+        self.kind() == provider_kind
+    }
+
     async fn user_login_by_id(&self, user_id: &str) -> Result<String, Box<dyn Error>>;
 
     async fn find_pending_invitation(

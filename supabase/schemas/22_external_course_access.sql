@@ -133,17 +133,15 @@ begin atomic
   join private.course_definition_external_groups as organization
     on organization.course_definition_key = course.course_definition_key
   left join lateral (
-    select identifier.normalized_value
-    from private.profile_identifiers as identifier
-    where identifier.profile_id = access_row.profile_id
-      and identifier.kind = 'email'
-      and identifier.issuer = organization.provider_issuer
-      and identifier.revoked_at is null
-    order by identifier.last_verified_at desc
-    limit 1
+    select private.unique_active_profile_identifier(
+      access_row.profile_id,
+      'email',
+      organization.provider_issuer
+    ) as normalized_value
   ) as email on true
   where request_row.status = 'approved'
     and course.status = 'published'
+    and course.membership_verification = 'external_membership'
     and access_row.state <> 'revoked';
 end;
 
@@ -410,7 +408,7 @@ begin
     select
       p_course_id, p_profile_id, 'transitioned', membership.role, 'active',
       membership.role, 'revoked', null,
-      'GitHub course organization membership no longer active'
+      'External provider group membership no longer active'
     from public.course_memberships as membership
     where membership.course_id = p_course_id
       and membership.profile_id = p_profile_id
@@ -424,7 +422,7 @@ begin
           and event_row.profile_id = p_profile_id
           and event_row.event_kind = 'transitioned'
           and event_row.new_status = 'revoked'
-          and event_row.reason = 'GitHub course organization membership no longer active'
+          and event_row.reason = 'External provider group membership no longer active'
       );
   end if;
 end

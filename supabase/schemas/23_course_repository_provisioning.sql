@@ -114,7 +114,8 @@ for each row execute function private.set_updated_at();
 create function private.claim_course_repository_provisioning(
   p_limit integer default 25,
   p_course_id uuid default null,
-  p_profile_id uuid default null
+  p_profile_id uuid default null,
+  p_provider_kind text default null
 )
 returns table (
   course_id uuid,
@@ -122,6 +123,7 @@ returns table (
   access_request_id uuid,
   offering_key text,
   provider_kind text,
+  provider_issuer text,
   external_group_id text,
   external_group_handle text,
   repository_name text,
@@ -149,20 +151,21 @@ begin
       repository.access_request_id,
       course.offering_key,
       organization.provider_kind,
+      organization.provider_issuer,
       repository.external_group_id,
       repository.external_group_handle,
       repository.external_repository_id,
       repository.external_repository_url,
-      coalesce(access_row.external_user_id, provider_identity.normalized_value),
-      coalesce(access_row.external_user_handle, provider_handle.normalized_value),
+      resolved_identity.external_user_id,
+      resolved_identity.external_user_handle,
       case
-        when coalesce(access_row.external_user_handle, provider_handle.normalized_value) is null then null
-        when char_length('submissions-' || course.offering_key || '-' || coalesce(access_row.external_user_handle, provider_handle.normalized_value)) <= 100
-          then 'submissions-' || course.offering_key || '-' || coalesce(access_row.external_user_handle, provider_handle.normalized_value)
+        when resolved_identity.external_user_handle is null then null
+        when char_length('submissions-' || course.offering_key || '-' || resolved_identity.external_user_handle) <= 100
+          then 'submissions-' || course.offering_key || '-' || resolved_identity.external_user_handle
         else
           'submissions-' || left(course.offering_key, 58) || '-' ||
-          right(md5(course.offering_key || ':' || coalesce(access_row.external_user_handle, provider_handle.normalized_value)), 8) || '-' ||
-          left(coalesce(access_row.external_user_handle, provider_handle.normalized_value), 20)
+          right(md5(course.offering_key || ':' || resolved_identity.external_user_handle), 8) || '-' ||
+          left(resolved_identity.external_user_handle, 20)
       end as generated_repository_name
     from private.course_repository_provisioning as repository
     join private.course_access_requests as request_row
@@ -181,28 +184,38 @@ begin
     left join private.external_course_access as access_row
       on access_row.course_id = repository.course_id
      and access_row.profile_id = repository.profile_id
+     and access_row.access_request_id = repository.access_request_id
      and access_row.external_group_id = repository.external_group_id
      and access_row.external_group_handle = repository.external_group_handle
     left join lateral (
-      select identifier.normalized_value
-      from private.profile_identifiers as identifier
-      where identifier.profile_id = repository.profile_id
-        and identifier.kind = 'external_user_id'
-        and identifier.issuer = organization.provider_issuer
-        and identifier.revoked_at is null
-      order by identifier.last_verified_at desc
-      limit 1
-    ) as provider_identity on true
-    left join lateral (
-      select identifier.normalized_value
-      from private.profile_identifiers as identifier
-      where identifier.profile_id = repository.profile_id
-        and identifier.kind = 'external_user_handle'
-        and identifier.issuer = organization.provider_issuer
-        and identifier.revoked_at is null
-      order by identifier.last_verified_at desc
-      limit 1
-    ) as provider_handle on true
+      select
+        -- The membership mode is the source-of-truth boundary. An external
+        -- membership snapshot must not override a first-party profile fact,
+        -- and an unexpected stale access row must not override approval-only
+        -- provisioning.
+        case
+          when course.membership_verification = 'external_membership'
+            then access_row.external_user_id
+          when course.membership_verification = 'approval_only'
+            then private.unique_active_profile_identifier(
+              repository.profile_id,
+              'external_user_id',
+              organization.provider_issuer
+            )
+          else null
+        end as external_user_id,
+        case
+          when course.membership_verification = 'external_membership'
+            then access_row.external_user_handle
+          when course.membership_verification = 'approval_only'
+            then private.unique_active_profile_identifier(
+              repository.profile_id,
+              'external_user_handle',
+              organization.provider_issuer
+            )
+          else null
+        end as external_user_handle
+    ) as resolved_identity on true
     where request_row.status = 'approved'
       and (
         course.membership_verification = 'approval_only'
@@ -213,9 +226,11 @@ begin
           and access_row.last_checked_at >= clock_timestamp() - interval '5 minutes'
         )
       )
-      and coalesce(access_row.external_user_handle, provider_handle.normalized_value) is not null
+      and resolved_identity.external_user_id is not null
+      and resolved_identity.external_user_handle is not null
       and (p_course_id is null or repository.course_id = p_course_id)
       and (p_profile_id is null or repository.profile_id = p_profile_id)
+      and (p_provider_kind is null or organization.provider_kind = p_provider_kind)
       and (
         repository.state = 'queued'
         or (repository.state = 'retry_wait' and repository.next_attempt_at <= clock_timestamp())
@@ -244,13 +259,14 @@ begin
     claimed.access_request_id,
     course.offering_key,
     organization.provider_kind,
+    organization.provider_issuer,
     claimed.external_group_id,
     claimed.external_group_handle,
     claimed.repository_name,
     claimed.external_repository_id,
     claimed.external_repository_url,
-    coalesce(access_row.external_user_handle, provider_handle.normalized_value),
-    coalesce(access_row.external_user_id, provider_identity.normalized_value),
+    resolved_identity.external_user_handle,
+    resolved_identity.external_user_id,
     claimed.lease_token,
     claimed.attempt_count
   from claimed
@@ -260,28 +276,34 @@ begin
   left join private.external_course_access as access_row
     on access_row.course_id = claimed.course_id
    and access_row.profile_id = claimed.profile_id
+   and access_row.access_request_id = claimed.access_request_id
    and access_row.external_group_id = claimed.external_group_id
    and access_row.external_group_handle = claimed.external_group_handle
   left join lateral (
-    select identifier.normalized_value
-    from private.profile_identifiers as identifier
-    where identifier.profile_id = claimed.profile_id
-      and identifier.kind = 'external_user_id'
-      and identifier.issuer = organization.provider_issuer
-      and identifier.revoked_at is null
-    order by identifier.last_verified_at desc
-    limit 1
-  ) as provider_identity on true
-  left join lateral (
-    select identifier.normalized_value
-    from private.profile_identifiers as identifier
-    where identifier.profile_id = claimed.profile_id
-      and identifier.kind = 'external_user_handle'
-      and identifier.issuer = organization.provider_issuer
-      and identifier.revoked_at is null
-    order by identifier.last_verified_at desc
-    limit 1
-  ) as provider_handle on true
+    select
+      case
+        when course.membership_verification = 'external_membership'
+          then access_row.external_user_id
+        when course.membership_verification = 'approval_only'
+          then private.unique_active_profile_identifier(
+            claimed.profile_id,
+            'external_user_id',
+            organization.provider_issuer
+          )
+        else null
+      end as external_user_id,
+      case
+        when course.membership_verification = 'external_membership'
+          then access_row.external_user_handle
+        when course.membership_verification = 'approval_only'
+          then private.unique_active_profile_identifier(
+            claimed.profile_id,
+            'external_user_handle',
+            organization.provider_issuer
+          )
+        else null
+      end as external_user_handle
+  ) as resolved_identity on true
   ;
 end
 $function$;

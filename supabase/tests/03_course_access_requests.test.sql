@@ -84,12 +84,14 @@ select set_config(
 grant ainigma_maintenance to postgres;
 insert into private.course_definition_external_groups (
   course_definition_key,
+  provider_kind,
+  provider_issuer,
   external_group_id,
   external_group_handle
 )
 values
-  ('access-gate-course', '88000001', 'access-gate-course-test-org'),
-  ('access-gate-auto-course', '88000002', 'access-gate-auto-course-test-org');
+  ('access-gate-course', 'github', 'github', '88000001', 'access-gate-course-test-org'),
+  ('access-gate-auto-course', 'github', 'github', '88000002', 'access-gate-auto-course-test-org');
 insert into private.course_definition_external_email_domains (
   course_definition_key,
   domain_suffix
@@ -155,14 +157,14 @@ insert into private.course_roster_allowlist (
 values (
   current_setting('ainigma_access_test.course_id')::uuid,
   'external_user_id',
-  'github.com',
+  'github',
   1,
   '97000001',
   'test roster'
 ), (
   current_setting('ainigma_access_test.auto_course_id')::uuid,
   'external_user_id',
-  'github.com',
+  'github',
   1,
   '97000001',
   'test auto roster'
@@ -554,7 +556,7 @@ select private.record_course_repository_provisioning_failure(
   current_setting('ainigma_access_test.course_id')::uuid,
   current_setting('ainigma_access_test.requester_profile_id')::uuid,
   current_setting('ainigma_access_test.repository_lease_token')::uuid,
-  'github_repository_create_http_500',
+  'repository_create_http_500',
   true
 );
 reset role;

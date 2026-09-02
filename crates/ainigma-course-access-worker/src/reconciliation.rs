@@ -15,7 +15,7 @@ pub async fn poll_once<P: ExternalPlatform>(
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
 ) -> Result<usize, Box<dyn Error>> {
-    let records = database::access_to_reconcile(database).await?;
+    let records = database::access_to_reconcile(database, platform.kind()).await?;
     let mut records_by_organization: HashMap<_, Vec<_>> = HashMap::new();
     for access in records {
         if course_id.is_some_and(|id| id != access.course_id)
@@ -23,7 +23,7 @@ pub async fn poll_once<P: ExternalPlatform>(
         {
             continue;
         }
-        if access.provider_kind != platform.kind() {
+        if !platform.supports(&access.provider_kind, &access.provider_issuer) {
             let failure_code = "unsupported_external_provider";
             if access.state == "active" {
                 database::record_check_failure(
@@ -48,6 +48,7 @@ pub async fn poll_once<P: ExternalPlatform>(
         records_by_organization
             .entry((
                 access.provider_kind.clone(),
+                access.provider_issuer.clone(),
                 access.expected_external_group_id.clone(),
                 access.expected_external_group_handle.clone(),
             ))
@@ -57,7 +58,9 @@ pub async fn poll_once<P: ExternalPlatform>(
 
     let mut reconciled = 0;
 
-    for ((_provider_kind, expected_group_id, organization), accesses) in records_by_organization {
+    for ((_provider_kind, _provider_issuer, expected_group_id, organization), accesses) in
+        records_by_organization
+    {
         let unresolved_invitation_ids: HashSet<_> = accesses
             .iter()
             .filter(|access| access.state != "active")
@@ -131,7 +134,7 @@ async fn reconcile_one(
                 if access.external_user_handle.as_deref() != Some(username) {
                     tracing::info!(offering = %access.offering_key, "external username cache refreshed");
                 } else {
-                    tracing::debug!(offering = %access.offering_key, "GitHub membership remains active");
+                    tracing::debug!(offering = %access.offering_key, "external provider membership remains active");
                 }
             } else {
                 let revoked = database::record_membership_absence(
@@ -141,9 +144,9 @@ async fn reconcile_one(
                 )
                 .await?;
                 if revoked {
-                    tracing::info!(offering = %access.offering_key, "GitHub membership absence confirmed; offering access revoked");
+                    tracing::info!(offering = %access.offering_key, "external provider membership absence confirmed; offering access revoked");
                 } else {
-                    tracing::warn!(offering = %access.offering_key, "GitHub member absent from snapshot; waiting for confirmation");
+                    tracing::warn!(offering = %access.offering_key, "external provider member absent from snapshot; waiting for confirmation");
                 }
             }
         } else if access.external_invitation_id.is_none() {
@@ -224,7 +227,7 @@ async fn record_check_failure(
     tracing::warn!(
         offering = %access.offering_key,
         failure_code,
-        "GitHub reconciliation check failed; confirmed access state was preserved"
+        "external provider reconciliation check failed; confirmed access state was preserved"
     );
     Ok(())
 }

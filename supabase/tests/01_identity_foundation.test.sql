@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(50);
+select extensions.plan(56);
 
 select extensions.is(
   current_setting('plpgsql.extra_errors'),
@@ -165,7 +165,7 @@ values (
   '20000000-0000-0000-0000-000000000002',
   'entra-subject-2',
   '10000000-0000-0000-0000-000000000002',
-  '{"sub":"entra-subject-2","iss":"https://login.microsoftonline.com/test-tenant/v2.0"}',
+  '{"sub":"entra-subject-2","iss":"https://login.microsoftonline.com/test-tenant/v2.0","preferred_username":"EntraStudent","email":"entra.student@university.example","email_verified":true}',
   'azure',
   clock_timestamp(),
   clock_timestamp()
@@ -181,7 +181,7 @@ select extensions.is(
       and revoked_at is null
   ),
   1::bigint,
-  'a direct SSO subject is synchronized without a GitHub-specific adapter'
+  'a direct SSO subject is synchronized without a provider-specific database adapter'
 );
 select extensions.is(
   (
@@ -193,6 +193,55 @@ select extensions.is(
   1::bigint,
   'identity reconciliation includes direct SSO providers'
 );
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.profile_identifiers
+    where kind = 'external_user_handle'
+      and issuer = 'https://login.microsoftonline.com/test-tenant/v2.0'
+      and normalized_value = 'entrastudent'
+      and revoked_at is null
+  ),
+  1::bigint,
+  'a direct SSO username is synchronized as a provider-neutral handle'
+);
+select extensions.is(
+  (
+    select count(*)::bigint
+    from private.profile_identifiers
+    where kind = 'email'
+      and issuer = 'https://login.microsoftonline.com/test-tenant/v2.0'
+      and normalized_value = 'entra.student@university.example'
+      and revoked_at is null
+  ),
+  1::bigint,
+  'a direct SSO verified email is synchronized'
+);
+
+select extensions.throws_ok(
+  $$insert into auth.identities (
+      id,
+      provider_id,
+      user_id,
+      identity_data,
+      provider,
+      created_at,
+      updated_at
+    )
+    values (
+      '20000000-0000-0000-0000-000000000003',
+      'ambiguous-subject',
+      '10000000-0000-0000-0000-000000000002',
+      '{"sub":"ambiguous-subject","iss":"https://issuer.example.test","preferred_username":"first-student","user_name":"second-student"}',
+      'oidc',
+      clock_timestamp(),
+      clock_timestamp()
+    )$$,
+  '22023',
+  'ambiguous_external_user_handle',
+  'conflicting provider username claims are not resolved by arbitrary precedence'
+);
+
 select extensions.is(
   (
     select count(*)::bigint
@@ -309,6 +358,60 @@ select extensions.has_index(
   'profile_identifiers',
   'profile_identifiers_active_external_user_uidx',
   'a profile has at most one active external user ID per provider'
+);
+select extensions.has_index(
+  'private',
+  'profile_identifiers',
+  'profile_identifiers_active_provider_fact_uidx',
+  'a profile has at most one active handle or email per provider'
+);
+select extensions.throws_ok(
+  $$insert into private.profile_identifiers (
+      profile_id,
+      kind,
+      issuer,
+      scheme_version,
+      normalized_value,
+      verified_at,
+      last_verified_at
+    )
+    values (
+      (select profile_id from private.auth_user_links
+       where auth_user_id = '10000000-0000-0000-0000-000000000001'),
+      'external_user_handle',
+      'github',
+      1,
+      'another-active-handle',
+      clock_timestamp(),
+      clock_timestamp()
+    )$$,
+  '23505',
+  null,
+  'a profile cannot have two active handles for one provider'
+);
+select extensions.throws_ok(
+  $$insert into private.profile_identifiers (
+      profile_id,
+      kind,
+      issuer,
+      scheme_version,
+      normalized_value,
+      verified_at,
+      last_verified_at
+    )
+    values (
+      (select profile_id from private.auth_user_links
+       where auth_user_id = '10000000-0000-0000-0000-000000000001'),
+      'email',
+      'github',
+      1,
+      'another-active-email@example.test',
+      clock_timestamp(),
+      clock_timestamp()
+    )$$,
+  '23505',
+  null,
+  'a profile cannot have two active emails for one provider'
 );
 select extensions.ok(
   not has_schema_privilege('authenticated', 'private', 'USAGE'),

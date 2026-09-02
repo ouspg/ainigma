@@ -15,7 +15,8 @@ pub async fn provision_repositories<P: ExternalPlatform>(
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
 ) -> Result<ProvisioningSummary, Box<dyn Error>> {
-    let jobs = database::claim_repository_jobs(database, course_id, profile_id).await?;
+    let jobs =
+        database::claim_repository_jobs(database, platform.kind(), course_id, profile_id).await?;
     let mut summary = ProvisioningSummary::default();
 
     for job in jobs {
@@ -42,7 +43,7 @@ async fn provision_repository<P: ExternalPlatform>(
     platform: &P,
     job: &database::RepositoryJob,
 ) -> Result<bool, Box<dyn Error>> {
-    if job.provider_kind != platform.kind() {
+    if !platform.supports(&job.provider_kind, &job.provider_issuer) {
         let error_code = "unsupported_external_provider";
         database::fail_repository_job(database, job, error_code, false).await?;
         tracing::warn!(
@@ -112,13 +113,13 @@ fn is_retryable_error(error_code: &str) -> bool {
         error_code,
         "external_user_handle_not_found"
             | "external_repository_name_not_generated"
-            | "github_repository_name_collision"
-            | "github_collaborator_http_401"
-            | "github_collaborator_http_403"
-            | "github_repository_lookup_http_401"
-            | "github_repository_lookup_http_403"
-            | "github_repository_create_http_401"
-            | "github_repository_create_http_403"
+            | "repository_name_collision"
+            | "repository_collaborator_http_401"
+            | "repository_collaborator_http_403"
+            | "repository_lookup_http_401"
+            | "repository_lookup_http_403"
+            | "repository_create_http_401"
+            | "repository_create_http_403"
     )
 }
 
@@ -128,9 +129,9 @@ mod tests {
 
     #[test]
     fn classifies_repository_failures_for_bounded_retry() {
-        assert!(is_retryable_error("github_repository_create_http_500"));
-        assert!(is_retryable_error("github_repository_create_failed"));
-        assert!(!is_retryable_error("github_repository_name_collision"));
-        assert!(!is_retryable_error("github_collaborator_http_403"));
+        assert!(is_retryable_error("repository_create_http_500"));
+        assert!(is_retryable_error("repository_create_failed"));
+        assert!(!is_retryable_error("repository_name_collision"));
+        assert!(!is_retryable_error("repository_collaborator_http_403"));
     }
 }

@@ -44,24 +44,15 @@ begin
     request_row.id,
     course.offering_key,
     profile.display_name,
-    (
-      select identifier.normalized_value
-      from private.profile_identifiers as identifier
-      where identifier.profile_id = request_row.requester_profile_id
-        and identifier.kind = 'external_user_handle'
-        and identifier.issuer = v_provider_issuer
-        and identifier.revoked_at is null
-      order by identifier.last_verified_at desc
-      limit 1
+    private.unique_active_profile_identifier(
+      request_row.requester_profile_id,
+      'external_user_handle',
+      v_provider_issuer
     ),
-    (
-      select identifier.normalized_value
-      from private.profile_identifiers as identifier
-      where identifier.profile_id = request_row.requester_profile_id
-        and identifier.kind = 'email'
-        and identifier.revoked_at is null
-      order by identifier.last_verified_at desc
-      limit 1
+    private.unique_active_profile_identifier(
+      request_row.requester_profile_id,
+      'email',
+      null
     ),
     request_row.reason,
     request_row.status,

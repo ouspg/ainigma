@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(48);
+select extensions.plan(51);
 
 select extensions.has_table('public', 'courses', 'courses table exists');
 select extensions.has_table(
@@ -90,12 +90,43 @@ select set_config(
 grant ainigma_maintenance to postgres;
 insert into private.course_definition_external_groups (
   course_definition_key,
+  provider_kind,
+  provider_issuer,
   external_group_id,
   external_group_handle
 )
 values
-  ('security-fundamentals', '88000001', 'security-test-org'),
-  ('unrelated-course', '88000002', 'unrelated-test-org');
+  ('security-fundamentals', 'forgejo', 'https://forgejo.example.test', '88000001', 'security-test-org'),
+  ('unrelated-course', 'github', 'github', '88000002', 'unrelated-test-org');
+select extensions.is(
+  (
+    select provider_kind
+    from private.course_definition_external_groups
+    where course_definition_key = 'security-fundamentals'
+  ),
+  'forgejo'::text,
+  'course definitions store an opaque external provider adapter key'
+);
+select extensions.is(
+  (
+    select provider_issuer
+    from private.course_definition_external_groups
+    where course_definition_key = 'security-fundamentals'
+  ),
+  'https://forgejo.example.test'::text,
+  'course definitions store an explicit external provider identity namespace'
+);
+select extensions.ok(
+  not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'private'
+      and table_name = 'course_definition_external_groups'
+      and column_name in ('provider_kind', 'provider_issuer')
+      and column_default is not null
+  ),
+  'external provider columns have no provider-specific defaults'
+);
 set role ainigma_maintenance;
 select set_config(
   'ainigma_test.security_release_id',

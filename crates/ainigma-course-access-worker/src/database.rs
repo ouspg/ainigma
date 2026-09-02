@@ -5,6 +5,7 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct InvitationData {
     pub provider_kind: String,
+    pub provider_issuer: String,
     pub external_group_handle: String,
     pub external_user_id: String,
     pub external_user_handle: Option<String>,
@@ -22,6 +23,7 @@ pub struct AccessToReconcile {
     pub profile_id: Uuid,
     pub offering_key: String,
     pub provider_kind: String,
+    pub provider_issuer: String,
     pub expected_external_group_id: String,
     pub expected_external_group_handle: String,
     pub external_user_id: String,
@@ -42,6 +44,7 @@ pub struct RepositoryJob {
     pub profile_id: Uuid,
     pub offering_key: String,
     pub provider_kind: String,
+    pub provider_issuer: String,
     pub external_group_handle: String,
     pub repository_name: Option<String>,
     pub external_user_handle: Option<String>,
@@ -54,7 +57,7 @@ pub async fn invitation_data(
     profile_id: Uuid,
 ) -> Result<InvitationData, Box<dyn Error>> {
     let row = sqlx::query!(
-        r#"select provider_kind, expected_external_group_handle,
+        r#"select provider_kind, provider_issuer, expected_external_group_handle,
                   external_user_id, external_user_handle, external_invitation_id,
                   external_email, invitation_target, state::text
            from private.list_external_course_access_to_reconcile()
@@ -87,6 +90,9 @@ pub async fn invitation_data(
         provider_kind: row
             .provider_kind
             .ok_or("database returned no external provider kind")?,
+        provider_issuer: row
+            .provider_issuer
+            .ok_or("database returned no external provider issuer")?,
         external_group_handle: row
             .expected_external_group_handle
             .ok_or("database returned no external provider group slug")?,
@@ -128,14 +134,17 @@ pub async fn record_invitation(
 
 pub async fn access_to_reconcile(
     database: &PgPool,
+    provider_kind: &str,
 ) -> Result<Vec<AccessToReconcile>, Box<dyn Error>> {
     let rows = sqlx::query!(
-        r#"select course_id, profile_id, offering_key, provider_kind,
+        r#"select course_id, profile_id, offering_key, provider_kind, provider_issuer,
                   expected_external_group_id, expected_external_group_handle,
                   external_user_id, external_user_handle, external_invitation_id,
                   state::text
            from private.list_external_course_access_to_reconcile()
-           where state <> 'revoked'"#
+           where state <> 'revoked'
+             and provider_kind = $1"#,
+        provider_kind
     )
     .fetch_all(database)
     .await?;
@@ -155,6 +164,9 @@ pub async fn access_to_reconcile(
                 provider_kind: row
                     .provider_kind
                     .ok_or("database returned no external provider kind")?,
+                provider_issuer: row
+                    .provider_issuer
+                    .ok_or("database returned no external provider issuer")?,
                 expected_external_group_id: row
                     .expected_external_group_id
                     .ok_or("database returned no external provider group ID")?,
@@ -172,12 +184,17 @@ pub async fn access_to_reconcile(
         .collect()
 }
 
-pub async fn access_to_invite(database: &PgPool) -> Result<Vec<AccessToInvite>, Box<dyn Error>> {
+pub async fn access_to_invite(
+    database: &PgPool,
+    provider_kind: &str,
+) -> Result<Vec<AccessToInvite>, Box<dyn Error>> {
     let rows = sqlx::query!(
         r#"select course_id, profile_id
            from private.list_external_course_access_to_reconcile()
            where state = 'not_started'
-             and external_invitation_id is null"#
+             and external_invitation_id is null
+             and provider_kind = $1"#,
+        provider_kind
     )
     .fetch_all(database)
     .await?;
@@ -275,16 +292,19 @@ pub async fn confirm_access(
 
 pub async fn claim_repository_jobs(
     database: &PgPool,
+    provider_kind: &str,
     course_id: Option<Uuid>,
     profile_id: Option<Uuid>,
 ) -> Result<Vec<RepositoryJob>, Box<dyn Error>> {
     let rows = sqlx::query!(
-        r#"select course_id, profile_id, offering_key, provider_kind, external_group_handle,
+        r#"select course_id, profile_id, offering_key, provider_kind, provider_issuer,
+                  external_group_handle,
                   repository_name, external_user_handle, lease_token
-           from private.claim_course_repository_provisioning($1, $2, $3)"#,
+           from private.claim_course_repository_provisioning($1, $2, $3, $4)"#,
         25_i32,
         course_id,
-        profile_id
+        profile_id,
+        provider_kind
     )
     .fetch_all(database)
     .await?;
@@ -304,6 +324,9 @@ pub async fn claim_repository_jobs(
                 provider_kind: row
                     .provider_kind
                     .ok_or("database returned no repository provider kind")?,
+                provider_issuer: row
+                    .provider_issuer
+                    .ok_or("database returned no repository provider issuer")?,
                 external_group_handle: row
                     .external_group_handle
                     .ok_or("database returned no repository external provider group slug")?,
@@ -315,6 +338,30 @@ pub async fn claim_repository_jobs(
             })
         })
         .collect()
+}
+
+pub async fn external_provider_for_access(
+    database: &PgPool,
+    course_id: Uuid,
+    profile_id: Uuid,
+) -> Result<(String, String), Box<dyn Error>> {
+    let row = sqlx::query!(
+        r#"select provider_kind, provider_issuer
+           from private.list_external_course_access_to_reconcile()
+           where course_id = $1 and profile_id = $2"#,
+        course_id,
+        profile_id
+    )
+    .fetch_optional(database)
+    .await?
+    .ok_or("approved external access record not found")?;
+
+    Ok((
+        row.provider_kind
+            .ok_or("database returned no external provider kind")?,
+        row.provider_issuer
+            .ok_or("database returned no external provider issuer")?,
+    ))
 }
 
 pub async fn complete_repository_job(

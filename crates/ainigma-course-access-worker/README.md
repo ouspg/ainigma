@@ -136,7 +136,7 @@ from private.auth_user_links as link
 where link.auth_user_id = '50000000-0000-0000-0000-000000000004'
   and identifier.profile_id = link.profile_id
   and identifier.kind = 'external_user_id'
-  and identifier.issuer = 'github.com'
+  and identifier.issuer = 'github'
   and identifier.revoked_at is null;
 update auth.identities
 set provider_id = :'github_user_id',

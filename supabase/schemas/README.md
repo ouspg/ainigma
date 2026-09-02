@@ -51,12 +51,12 @@ queries and metadata still agree.
 
 External provider group identity is configured for the course definition, while an access request and
 external access record belong to one concrete offering and profile. The stable group ID is
-authoritative; the slug is retained for display and diagnostics. Confirmed GitHub access activates
+authoritative; the slug is retained for display and diagnostics. Confirmed external-provider access activates
 the offering membership but does not create a repository. An authenticated learner may separately
 call `request_my_course_repository(offering_key)`; only then does
 `course_repository_provisioning` store one durable repository job for that offering/profile.
 Trusted workers claim jobs with leases, create or reuse the marked private repository, grant the
-user `maintain` permission, and complete or retry the job through private RPCs. The GitHub user ID is
+user `maintain` permission, and complete or retry the job through private RPCs. The provider user ID is
 the authoritative identity; the current username is retained only as a provider API handle and
 repository-name input. The access row also stores the exact provider invitation ID, and
 acceptance requires that ID plus the user ID to appear in the provider audit trail. Browser clients
@@ -68,7 +68,7 @@ approval or allowlist auto-approval creates the local membership without an exte
 membership snapshot. The configured provider group remains available as the repository target; a
 repository job still requires a verified identity for that provider.
 
-Only published offerings are returned to the GitHub reconciliation worker. Transient provider
+Only published offerings are returned to the external-provider reconciliation worker. Transient provider
 failures preserve confirmed access, and three consecutive complete snapshots must omit a member
 before the database revokes offering membership. Repository names become immutable when first
 claimed, retries use bounded exponential backoff, and permanent or exhausted failures become

@@ -2,8 +2,8 @@
 -- One group may intentionally serve several course definitions.
 create table private.course_definition_external_groups (
   course_definition_key text primary key,
-  provider_kind text not null default 'github',
-  provider_issuer text not null default 'github.com',
+  provider_kind text not null,
+  provider_issuer text not null,
   external_group_id text not null,
   external_group_handle text not null,
   email_domain_enforced boolean not null default true,
@@ -48,9 +48,9 @@ create table private.course_definition_external_email_domains (
 comment on table private.course_definition_external_groups is
   'The trusted external provider group configured for each reusable course definition.';
 comment on column private.course_definition_external_groups.provider_kind is
-  'Provider adapter key, currently github; it selects the external integration used for invitations and repositories.';
+  'Opaque provider adapter key used to route external membership and repository operations.';
 comment on column private.course_definition_external_groups.provider_issuer is
-  'Identifier issuer used to select verified profile facts for this provider instance.';
+  'Trusted identity namespace used to select verified profile facts for this provider target.';
 comment on column private.course_definition_external_groups.external_group_id is
   'Stable provider group ID used for external membership verification when configured; the handle is only a display snapshot.';
 comment on column private.course_definition_external_groups.external_group_handle is

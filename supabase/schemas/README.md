@@ -55,9 +55,11 @@ authoritative; the slug is retained for display and diagnostics. Confirmed exter
 the offering membership but does not create a repository. An authenticated learner may separately
 call `request_my_course_repository(offering_key)`; only then does
 `course_repository_provisioning` store one durable repository job for that offering/profile.
-Trusted workers claim jobs with leases, create or reuse the marked private repository, grant the
-user `maintain` permission, and complete or retry the job through private RPCs. The provider user ID is
-the authoritative identity; the current username is retained only as a provider API handle and
+Trusted workers claim jobs with leases, create a private repository from the configured public
+repository template (or reuse the marked repository), grant the user `maintain` permission, and
+complete or retry the job through private RPCs. The template owner and name are snapshotted on the
+job, so the source may differ from the access group and queued jobs remain deterministic. The
+provider user ID is the authoritative identity; the current username is retained only as a provider API handle and
 repository-name input. The access row also stores the exact provider invitation ID, and
 acceptance requires that ID plus the user ID to appear in the provider audit trail. Browser clients
 cannot read or write these tables directly.

@@ -394,19 +394,25 @@ declare
   v_course_definition_key text;
   v_external_group_id text;
   v_external_group_handle text;
+  v_repository_template_owner text;
+  v_repository_template_name text;
 begin
   select
     course.id,
     course.course_definition_key,
     request_row.id,
     organization.external_group_id,
-    organization.external_group_handle
+    organization.external_group_handle,
+    organization.repository_template_owner,
+    organization.repository_template_name
   into
     v_course_id,
     v_course_definition_key,
     v_access_request_id,
     v_external_group_id,
-    v_external_group_handle
+    v_external_group_handle,
+    v_repository_template_owner,
+    v_repository_template_name
   from public.courses as course
   join public.course_memberships as membership
     on membership.course_id = course.id
@@ -446,14 +452,18 @@ begin
     course_definition_key,
     access_request_id,
     external_group_id,
-    external_group_handle
+    external_group_handle,
+    repository_template_owner,
+    repository_template_name
   ) values (
     v_course_id,
     v_profile_id,
     v_course_definition_key,
     v_access_request_id,
     v_external_group_id,
-    v_external_group_handle
+    v_external_group_handle,
+    v_repository_template_owner,
+    v_repository_template_name
   )
   on conflict (course_id, profile_id) do nothing;
 

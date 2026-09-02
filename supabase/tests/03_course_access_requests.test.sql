@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(60);
+select extensions.plan(61);
 
 select extensions.has_table('private', 'course_access_requests', 'access request table exists');
 select extensions.has_table('private', 'course_roster_allowlist', 'roster allowlist table exists');
@@ -87,11 +87,13 @@ insert into private.course_definition_external_groups (
   provider_kind,
   provider_issuer,
   external_group_id,
-  external_group_handle
+  external_group_handle,
+  repository_template_owner,
+  repository_template_name
 )
 values
-  ('access-gate-course', 'github', 'github', '88000001', 'access-gate-course-test-org'),
-  ('access-gate-auto-course', 'github', 'github', '88000002', 'access-gate-auto-course-test-org');
+  ('access-gate-course', 'github', 'github', '88000001', 'access-gate-course-test-org', 'shared-template-org', 'course-template'),
+  ('access-gate-auto-course', 'github', 'github', '88000002', 'access-gate-auto-course-test-org', 'shared-template-org', 'course-template');
 insert into private.course_definition_external_email_domains (
   course_definition_key,
   domain_suffix
@@ -530,6 +532,14 @@ select extensions.is(
      and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
   'access-gate-course-test-org'::text,
   'repository job stores the configured GitHub organization'
+);
+select extensions.is(
+  (select repository_template_owner || '/' || repository_template_name
+   from private.course_repository_provisioning
+   where course_id = current_setting('ainigma_access_test.course_id')::uuid
+     and profile_id = current_setting('ainigma_access_test.requester_profile_id')::uuid),
+  'shared-template-org/course-template'::text,
+  'repository job snapshots a template source that may differ from the target organization'
 );
 set role ainigma_maintenance;
 select set_config(

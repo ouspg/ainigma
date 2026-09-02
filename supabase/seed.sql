@@ -214,11 +214,13 @@ insert into private.course_definition_external_groups (
   provider_kind,
   provider_issuer,
   external_group_id,
-  external_group_handle
+  external_group_handle,
+  repository_template_owner,
+  repository_template_name
 )
 values
-  ('test-course-a', 'github', 'github', '88000001', 'ainigma-dev-course-org'),
-  ('test-course-b', 'github', 'github', '88000001', 'ainigma-dev-course-org');
+  ('test-course-a', 'github', 'github', '88000001', 'ainigma-dev-course-org', 'ainigma-course-templates', 'course-submission-template'),
+  ('test-course-b', 'github', 'github', '88000001', 'ainigma-dev-course-org', 'ainigma-course-templates', 'course-submission-template');
 
 insert into private.course_definition_releases (
   id,

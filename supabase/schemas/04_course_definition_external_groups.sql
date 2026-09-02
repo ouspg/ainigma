@@ -6,6 +6,8 @@ create table private.course_definition_external_groups (
   provider_issuer text not null,
   external_group_id text not null,
   external_group_handle text not null,
+  repository_template_owner text not null,
+  repository_template_name text not null,
   email_domain_enforced boolean not null default true,
   created_at timestamptz not null default clock_timestamp(),
   constraint course_definition_external_groups_definition_key_check check (
@@ -27,6 +29,16 @@ create table private.course_definition_external_groups (
   constraint course_definition_external_groups_org_slug_check check (
     external_group_handle = btrim(external_group_handle)
     and char_length(external_group_handle) between 1 and 255
+  ),
+  constraint course_definition_external_groups_repository_template_owner_check check (
+    repository_template_owner = btrim(repository_template_owner)
+    and char_length(repository_template_owner) between 1 and 255
+    and repository_template_owner !~ '[[:space:]]'
+  ),
+  constraint course_definition_external_groups_repository_template_name_check check (
+    repository_template_name = btrim(repository_template_name)
+    and char_length(repository_template_name) between 1 and 100
+    and repository_template_name !~ '[[:space:]]'
   ),
   constraint course_definition_external_groups_repository_target_unique unique (
     course_definition_key, external_group_id, external_group_handle
@@ -55,6 +67,10 @@ comment on column private.course_definition_external_groups.external_group_id is
   'Stable provider group ID used for external membership verification when configured; the handle is only a display snapshot.';
 comment on column private.course_definition_external_groups.external_group_handle is
   'Current provider group handle for diagnostics and display; external_group_id is authoritative.';
+comment on column private.course_definition_external_groups.repository_template_owner is
+  'Provider owner of the public repository template; it may differ from the access group.';
+comment on column private.course_definition_external_groups.repository_template_name is
+  'Provider repository name of the public template used for student repositories.';
 comment on column private.course_definition_external_groups.email_domain_enforced is
   'Whether email invitation targets must match the configured domain suffixes.';
 comment on table private.course_definition_external_email_domains is

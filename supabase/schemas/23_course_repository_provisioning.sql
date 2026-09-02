@@ -9,6 +9,8 @@ create table private.course_repository_provisioning (
   access_request_id uuid not null,
   external_group_id text not null,
   external_group_handle text not null,
+  repository_template_owner text not null,
+  repository_template_name text not null,
   repository_name text,
   external_repository_id text,
   external_repository_url text,
@@ -46,6 +48,16 @@ create table private.course_repository_provisioning (
   constraint course_repository_provisioning_group_handle_check check (
     external_group_handle = btrim(external_group_handle)
     and char_length(external_group_handle) between 1 and 255
+  ),
+  constraint course_repository_provisioning_repository_template_owner_check check (
+    repository_template_owner = btrim(repository_template_owner)
+    and char_length(repository_template_owner) between 1 and 255
+    and repository_template_owner !~ '[[:space:]]'
+  ),
+  constraint course_repository_provisioning_repository_template_name_check check (
+    repository_template_name = btrim(repository_template_name)
+    and char_length(repository_template_name) between 1 and 100
+    and repository_template_name !~ '[[:space:]]'
   ),
   constraint course_repository_provisioning_name_check check (
     repository_name is null
@@ -96,6 +108,10 @@ comment on column private.course_repository_provisioning.repository_name is
   'Deterministic offering-specific repository name, normally submissions-<offering_key>-<user_handle>.';
 comment on column private.course_repository_provisioning.external_repository_id is
   'Stable provider repository ID; used instead of the mutable repository name for reconciliation.';
+comment on column private.course_repository_provisioning.repository_template_owner is
+  'Snapshot of the public repository template owner used for this job; it may differ from the target group.';
+comment on column private.course_repository_provisioning.repository_template_name is
+  'Snapshot of the public repository template name used for this job.';
 
 create unique index course_repository_provisioning_repository_id_uidx
   on private.course_repository_provisioning (external_repository_id)
@@ -126,6 +142,8 @@ returns table (
   provider_issuer text,
   external_group_id text,
   external_group_handle text,
+  repository_template_owner text,
+  repository_template_name text,
   repository_name text,
   external_repository_id text,
   external_repository_url text,
@@ -154,6 +172,8 @@ begin
       organization.provider_issuer,
       repository.external_group_id,
       repository.external_group_handle,
+      repository.repository_template_owner,
+      repository.repository_template_name,
       repository.external_repository_id,
       repository.external_repository_url,
       resolved_identity.external_user_id,
@@ -262,6 +282,8 @@ begin
     organization.provider_issuer,
     claimed.external_group_id,
     claimed.external_group_handle,
+    claimed.repository_template_owner,
+    claimed.repository_template_name,
     claimed.repository_name,
     claimed.external_repository_id,
     claimed.external_repository_url,

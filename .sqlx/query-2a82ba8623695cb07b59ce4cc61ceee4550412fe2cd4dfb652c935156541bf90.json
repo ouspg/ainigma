@@ -1,60 +1,65 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select course_id, profile_id, offering_key, provider_kind, external_group_handle,\n                  repository_name, external_user_handle, lease_token\n           from private.claim_course_repository_provisioning($1, $2, $3)",
+  "query": "select provider_kind, provider_issuer, expected_external_group_handle,\n                  external_user_id, external_user_handle, external_invitation_id,\n                  external_email, invitation_target, state::text\n           from private.list_external_course_access_to_reconcile()\n           where course_id = $1 and profile_id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "course_id",
-        "type_info": "Uuid",
-        "origin": "Expression"
-      },
-      {
-        "ordinal": 1,
-        "name": "profile_id",
-        "type_info": "Uuid",
-        "origin": "Expression"
-      },
-      {
-        "ordinal": 2,
-        "name": "offering_key",
-        "type_info": "Text",
-        "origin": "Expression"
-      },
-      {
-        "ordinal": 3,
         "name": "provider_kind",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
+        "ordinal": 1,
+        "name": "provider_issuer",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "expected_external_group_handle",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "external_user_id",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
         "ordinal": 4,
-        "name": "external_group_handle",
-        "type_info": "Text",
-        "origin": "Expression"
-      },
-      {
-        "ordinal": 5,
-        "name": "repository_name",
-        "type_info": "Text",
-        "origin": "Expression"
-      },
-      {
-        "ordinal": 6,
         "name": "external_user_handle",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
+        "ordinal": 5,
+        "name": "external_invitation_id",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "external_email",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
         "ordinal": 7,
-        "name": "lease_token",
-        "type_info": "Uuid",
+        "name": "invitation_target",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "state",
+        "type_info": "Text",
         "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
-        "Int4",
         "Uuid",
         "Uuid"
       ]
@@ -67,8 +72,9 @@
       null,
       null,
       null,
+      null,
       null
     ]
   },
-  "hash": "4db83e934c6d2141c3e27f954a28c9adc80807509c3500b505bfd2a466e3f31e"
+  "hash": "2a82ba8623695cb07b59ce4cc61ceee4550412fe2cd4dfb652c935156541bf90"
 }

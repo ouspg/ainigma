@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "select course_id, profile_id, offering_key, provider_kind,\n                  expected_external_group_id, expected_external_group_handle,\n                  external_user_id, external_user_handle, external_invitation_id,\n                  state::text\n           from private.list_external_course_access_to_reconcile()\n           where state <> 'revoked'",
+  "query": "select course_id, profile_id, offering_key, provider_kind, provider_issuer,\n                  external_group_handle,\n                  repository_template_owner, repository_template_name,\n                  repository_name, external_user_handle, lease_token\n           from private.claim_course_repository_provisioning($1, $2, $3, $4)",
   "describe": {
     "columns": [
       {
@@ -29,45 +29,57 @@
       },
       {
         "ordinal": 4,
-        "name": "expected_external_group_id",
+        "name": "provider_issuer",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
         "ordinal": 5,
-        "name": "expected_external_group_handle",
+        "name": "external_group_handle",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
         "ordinal": 6,
-        "name": "external_user_id",
+        "name": "repository_template_owner",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
         "ordinal": 7,
-        "name": "external_user_handle",
+        "name": "repository_template_name",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
         "ordinal": 8,
-        "name": "external_invitation_id",
+        "name": "repository_name",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
         "ordinal": 9,
-        "name": "state",
+        "name": "external_user_handle",
         "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 10,
+        "name": "lease_token",
+        "type_info": "Uuid",
         "origin": "Expression"
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Int4",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
     },
     "nullable": [
+      null,
       null,
       null,
       null,
@@ -80,5 +92,5 @@
       null
     ]
   },
-  "hash": "66ccb706c210c6796160af43e1c49768c2357613aefc3d454080f65258d18122"
+  "hash": "f028732269b30d2065c35c8c72c4ffef4ef20337bda947b48cfee18968a3fbf7"
 }

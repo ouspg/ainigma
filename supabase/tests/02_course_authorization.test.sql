@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select extensions.plan(51);
+select extensions.plan(52);
 
 select extensions.has_table('public', 'courses', 'courses table exists');
 select extensions.has_table(
@@ -93,11 +93,13 @@ insert into private.course_definition_external_groups (
   provider_kind,
   provider_issuer,
   external_group_id,
-  external_group_handle
+  external_group_handle,
+  repository_template_owner,
+  repository_template_name
 )
 values
-  ('security-fundamentals', 'forgejo', 'https://forgejo.example.test', '88000001', 'security-test-org'),
-  ('unrelated-course', 'github', 'github', '88000002', 'unrelated-test-org');
+  ('security-fundamentals', 'forgejo', 'https://forgejo.example.test', '88000001', 'security-test-org', 'shared-template-org', 'course-template'),
+  ('unrelated-course', 'github', 'github', '88000002', 'unrelated-test-org', 'shared-template-org', 'course-template');
 select extensions.is(
   (
     select provider_kind
@@ -115,6 +117,15 @@ select extensions.is(
   ),
   'https://forgejo.example.test'::text,
   'course definitions store an explicit external provider identity namespace'
+);
+select extensions.is(
+  (
+    select repository_template_owner
+    from private.course_definition_external_groups
+    where course_definition_key = 'security-fundamentals'
+  ),
+  'shared-template-org'::text,
+  'course definitions store a repository template owner separately from the access group'
 );
 select extensions.ok(
   not exists (

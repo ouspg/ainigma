@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select provider_kind, provider_issuer\n           from private.list_external_course_access_to_reconcile()\n           where course_id = $1 and profile_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_kind",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_issuer",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "d10b73bc5ea5fef8d4ce6ce04a85099b353d9a303eaddb35967be8412e6926b5"
+}
